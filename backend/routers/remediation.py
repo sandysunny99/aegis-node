@@ -341,4 +341,5 @@ def download_sanitized_dataset(
         path=str(san_path),
         filename=download_name,
         media_type=mime,
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate, private"},
     )
