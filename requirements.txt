@@ -5,6 +5,7 @@
 fastapi>=0.115.0
 uvicorn[standard]>=0.30.0
 python-multipart>=0.0.12
+aiofiles>=23.2.0             # Required by FastAPI StaticFiles (serves React build)
 slowapi>=0.1.9             # Rate limiting (per-IP, in-memory)
 
 # ─── Data Processing ──────────────────────────────────────────────────────────

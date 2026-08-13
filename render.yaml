@@ -1,0 +1,59 @@
+# Aegis Node — Render.com Blueprint
+# Deploys the full stack as a single Docker web service.
+# One container serves both the FastAPI backend AND the built React frontend.
+#
+# How to deploy:
+#   1. Push this repo to GitHub (already done: github.com/sandysunny99/aegis-node)
+#   2. Go to https://dashboard.render.com/select-repo
+#   3. Connect the aegis-node repository
+#   4. Render detects this render.yaml automatically
+#   5. Set GEMINI_API_KEY (or GROQ_API_KEY) in the environment variables section
+#   6. Click "Apply" — deployment takes ~5 minutes
+
+services:
+  - type: web
+    name: aegis-node
+    runtime: docker
+    # Use the root Dockerfile (multi-stage: Node builds React, Python serves everything)
+    dockerfilePath: ./Dockerfile
+    # Build context is project root
+    dockerContext: .
+    plan: free          # Free tier: 512MB RAM, shared CPU, sleeps after 15min inactivity
+    healthCheckPath: /health
+
+    envVars:
+      # ── AI Provider ───────────────────────────────────────────────────────────
+      # Set to: gemini | groq | ollama | none
+      # If none/key missing, app still works — AI panel is hidden in the UI.
+      - key: AI_PROVIDER
+        value: gemini
+
+      # Add your real key in the Render dashboard (Environment tab)
+      - key: GEMINI_API_KEY
+        sync: false       # sync: false = secret, set manually in dashboard
+
+      - key: GROQ_API_KEY
+        sync: false
+
+      # ── ClamAV ────────────────────────────────────────────────────────────────
+      # No ClamAV sidecar on free Render tier (too much RAM).
+      # The app handles this gracefully — rule-based detection still runs fully.
+      - key: CLAMAV_HOST
+        value: ""         # Empty = ClamAV disabled, rule engine still active
+
+      - key: CLAMAV_PORT
+        value: "3310"
+
+      # ── App Config ────────────────────────────────────────────────────────────
+      - key: APP_ENV
+        value: production
+
+      - key: MAX_UPLOAD_SIZE_MB
+        value: "100"      # Lower limit for free tier (512MB RAM)
+
+      - key: DATABASE_URL
+        value: sqlite:///./aegis_node.db
+
+      # ── Render injects PORT automatically — uvicorn uses it ───────────────────
+      - key: PORT
+        value: "8000"

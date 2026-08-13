@@ -1,0 +1,51 @@
+# Aegis Node — Docker Build Ignore
+# Excludes files from the Docker build context to keep image builds fast.
+
+# Python caches
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Secrets — NEVER include in image
+.env
+.env.*
+
+# Frontend dev artifacts (dist is built inside Docker, node_modules are reinstalled)
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.idea/
+.vscode/
+
+# Runtime data — mounted as volumes in docker-compose, not baked into image
+data/samples/
+data/quarantine/
+data/sanitized/
+data/reports/
+*.db
+*.sqlite
+
+# Docs (not needed inside container)
+docs/
+evaluation/
+
+# Test files (not needed in production image)
+tests/
+
+# Logs
+*.log
+logs/

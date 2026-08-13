@@ -3,13 +3,16 @@ Aegis Node — Backend Entry Point
 FastAPI application with dataset scanning API, rate limiting, and rich health check.
 """
 
+import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from config import settings
 from database import create_all_tables
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from routers.analysis import router as analysis_router
 from routers.datasets import router as datasets_router
 from routers.history import router as history_router
@@ -55,14 +58,12 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
 # ─── CORS ─────────────────────────────────────────────────────────────────────
+# Allow all origins in production (Render/Railway assign dynamic subdomains).
+# Restrict to specific domains if you need tighter security.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",   # Vite dev
-        "http://localhost:80",     # Nginx / Docker
-        "http://localhost",
-    ],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,   # Must be False when allow_origins=["*"]
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -111,8 +112,32 @@ async def health(request: Request) -> dict:
     }
 
 
-# ─── Root ─────────────────────────────────────────────────────────────────────
+# ─── Frontend Static Files (React SPA) ───────────────────────────────────────
+# Serve the Vite-built React app from the /static directory.
+# In development (no /static dir), this block is skipped gracefully.
+_STATIC_DIR = Path(__file__).parent / "static"
+if _STATIC_DIR.exists():
+    # Mount assets under /assets (Vite output structure)
+    app.mount("/assets", StaticFiles(directory=str(_STATIC_DIR / "assets")), name="assets")
 
-@app.get("/", tags=["system"])
-async def root() -> dict:
-    return {"message": "Aegis Node API — see /docs for usage"}
+    @app.get("/", include_in_schema=False)
+    async def serve_root():
+        """Serve React index.html at root."""
+        return FileResponse(str(_STATIC_DIR / "index.html"))
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_spa(full_path: str):
+        """
+        SPA catch-all: serve index.html for any path not matched by API routers.
+        This enables React client-side navigation (tab switching, etc.).
+        """
+        # Don't intercept API or system routes
+        if full_path.startswith(("api/", "health", "docs", "openapi", "redoc")):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404)
+        return FileResponse(str(_STATIC_DIR / "index.html"))
+else:
+    # Development mode — just return API info at root
+    @app.get("/", tags=["system"])
+    async def root() -> dict:
+        return {"message": "Aegis Node API — see /docs for usage. Frontend not bundled in dev mode."}
