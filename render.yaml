@@ -39,10 +39,13 @@ services:
       # No ClamAV sidecar on free Render tier (too much RAM).
       # The app handles this gracefully — rule-based detection still runs fully.
       - key: CLAMAV_HOST
-        value: ""         # Empty = ClamAV disabled, rule engine still active
+        value: "localhost"
 
       - key: CLAMAV_PORT
         value: "3310"
+
+      - key: CLAMAV_MOCK_MODE
+        value: "true"
 
       # ── App Config ────────────────────────────────────────────────────────────
       - key: APP_ENV
