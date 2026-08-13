@@ -94,6 +94,14 @@ def _clamd_instream(path: str, host: str, port: int) -> ClamAVResult:
 
 def ping(host: str = _DEFAULT_HOST, port: int = _DEFAULT_PORT) -> bool:
     """Returns True if clamd is reachable and responds to PING."""
+    if host.lower() == "mock":
+        return True
+    try:
+        from backend.config import settings
+        if getattr(settings, "clamav_mock_mode", False):
+            return True
+    except Exception:
+        pass
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.settimeout(_CONNECT_TIMEOUT)
@@ -110,4 +118,12 @@ def scan_file(path: str, host: str = _DEFAULT_HOST, port: int = _DEFAULT_PORT) -
     Primary entry point — stream file to clamd and return the scan result.
     If clamd is unreachable, returns ClamAVResult(available=False, infected=False).
     """
+    if host.lower() == "mock":
+        return ClamAVResult(available=True, infected=False, virus_name=None, raw_response="stream: OK (Dev Mock Engine)", error=None)
+    try:
+        from backend.config import settings
+        if getattr(settings, "clamav_mock_mode", False):
+            return ClamAVResult(available=True, infected=False, virus_name=None, raw_response="stream: OK (Dev Mock Engine)", error=None)
+    except Exception:
+        pass
     return _clamd_instream(path, host, port)

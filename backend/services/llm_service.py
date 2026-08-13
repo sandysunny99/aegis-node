@@ -525,11 +525,11 @@ def _call_gemini(
         )
     except Exception as exc:  # noqa: BLE001
         exc_str = str(exc).lower()
-        if "429" in exc_str or "quota" in exc_str or "rate" in exc_str:
+        if "429" in exc_str or "quota" in exc_str or "resource_exhausted" in exc_str:
             logger.warning("Gemini rate limit hit: %s", exc)
-            return _unavailable_result(model_name, "Gemini API rate limit exceeded — AI temporarily unavailable. Try again in a moment.")
+            return _unavailable_result(model_name, "Gemini API quota/rate limit reached — AI temporarily unavailable. Try again in a moment.")
         logger.error("Gemini call failed: %s", exc)
-        return _failed_result(model_name, "Gemini API error")
+        return _failed_result(model_name, f"Gemini API error: {exc}")
 
 
 def _call_groq(

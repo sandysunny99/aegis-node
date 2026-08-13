@@ -74,6 +74,7 @@ class Settings(BaseSettings):
     # ─── Scanner ─────────────────────────────────────────────────────────────
     clamav_host: str = "localhost"
     clamav_port: int = 3310
+    clamav_mock_mode: bool = False
     max_upload_size_mb: int = 500
 
     # ─── Database ────────────────────────────────────────────────────────────
