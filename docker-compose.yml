@@ -39,6 +39,13 @@ services:
       - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.0-flash}
       - GROQ_API_KEY=${GROQ_API_KEY:-}
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      # AI Fallback
+      - AI_FALLBACK_CHAIN=${AI_FALLBACK_CHAIN:-}
+      - FALLBACK_GEMINI_API_KEY=${FALLBACK_GEMINI_API_KEY:-}
+      - FALLBACK_GROQ_API_KEY=${FALLBACK_GROQ_API_KEY:-}
+      # Auth & Token
+      - API_KEY=${API_KEY:-}
+      - DOWNLOAD_TOKEN_EXPIRY_MINUTES=${DOWNLOAD_TOKEN_EXPIRY_MINUTES:-60}
       # App
       - APP_ENV=production
       - MAX_UPLOAD_SIZE_MB=500
