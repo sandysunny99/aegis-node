@@ -76,6 +76,4 @@ services:
       - key: FALLBACK_GROQ_API_KEY
         sync: false
 
-      # ── Render injects PORT automatically — uvicorn uses it ───────────────────
-      - key: PORT
-        value: "8000"
+
