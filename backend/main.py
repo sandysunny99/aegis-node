@@ -74,20 +74,12 @@ async def health(request: Request) -> dict:
         clamav_running = False
 
     # AI availability check
-    try:
-        from services.llm_service import _build_provider_chain, _get_provider_key
-        chain = _build_provider_chain()
-        ai_configured = any(
-            (bool(_get_provider_key(p, is_fb)) or p == "ollama")
-            for p, is_fb in chain if p != "none"
-        )
-    except Exception:
-        ai_provider = settings.ai_provider
-        ai_configured = (
-            (ai_provider == "gemini" and bool(settings.gemini_api_key))
-            or (ai_provider == "groq" and bool(settings.groq_api_key))
-            or (ai_provider == "ollama")
-        )
+    ai_provider = settings.ai_provider.strip().lower()
+    ai_configured = (
+        (ai_provider == "gemini" and bool(settings.gemini_api_key.strip()))
+        or (ai_provider == "groq" and bool(settings.groq_api_key.strip()))
+        or (ai_provider == "ollama")
+    )
 
     return {
         "status": "ok",
