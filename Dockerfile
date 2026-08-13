@@ -43,4 +43,4 @@ RUN mkdir -p /app/data/samples /app/data/quarantine /app/data/sanitized /app/dat
 EXPOSE 8000
 
 # Single worker on free tier (limited RAM); increase for paid plans
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]
