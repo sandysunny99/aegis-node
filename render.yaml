@@ -51,6 +51,11 @@ services:
       - key: APP_ENV
         value: production
 
+      # SECRET_KEY is required in production — must be a long random string.
+      # Generated with: python -c "import secrets; print(secrets.token_hex(32))"
+      - key: SECRET_KEY
+        generateValue: true   # Render auto-generates a secure random value
+
       - key: MAX_UPLOAD_SIZE_MB
         value: "100"      # Lower limit for free tier (512MB RAM)
 
