@@ -1,224 +1,222 @@
-# 🛡️ Aegis Node — Dataset Threat Detection & Remediation
+# 🛡️ Aegis Node — Dataset Threat Detection & Remediation Platform
 
-An M.Tech mini-project web application that scans datasets for malware and injection threats, explains them using AI, and automatically cleans the dataset.
+An enterprise-grade, security-hardened dataset threat detection and automated remediation platform. Aegis Node scans datasets (CSV, JSON, JSONL, Parquet, XLSX, TXT) for malware, formula injections, script injections, and SQL anomalies, explains findings using AI, and neutralizes threats in-place while maintaining schema integrity.
 
----
-
-## 📌 Features
-
-| Feature | Description |
-|---------|-------------|
-| 🔍 **Multi-stage Scanning** | ClamAV antivirus + deobfuscation preprocessing + regex rule engine |
-| ⚡ **Injection Detection** | Formula injection (=, @, DDE, HYPERLINK), SQL injection, Script/XSS injection, Null bytes |
-| 🧹 **Deobfuscation** | URL decoding, HTML entity unescaping, SQL comment removal before matching |
-| 🤖 **AI Threat Analysis** | Gemini / Groq (Llama 3.1) / Local Ollama — advisory explanation only |
-| 🛠️ **Risk-Based Remediation** | In-place neutralization preserving dataset schema |
-| ✅ **Verification Re-scan** | Automated re-scan of sanitized file with threat reduction % |
-| 📊 **Format Support** | CSV, JSON, JSONL, Parquet, XLSX, TXT |
-| 📋 **Scan History** | SQLite-backed history of all scans with download links |
-| 🐳 **Docker Ready** | One-command startup with `docker compose up` |
+[![Build Status](https://img.shields.io/badge/tests-133%20passed-success)](https://github.com/sandysunny99/aegis-node)
+[![Python](https://img.shields.io/badge/python-3.12-blue)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.109+-009688)](https://fastapi.tiangolo.com/)
+[![React](https://img.shields.io/badge/React-18-61dafb)](https://react.dev/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ed)](https://www.docker.com/)
+[![License](https://img.shields.io/badge/license-MIT-green)](#license)
 
 ---
 
-## 🏗️ Architecture
+## 📌 Key Capabilities & Security Hardening
 
+| Category | Features & Technical Highlights |
+|----------|---------------------------------|
+| 🔍 **Multi-Stage Detection Engine** | ClamAV INSTREAM antivirus scanning + Deobfuscation pre-processor + 9-rule Regex Engine + Local Dev Mock Mode. |
+| ⚡ **Threat Neutralization** | Neutralizes Formula Injections (`=`, `@`, `+`, `-`, `DDE`, `HYPERLINK`), Script/XSS Tags, SQL Injection patterns, and Null bytes. |
+| 🧹 **Deobfuscation Pipeline** | Recursive URL decoding, HTML entity unescaping, SQL comment stripping, and whitespace normalization prior to pattern matching. |
+| 🤖 **Multi-Provider AI Analysis** | Real-time threat explanation via Google Gemini (`gemini-flash-latest`), Groq Cloud (Llama 3.1), or offline local Ollama with fallback chains. |
+| 🛡️ **Hardened Security Architecture** | Evaluated against 38 security & architectural audit findings. Includes magic-byte header validation, chunked upload streaming, single-use download tokens, and strict `Cache-Control` response guards. |
+| ⚡ **Database & Performance** | SQLite WAL mode (`PRAGMA journal_mode=WAL`) for high-concurrency connection handling without database lock failures. |
+| 📊 **Format Support** | Full native support for `.csv`, `.json`, `.jsonl`, `.parquet`, `.xlsx`, and `.txt` format datasets. |
+| 📋 **Audit & Scan History** | Persistent SQLite-backed history tracking all scans, risk scores, threat breakdowns, and single-use download tokens. |
+| 🚀 **Cloud & Docker Ready** | Blueprint configured for 1-click [Render.com](https://render.com) deployment or multi-container `docker compose` orchestration. |
+
+---
+
+## 🏗️ System Architecture
+
+```text
+               ┌──────────────────────────────────────────────┐
+               │    React 18 + Vite Frontend (UI Dashboard)   │
+               └──────────────────────┬───────────────────────┘
+                                      │ REST API (XHR + Progress)
+                                      ▼
+               ┌──────────────────────────────────────────────┐
+               │         FastAPI Backend (Python 3.12)        │
+               │   • SlowAPI IP Rate Limiter                  │
+               │   • Magic-Byte File Type Validator           │
+               │   • Single-Use Token Remediation Controller  │
+               └──────┬───────────────────────┬───────────────┘
+                      │                       │
+         ┌────────────┴──────────┐   ┌────────┴─────────────────────┐
+         ▼                       ▼   ▼                             ▼
+ ┌───────────────┐       ┌───────────────┐                 ┌───────────────┐
+ │ ClamAV Daemon │       │ Scanner Engine│                 │ AI Provider   │
+ │ (INSTREAM /   │       │ • Deobfuscator│                 │ Router        │
+ │  Mock Mode)   │       │ • 9 Rules     │                 │ • Gemini      │
+ └───────────────┘       └───────┬───────┘                 │ • Groq        │
+                                 │                         │ • Ollama      │
+                                 ▼                         └───────────────┘
+                         ┌───────────────┐
+                         │   Sanitizer   │
+                         │ neutralizes   │
+                         │ cell payload  │
+                         └───────────────┘
 ```
-Browser (React 18 + Vite)
-        │
-        ▼ REST API
-FastAPI Backend (Python 3.12)
-        │
-        ├── Scanner Engine
-        │   ├── ClamAV TCP Client (INSTREAM)
-        │   ├── Deobfuscator (URL/HTML decode, SQL comment strip)
-        │   └── Regex Rule Engine (9 rules)
-        │
-        ├── Sanitizer Engine (in-place neutralization)
-        ├── Evidence Builder (no raw data sent to AI)
-        └── AI Provider Router (Gemini / Groq / Ollama)
-```
 
 ---
 
-## ⚡ Quick Start
+## ⚡ Quick Start & Local Setup
 
-### Option A: Local Development (No Docker)
+### Option A: Local Native Execution (Fastest)
 
-**Prerequisites:** Python 3.12, Node.js 20
+**Prerequisites:** Python 3.12+, Node.js 20+
 
 ```bash
-# 1. Clone and enter project
-cd Aegis-Node
+# 1. Clone repository
+git clone https://github.com/sandysunny99/aegis-node.git
+cd aegis-node
 
-# 2. Backend setup
+# 2. Configure Environment
+cp .env.example .env
+# Edit .env and set your GEMINI_API_KEY (optional) and CLAMAV_MOCK_MODE=true
+
+# 3. Backend Setup
 cd backend
 python -m venv .venv
 .venv\Scripts\activate          # Windows
+# source .venv/bin/activate     # Linux / macOS
 pip install -r ..\requirements.txt
 
-# 3. Configure environment
-cp .env.example .env
-# Edit .env and add your GEMINI_API_KEY (optional)
-
-# 4. Start backend
-uvicorn main:app --reload --port 8000
-
-# 5. Start frontend (new terminal)
-cd ..\frontend
-npm install
-npm run dev
+# Start backend server
+python -m uvicorn main:app --reload --port 8000
 ```
 
-Open: **http://localhost:5173**
+Open: **`http://localhost:8000`** (FastAPI serves both static React frontend and REST API).
 
 ---
 
-### Option B: Docker Compose (Recommended)
+### Option B: Docker Compose Stack (With ClamAV Antivirus)
 
 ```bash
 # 1. Configure environment
 cp .env.example .env
-# Edit .env — add AI API key if desired
 
-# 2. Start all services (ClamAV + Backend + Frontend)
-docker compose up
+# 2. Start services (ClamAV sidecar + Aegis App container)
+docker compose up -d --build
 
-# 3. Open application
-# http://localhost  (Nginx frontend)
-# http://localhost:8000/docs  (FastAPI Swagger UI)
+# 3. Monitor container readiness
+docker compose logs -f app
 ```
 
-> **Note:** ClamAV downloads its virus database on first start (~200MB). This takes 2–5 minutes. The backend starts immediately and falls back to rule-only scanning if ClamAV is not yet ready.
+Open: **`http://localhost`** (Nginx container) or **`http://localhost:8000`** (FastAPI container).
+
+> **Note:** On first startup, ClamAV downloads its daily virus signature database (~250MB), which takes 2–3 minutes. The backend operates immediately with `CLAMAV_MOCK_MODE=true` or falls back to rule-based scanning until ClamAV reports healthy.
 
 ---
 
-## 🔑 AI Configuration
+## 🔑 AI Provider Setup
 
-| Provider | Cost | Setup |
-|----------|------|-------|
-| **Google Gemini** | Free tier | Get key at [aistudio.google.com](https://aistudio.google.com) |
-| **Groq Cloud** | Free tier | Get key at [console.groq.com](https://console.groq.com) |
-| **Ollama (local)** | 100% free | Install from [ollama.com](https://ollama.com), run `ollama pull llama3.1` |
-| **None** | — | App works fully without AI (AI button hidden) |
+Aegis Node provides intelligent AI threat advisories while preserving data privacy (only compact threat evidence metadata is sent to AI, never raw user dataset cells).
 
-Set in `.env`:
+| Provider | Model | Setup Instructions |
+|----------|-------|--------------------|
+| **Google Gemini** | `gemini-flash-latest` | Obtain a free key at [Google AI Studio](https://aistudio.google.com/) |
+| **Groq Cloud** | `llama-3.1-8b-instant` | Obtain a free key at [Groq Console](https://console.groq.com/) |
+| **Ollama** | `llama3.1` (Local) | Install from [ollama.com](https://ollama.com) & run `ollama pull llama3.1` |
+| **Rule Engine** | Deterministic Fallback | Active automatically when no key is set or upon provider quota limit |
+
+Configure in `.env`:
 ```env
-AI_PROVIDER=gemini          # gemini | groq | ollama | none
-GEMINI_API_KEY=your_key_here
+AI_PROVIDER=gemini
+GEMINI_API_KEY=<YOUR_GEMINI_API_KEY>
+GEMINI_MODEL=gemini-flash-latest
 ```
 
 ---
 
-## 🧪 Testing
+## ☁️ Cloud Deployment (Render.com)
+
+Aegis Node features a native `render.yaml` Blueprint for 1-click cloud deployment:
+
+1. Push code to GitHub repository.
+2. Navigate to [dashboard.render.com](https://dashboard.render.com) → **New** → **Blueprint**.
+3. Select `sandysunny99/aegis-node`.
+4. Render auto-detects `render.yaml` and builds the single multi-stage container.
+5. Set `GEMINI_API_KEY` under Environment variables.
+6. Click **Deploy**.
+
+---
+
+## 🧪 Verification & Testing Suite
+
+Execute the complete 133-test automated suite:
 
 ```bash
-# Run all tests
-cd Aegis-Node
-python -m pytest tests/ -v
+# Run complete test suite
+python -m pytest tests/ -v --tb=short
 
-# Run specific test files
-python -m pytest tests/test_scanner_rules.py -v   # Detection rules
-python -m pytest tests/test_sanitizer.py -v       # Sanitization logic
-python -m pytest tests/test_api.py -v             # API endpoints
+# Run specific domain test modules
+python -m pytest tests/test_scanner.py -v         # Core scanner & engine
+python -m pytest tests/test_sanitizer.py -v       # Cell sanitization rules
+python -m pytest tests/test_security.py -v        # Security & AI output validators
+python -m pytest tests/test_remediation.py -v     # Single-use download token & path traversal
 ```
 
 ---
 
-## 📁 Project Structure
+## 🛡️ Security Audit Compliance
+
+The platform underwent a comprehensive 38-finding security audit across backend, frontend, scanner, and deployment layers:
+
+- **Path Traversal Shield:** All files stored as UUIDs; strictly validated against root storage directories.
+- **Single-Use Download Tokens:** Sanitized datasets require a single-use token expiring in 60 minutes with `secrets.compare_digest` validation.
+- **Memory Bomb Defense:** Uploads stream in 1MB chunks enforcing max file size bounds before memory allocation.
+- **Prompt Injection Neutralization:** Evidence inputs to AI models undergo strict validation and stripping of prompt manipulation keywords.
+- **SQLite Concurrency:** Connection listener applies `PRAGMA journal_mode=WAL` and `PRAGMA synchronous=NORMAL` on engine creation.
+
+---
+
+## 📂 Repository Structure
 
 ```
 Aegis-Node/
 ├── backend/
-│   ├── main.py                     # FastAPI app + enhanced /health endpoint
-│   ├── config.py                   # Settings (Gemini, Groq, Ollama, ClamAV)
-│   ├── models.py                   # SQLite ORM models
-│   ├── schemas.py                  # Pydantic API schemas
-│   ├── database.py                 # DB session management
+│   ├── main.py                     # FastAPI app, CORS, /health endpoint
+│   ├── config.py                   # Pydantic Settings with root .env resolution
+│   ├── database.py                 # SQLite WAL connection engine
+│   ├── models.py                   # Database schema definitions
+│   ├── schemas.py                  # Pydantic request/response models
 │   ├── routers/
-│   │   ├── datasets.py             # Upload, scan, status endpoints
-│   │   ├── analysis.py             # AI analysis endpoint
-│   │   ├── remediation.py          # Sanitize + download endpoints
-│   │   └── history.py              # Scan history endpoint
+│   │   ├── datasets.py             # Upload & scan API endpoints
+│   │   ├── analysis.py             # AI analysis routing
+│   │   ├── remediation.py          # Sanitization & single-use token downloads
+│   │   └── history.py              # Scan history API
 │   └── services/
-│       ├── file_service.py         # UUID storage, SHA-256, path guards
-│       ├── llm_service.py          # Multi-provider AI routing
-│       └── ai_providers/
-│           ├── groq_provider.py    # Groq Cloud (Llama 3.1)
-│           └── ollama_provider.py  # Local Ollama
+│       ├── file_service.py         # Magic byte validation & file storage
+│       └── llm_service.py          # AI provider dispatch & deterministic fallback
 ├── scanner/
-│   ├── clamd_client.py             # ClamAV TCP INSTREAM client
-│   ├── content_checker.py          # Deobfuscation + 9 regex rules
-│   ├── engine.py                   # Two-stage scan orchestrator
-│   └── sanitizer.py               # Risk-based cell neutralization
+│   ├── clamd_client.py             # TCP INSTREAM & Dev Mock ClamAV client
+│   ├── content_checker.py          # Deobfuscation & regex rule engine
+│   ├── engine.py                   # Two-stage scanner orchestrator
+│   └── sanitizer.py               # In-place dataset cell neutralization
 ├── frontend/
 │   ├── src/
-│   │   ├── App.jsx                 # Main app with health status header
-│   │   ├── api.js                  # XHR-based client with upload progress
-│   │   ├── components/
-│   │   │   ├── UploadZone.jsx      # Drag-drop with progress bar
-│   │   │   ├── FindingsList.jsx    # Sortable threat findings table
-│   │   │   ├── RemediationCard.jsx # Integrity rings + action log
-│   │   │   ├── AiSummary.jsx       # AI advisory panel
-│   │   │   ├── RiskMeter.jsx       # SVG arc risk gauge
-│   │   │   └── StatusBadge.jsx     # Verdict chip
-│   │   └── pages/
-│   │       └── HistoryPage.jsx     # Paginated scan history
-│   ├── Dockerfile                  # Multi-stage Nginx build
-│   └── nginx.conf                  # API proxy + SPA routing
-├── data/
-│   ├── demo_malicious.csv          # 15-row dataset with injection vectors
-│   ├── demo_clean.csv              # 15-row clean employee dataset
-│   ├── samples/                    # Uploaded datasets (auto-created)
-│   ├── quarantine/                 # High-risk files (auto-created)
-│   └── sanitized/                  # Cleaned files (auto-created)
-├── tests/
-│   ├── conftest.py
-│   ├── test_scanner_rules.py       # 30+ detection rule tests
-│   ├── test_sanitizer.py           # Sanitization correctness tests
-│   └── test_api.py                 # FastAPI endpoint tests
-├── docker-compose.yml
-├── requirements.txt
-└── .env.example
+│   │   ├── App.jsx                 # React 18 SPA root & header indicators
+│   │   ├── api.js                  # Axios/XHR API client
+│   │   └── components/
+│   │       ├── UploadZone.jsx      # Progress bar drag-and-drop upload
+│   │       ├── FindingsList.jsx    # Categorized threat findings
+│   │       ├── RemediationCard.jsx # Threat reduction & download button
+│   │       └── AiSummary.jsx       # AI Threat Advisory panel
+├── docs/
+│   ├── architecture.md             # System architecture & data flow
+│   ├── audit_report.md             # 38 Audit findings & resolution log
+│   └── final-defense-checklist.md # Production readiness checklist
+├── Dockerfile                      # Multi-stage production build
+├── docker-compose.yml              # Local multi-container stack
+├── render.yaml                     # Render.com Cloud Blueprint
+└── requirements.txt                # Python dependencies
 ```
 
 ---
 
-## 🎯 Demo Flow (Live Presentation)
+## 📄 License
 
-1. **Upload** `data/demo_malicious.csv` using drag-and-drop
-2. **Observe** pipeline steps completing in real time
-3. **Review** threat table — 3 types: SQL injection, formula injection, script injection
-4. **Click** "Explain with AI" → see advisory analysis (if API key configured)
-5. **Click** "Remediate & Sanitize" → watch integrity ring + threat reduction
-6. **Download** clean dataset — verify threats removed
-7. Upload `data/demo_clean.csv` → show zero false positives
+Distributed under the MIT License. See `LICENSE` for details.
 
----
-
-## 🔐 Security Principles
-
-- **No eval/exec** — All file content is read-only via pandas/openpyxl parsers
-- **Path traversal protection** — UUID-named files, directory boundary checks
-- **Data minimization** — Raw cell contents are NEVER sent to AI; only compact metadata
-- **Prompt injection defense** — System prompt explicitly marks evidence as untrusted
-- **Structured AI output** — All responses validated via Pydantic before use
-- **Graceful fallback** — ClamAV offline → rule-only scan; AI unavailable → deterministic summary
-
----
-
-## 📚 Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Frontend | React 18, Vite, Vanilla CSS |
-| Backend | Python 3.12, FastAPI, Uvicorn |
-| Database | SQLite via SQLAlchemy 2.0 |
-| Parsing | pandas, pyarrow, openpyxl |
-| Antivirus | ClamAV (Docker, TCP INSTREAM) |
-| AI | Google Gemini / Groq / Ollama |
-| Testing | pytest, FastAPI TestClient |
-| Deployment | Docker Compose, Nginx |
-
----
-
-*Aegis Node © 2026 — M.Tech Mini Project — Secure Dataset Analysis Framework*
+*Aegis Node © 2026 — Dataset Threat Detection & Automated Remediation Framework*
