@@ -72,48 +72,41 @@ def _unavailable_result(model: str = "test-model", reason: str = "unavailable") 
 class TestBuildProviderChain:
     """Verify the chain builder returns correct (name, is_fallback) tuples."""
 
+    def _cfg(self, primary: str, fallback: str = ""):
+        """Minimal config stub — no mock patching needed (Bug 4 fix)."""
+        cfg = MagicMock()
+        cfg.ai_provider = primary
+        cfg.ai_fallback_chain = fallback
+        return cfg
+
     def test_primary_only_no_fallback(self):
-        """When AI_FALLBACK_CHAIN is empty, chain has only the primary."""
-        with patch("services.llm_service.settings") as mock_cfg:
-            mock_cfg.ai_provider = "gemini"
-            mock_cfg.ai_fallback_chain = ""
-            chain = _build_provider_chain()
+        chain = _build_provider_chain(self._cfg("gemini", ""))
         assert chain == [("gemini", False)]
 
     def test_primary_plus_two_fallbacks(self):
-        with patch("services.llm_service.settings") as mock_cfg:
-            mock_cfg.ai_provider = "gemini"
-            mock_cfg.ai_fallback_chain = "groq,ollama"
-            chain = _build_provider_chain()
+        chain = _build_provider_chain(self._cfg("gemini", "groq,ollama"))
         assert chain == [("gemini", False), ("groq", True), ("ollama", True)]
 
     def test_unknown_provider_in_chain_skipped(self):
-        with patch("services.llm_service.settings") as mock_cfg:
-            mock_cfg.ai_provider = "gemini"
-            mock_cfg.ai_fallback_chain = "banana,groq"  # 'banana' is unknown
-            chain = _build_provider_chain()
+        chain = _build_provider_chain(self._cfg("gemini", "banana,groq"))
         assert chain == [("gemini", False), ("groq", True)]
 
     def test_none_in_fallback_chain_skipped(self):
-        with patch("services.llm_service.settings") as mock_cfg:
-            mock_cfg.ai_provider = "gemini"
-            mock_cfg.ai_fallback_chain = "none,groq"  # 'none' excluded from fallbacks
-            chain = _build_provider_chain()
+        chain = _build_provider_chain(self._cfg("gemini", "none,groq"))
         assert chain == [("gemini", False), ("groq", True)]
 
     def test_whitespace_stripped_in_chain(self):
-        with patch("services.llm_service.settings") as mock_cfg:
-            mock_cfg.ai_provider = "gemini"
-            mock_cfg.ai_fallback_chain = " groq , ollama "
-            chain = _build_provider_chain()
+        chain = _build_provider_chain(self._cfg("gemini", " groq , ollama "))
         assert chain == [("gemini", False), ("groq", True), ("ollama", True)]
 
     def test_primary_none_returns_only_none(self):
-        with patch("services.llm_service.settings") as mock_cfg:
-            mock_cfg.ai_provider = "none"
-            mock_cfg.ai_fallback_chain = ""
-            chain = _build_provider_chain()
+        chain = _build_provider_chain(self._cfg("none", ""))
         assert chain == [("none", False)]
+
+    def test_duplicate_provider_deduplicated(self):
+        """Improvement 8: same provider in primary + fallback appears only once."""
+        chain = _build_provider_chain(self._cfg("gemini", "gemini,groq"))
+        assert chain == [("gemini", False), ("groq", True)]
 
 
 # ── Tests: _get_provider_key ───────────────────────────────────────────────────

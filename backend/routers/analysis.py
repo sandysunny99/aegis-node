@@ -19,6 +19,7 @@ from models import DatasetRecord, LlmAnalysisRecord  # noqa: E402
 from schemas import AnalysisResponse  # noqa: E402
 from services.llm_service import analyse  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
+from utils.auth import require_api_key  # noqa: E402
 
 router = APIRouter(prefix="/api/v1/datasets", tags=["analysis"])
 
@@ -26,9 +27,13 @@ router = APIRouter(prefix="/api/v1/datasets", tags=["analysis"])
 @router.post(
     "/{dataset_id}/analyse",
     response_model=AnalysisResponse,
-    summary="Run Gemini AI threat analysis on a scanned dataset",
+    summary="Run AI threat analysis on a scanned dataset (triggers external API call)",
 )
-def analyse_dataset(dataset_id: int, db: Session = Depends(get_db)) -> AnalysisResponse:  # noqa: B008
+def analyse_dataset(
+    dataset_id: int,
+    db: Session = Depends(get_db),  # noqa: B008
+    _auth: None = Depends(require_api_key),  # noqa: B008  # Guard — triggers paid AI calls
+) -> AnalysisResponse:
     record: DatasetRecord | None = db.get(DatasetRecord, dataset_id)
     if not record:
         raise HTTPException(status_code=404, detail=f"Dataset {dataset_id} not found.")

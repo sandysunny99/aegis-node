@@ -158,6 +158,9 @@ class RemediationRecord(Base):
     threat_reduction_percent: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
 
     changes_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Percentage of dataset fields left unchanged after sanitization (0–100)
+    # Stored so GET /remediation can return the real value (not a default).
+    integrity_preserved: Mapped[float] = mapped_column(Float, nullable=False, default=100.0)
     remediation_actions_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
 
     remediated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

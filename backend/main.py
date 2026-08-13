@@ -92,21 +92,30 @@ async def health(request: Request) -> dict:
         clamav_running = clamav_ping(host=settings.clamav_host, port=settings.clamav_port)
     except Exception:
         clamav_running = False
-    # AI availability
-    ai_provider = settings.ai_provider
-    ai_configured = False
-    if ai_provider == "gemini":
-        ai_configured = bool(settings.gemini_api_key)
-    elif ai_provider == "groq":
-        ai_configured = bool(settings.groq_api_key)
-    elif ai_provider == "ollama":
-        ai_configured = True  # Local Ollama always available if endpoint reachable
+    # AI availability — check full fallback chain, not just primary provider
+    # (Improvement 2: if primary has no key but a fallback does, still report true)
+    try:
+        from services.llm_service import _build_provider_chain, _get_provider_key
+        chain = _build_provider_chain()
+        ai_configured = any(
+            (bool(_get_provider_key(p, is_fb)) or p == "ollama")
+            for p, is_fb in chain if p != "none"
+        )
+    except Exception:
+        # Fallback to simple primary check if service import fails
+        ai_provider = settings.ai_provider
+        ai_configured = (
+            (ai_provider == "gemini" and bool(settings.gemini_api_key))
+            or (ai_provider == "groq" and bool(settings.groq_api_key))
+            or (ai_provider == "ollama")
+        )
     return {
         "status": "ok",
         "version": "0.1.0",
         "clamav_running": clamav_running,
         "ai_configured": ai_configured,
-        "ai_provider": ai_provider,
+        "ai_provider": settings.ai_provider,
+        "ai_fallback_chain": settings.ai_fallback_chain or "none",
         "max_file_size_mb": settings.max_upload_size_mb,
         "supported_formats": ["csv", "json", "jsonl", "parquet", "xlsx", "txt"],
     }

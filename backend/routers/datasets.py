@@ -107,7 +107,12 @@ async def upload_dataset(
     summary="Execute multi-stage threat scan on an uploaded dataset",
 )
 @limiter.limit("20/minute")    # Prevent CPU/ClamAV abuse — scans are compute-intensive
-async def scan_dataset(request: Request, dataset_id: int, db: Session = Depends(get_db)) -> ScanResultResponse:  # noqa: B008
+async def scan_dataset(
+    request: Request,
+    dataset_id: int,
+    db: Session = Depends(get_db),  # noqa: B008
+    _auth: None = Depends(require_api_key),  # noqa: B008  # API key guard
+) -> ScanResultResponse:
     # Retrieve dataset record
     record: DatasetRecord | None = db.get(DatasetRecord, dataset_id)
     if not record:
@@ -115,6 +120,10 @@ async def scan_dataset(request: Request, dataset_id: int, db: Session = Depends(
 
     if not file_service.sample_exists(record.stored_filename):
         raise HTTPException(status_code=404, detail="Dataset file not found on disk.")
+
+    # Guard against concurrent double-scan on same dataset
+    if record.status == "scanning":
+        raise HTTPException(status_code=409, detail="Scan already in progress for this dataset. Please wait.")
 
     # Mark as scanning
     record.status = "scanning"

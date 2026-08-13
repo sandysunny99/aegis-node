@@ -16,6 +16,7 @@ import json
 import logging
 import re
 from dataclasses import dataclass, field
+from typing import Literal
 
 from config import settings
 from pydantic import BaseModel, Field, ValidationError
@@ -34,16 +35,25 @@ _RISKY_ACTION_RE = re.compile(
     r'\b(execute|install|download|run\s+this|delete|format|rm\s+-rf|deploy|wget|curl)\b',
     re.IGNORECASE,
 )
+# Dangerous command strings that indicate prompt injection in AI output
+_DANGEROUS_PATTERNS = re.compile(
+    r'\b(rm\s+-rf|drop\s+table|shutdown|format\s+c:|del\s+/[sq]|'
+    r'os\.system|subprocess|__import__|exec\s*\(|eval\s*\(|'
+    r'ignore\s+previous\s+instructions|disregard\s+(the\s+)?system\s+prompt)\b',
+    re.IGNORECASE,
+)
 
 
 class LlmAnalysisOutput(BaseModel):
     """Pydantic schema for structured output validation from any AI provider."""
 
-    verdict: str = Field(
+    # Doc 2 fix: use Literal types so any hallucinated value (e.g. "threat", "danger")
+    # is rejected at parse time rather than stored as-is.
+    verdict: Literal["clean", "suspicious", "high_risk", "inconclusive"] = Field(
         ...,
         description="One of: clean, suspicious, high_risk, inconclusive",
     )
-    severity: str = Field(
+    severity: Literal["low", "medium", "high", "critical", "unknown"] = Field(
         ...,
         description="One of: low, medium, high, critical, unknown",
     )
@@ -216,12 +226,7 @@ def _validate_and_parse(raw_text: str) -> LlmAnalysisOutput | None:
         raw_text = raw_text[:4000]
 
     # 2. Dangerous command-string rejection (prompt injection defense)
-    _DANGEROUS_PATTERNS = re.compile(
-        r'\b(rm\s+-rf|drop\s+table|shutdown|format\s+c:|del\s+/[sq]|'
-        r'os\.system|subprocess|__import__|exec\s*\(|eval\s*\(|'
-        r'ignore\s+previous\s+instructions|disregard\s+(the\s+)?system\s+prompt)\b',
-        re.IGNORECASE,
-    )
+    # _DANGEROUS_PATTERNS is module-level (compiled once) — Improvement 6
     if _DANGEROUS_PATTERNS.search(raw_text):
         logger.warning("AI response contains dangerous/injected content — rejecting response entirely")
         return None
@@ -294,25 +299,34 @@ def _get_provider_key(provider: str, is_fallback: bool = False) -> str:
     return ""   # ollama / none need no key
 
 
-def _build_provider_chain() -> list[tuple[str, bool]]:
+def _build_provider_chain(cfg=None) -> list[tuple[str, bool]]:
     """
     Build the ordered list of (provider_name, is_fallback) tuples to try.
     Primary provider is always first with is_fallback=False.
     Fallback providers (from AI_FALLBACK_CHAIN) follow with is_fallback=True.
     Unknown / empty / 'none' entries are silently skipped.
+    Duplicate provider names are deduplicated (preserving first occurrence).
+
+    Args:
+        cfg: Settings object. Defaults to module-level `settings` (Bug 4 fix).
+             Pass a custom config in tests to avoid patching the module global.
     """
+    cfg = cfg or settings
     _KNOWN = {"gemini", "groq", "ollama", "none"}
     chain: list[tuple[str, bool]] = []
+    seen: set[str] = set()   # Improvement 8: dedup by provider name
 
-    primary = settings.ai_provider.strip().lower()
+    primary = cfg.ai_provider.strip().lower()
     if primary and primary in _KNOWN:
         chain.append((primary, False))
+        seen.add(primary)
 
-    fallback_raw = settings.ai_fallback_chain or ""
+    fallback_raw = cfg.ai_fallback_chain or ""
     for name in fallback_raw.split(","):
         name = name.strip().lower()
-        if name and name in _KNOWN and name != "none":
+        if name and name in _KNOWN and name != "none" and name not in seen:
             chain.append((name, True))
+            seen.add(name)
 
     return chain
 

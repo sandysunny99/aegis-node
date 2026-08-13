@@ -7,6 +7,7 @@ Endpoints:
 """
 
 import json
+import re
 import secrets
 import sys
 from datetime import UTC, datetime, timedelta
@@ -18,7 +19,7 @@ if str(_ROOT) not in sys.path:
 
 from config import settings  # noqa: E402
 from database import get_db  # noqa: E402
-from fastapi import APIRouter, Depends, HTTPException, status  # noqa: E402
+from fastapi import APIRouter, Depends, HTTPException, Query, status  # noqa: E402
 from fastapi.concurrency import run_in_threadpool  # noqa: E402
 from fastapi.responses import FileResponse  # noqa: E402
 from models import DatasetRecord, RemediationRecord  # noqa: E402
@@ -29,6 +30,32 @@ from utils.auth import require_api_key  # noqa: E402
 
 from scanner.engine import run_scan  # noqa: E402
 from scanner.sanitizer import sanitize_file  # noqa: E402
+
+# ─── Helpers ──────────────────────────────────────────────────────────────────
+
+_SAFE_FILENAME_RE = re.compile(r'[^\w.\-]')   # Allow only word chars, dots, hyphens
+
+
+def _read_sample_df(path: str, fmt: str):  # type: ignore[return]
+    """Read one header row from any supported format to get column count."""
+    try:
+        import pandas as pd
+        if fmt == "csv":
+            return pd.read_csv(path, nrows=1)
+        if fmt == "xlsx":
+            return pd.read_excel(path, nrows=1)
+        if fmt == "json":
+            return pd.read_json(path).head(1)
+        if fmt == "jsonl":
+            return pd.read_json(path, lines=True).head(1)
+        if fmt == "parquet":
+            import pyarrow.parquet as pq
+            return pq.read_table(path).to_pandas().head(1)
+    except Exception:  # noqa: BLE001
+        pass
+    import pandas as pd
+    return pd.DataFrame()
+
 
 router = APIRouter(prefix="/api/v1/datasets", tags=["remediation"])
 
@@ -90,23 +117,26 @@ async def remediate_dataset(
     else:
         reduction_pct = 100.0 if remaining_count == 0 else 0.0
 
-    # Calculate data integrity preservation score
-    # Formula: 100 * (1 - changes / total_fields) where total_fields = rows * columns
+    # ── Compute data integrity preservation score ──────────────────────────
+    # Formula: 100 * (1 - changes / total_fields)
+    # Uses format-aware reader for accurate column count across all 6 formats.
+    import os
     try:
-        import pandas as pd
-        _temp_df = pd.read_csv(orig_source_path, nrows=1) if orig_source_path.endswith(".csv") else pd.DataFrame()
-        _total_cols = max(len(_temp_df.columns), 1)
-        # Estimate rows from original file size (rough heuristic)
-        import os
+        sample_df = _read_sample_df(orig_source_path, record.file_format)
+        _total_cols = max(len(sample_df.columns), 1)
         _file_bytes = os.path.getsize(orig_source_path)
         _avg_row_bytes = max(_file_bytes // max(_total_cols * 10, 1), 1)
         _est_rows = max(_file_bytes // _avg_row_bytes, 1)
         _total_fields = _est_rows * _total_cols
-        integrity_preserved = round(100.0 * (1.0 - san_result.changes_count / max(_total_fields, 1)), 2)
+        integrity_preserved = round(
+            100.0 * (1.0 - san_result.changes_count / max(_total_fields, 1)), 2
+        )
         integrity_preserved = max(0.0, min(100.0, integrity_preserved))
-    except Exception:
-        # Fallback: estimate from threat count vs total finding count
-        integrity_preserved = round(100.0 * (1.0 - san_result.changes_count / max(san_result.changes_count + 1000, 1)), 2)
+    except Exception:  # noqa: BLE001
+        # Fallback: derive from change ratio vs an assumed baseline of 1000 clean fields
+        integrity_preserved = round(
+            100.0 * (1.0 - san_result.changes_count / max(san_result.changes_count + 1000, 1)), 2
+        )
 
     # Determine status: "completed" if 0 remaining threats, else "partial"
     rem_status = "completed" if remaining_count == 0 else "partial"
@@ -147,6 +177,7 @@ async def remediate_dataset(
         resolved_findings_count=resolved_count,
         threat_reduction_percent=reduction_pct,
         changes_count=san_result.changes_count,
+        integrity_preserved=integrity_preserved,        # ← persisted to DB
         remediation_actions_json=json.dumps(action_dicts),
     )
     db.add(db_record)
@@ -196,6 +227,7 @@ def get_remediation_report(dataset_id: int, db: Session = Depends(get_db)) -> Re
         dataset_id=latest.dataset_id,
         original_sha256=latest.original_sha256,
         sanitized_sha256=latest.sanitized_sha256,
+        download_token=latest.download_token or "",         # Bug 2 fix
         remediation_status=latest.remediation_status,
         original_risk_score=latest.original_risk_score,
         sanitized_risk_score=latest.sanitized_risk_score,
@@ -203,6 +235,7 @@ def get_remediation_report(dataset_id: int, db: Session = Depends(get_db)) -> Re
         remaining_findings_count=latest.remaining_findings_count,
         resolved_findings_count=latest.resolved_findings_count,
         threat_reduction_percent=latest.threat_reduction_percent,
+        integrity_preserved=latest.integrity_preserved,      # Bug 2 fix (from DB)
         changes_count=latest.changes_count,
         remediated_at=latest.remediated_at,
         actions=action_schemas,
@@ -215,7 +248,8 @@ def get_remediation_report(dataset_id: int, db: Session = Depends(get_db)) -> Re
 )
 def download_sanitized_dataset(
     dataset_id: int,
-    token: str,
+    # Improvement 7: validate token is non-empty via Query constraint
+    token: str = Query(..., min_length=1, description="Download token from remediation response"),
     db: Session = Depends(get_db),  # noqa: B008
 ) -> FileResponse:
     """
@@ -258,7 +292,11 @@ def download_sanitized_dataset(
     if not san_path.exists():
         raise HTTPException(status_code=404, detail="Sanitized file artifact missing from storage.")
 
-    download_name = f"sanitized_{record.original_filename}"
+    # Improvement 4: sanitize original_filename before embedding in Content-Disposition
+    # Prevents header injection if filename contains special characters or path separators.
+    safe_name = Path(record.original_filename).name          # basename only
+    safe_name = _SAFE_FILENAME_RE.sub("_", safe_name)        # strip unsafe chars
+    download_name = f"sanitized_{safe_name}"
     mime = record.mime_type or "application/octet-stream"
 
     return FileResponse(
