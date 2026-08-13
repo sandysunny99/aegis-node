@@ -34,8 +34,20 @@ class Settings(BaseSettings):
 
 
     # ─── AI Provider ─────────────────────────────────────────────────────────
-    # Select active AI provider: gemini | groq | ollama | none
+    # Primary AI provider: gemini | groq | ollama | none
     ai_provider: str = "gemini"
+
+    # ─── AI Fallback Chain ────────────────────────────────────────────────────
+    # Comma-separated list of providers to try after the primary fails.
+    # Example: "groq,ollama"  — tries Groq, then Ollama if Groq also fails.
+    # Empty string (default) = no fallback, behaves exactly as before.
+    ai_fallback_chain: str = ""
+
+    # Optional separate API keys for fallback providers (so you can use a
+    # different key for fallback than your primary).  If empty, the primary
+    # key for that provider is used instead.
+    fallback_gemini_api_key: str = ""
+    fallback_groq_api_key: str = ""
 
     # ─── LLM (Google Gemini) ──────────────────────────────────────────────────
     gemini_api_key: str = ""

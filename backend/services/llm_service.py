@@ -279,6 +279,44 @@ def _failed_result(model_name: str, error: str) -> LlmAnalysisResult:
     )
 
 
+def _get_provider_key(provider: str, is_fallback: bool = False) -> str:
+    """
+    Return the API key to use for a given provider.
+    When is_fallback=True, prefer the dedicated fallback key if set,
+    otherwise fall back to the primary key.
+    """
+    if provider == "gemini":
+        fallback_key = settings.fallback_gemini_api_key
+        return (fallback_key if is_fallback and fallback_key else settings.gemini_api_key)
+    if provider == "groq":
+        fallback_key = settings.fallback_groq_api_key
+        return (fallback_key if is_fallback and fallback_key else settings.groq_api_key)
+    return ""   # ollama / none need no key
+
+
+def _build_provider_chain() -> list[tuple[str, bool]]:
+    """
+    Build the ordered list of (provider_name, is_fallback) tuples to try.
+    Primary provider is always first with is_fallback=False.
+    Fallback providers (from AI_FALLBACK_CHAIN) follow with is_fallback=True.
+    Unknown / empty / 'none' entries are silently skipped.
+    """
+    _KNOWN = {"gemini", "groq", "ollama", "none"}
+    chain: list[tuple[str, bool]] = []
+
+    primary = settings.ai_provider.strip().lower()
+    if primary and primary in _KNOWN:
+        chain.append((primary, False))
+
+    fallback_raw = settings.ai_fallback_chain or ""
+    for name in fallback_raw.split(","):
+        name = name.strip().lower()
+        if name and name in _KNOWN and name != "none":
+            chain.append((name, True))
+
+    return chain
+
+
 def analyse(
     dataset_id: int,
     file_format: str,
@@ -289,11 +327,15 @@ def analyse(
 ) -> LlmAnalysisResult:
     """
     Generate structured AI threat analysis from compact scanner evidence.
-    Routes to the configured AI provider. Never raises exceptions to caller.
-    """
-    provider = settings.ai_provider.lower()
-    system_prompt = _build_system_prompt()
 
+    Iterates through the configured provider chain (primary + optional fallbacks).
+    Each provider's output is validated through the full 5-stage pipeline before
+    being accepted.  On any soft failure (rate limit, unavailability, bad output)
+    the loop moves to the next provider.  All providers exhausted → _unavailable_result().
+
+    Never raises exceptions to the caller.
+    """
+    system_prompt = _build_system_prompt()
     evidence_payload = _build_compact_evidence(
         dataset_id=dataset_id,
         file_format=file_format,
@@ -302,37 +344,92 @@ def analyse(
         risk_score=risk_score,
         findings=findings,
     )
-
     user_prompt = (
         f"Analyze the following compact security scanner evidence:\n"
         f"```json\n{json.dumps(evidence_payload, indent=2)}\n```\n\n"
         "Provide a structured JSON response matching the required schema."
     )
 
-    # ─── Provider routing ─────────────────────────────────────────────────────
+    provider_chain = _build_provider_chain()
 
-    if provider == "gemini":
-        return _call_gemini(system_prompt, user_prompt)
-
-    elif provider == "groq":
-        return _call_groq(system_prompt, user_prompt)
-
-    elif provider == "ollama":
-        return _call_ollama(system_prompt, user_prompt)
-
-    elif provider == "none":
+    if not provider_chain or provider_chain[0][0] == "none":
         return _unavailable_result("none", "AI provider set to 'none' in configuration.")
 
-    else:
-        logger.warning("Unknown AI_PROVIDER=%r — skipping AI analysis.", provider)
-        return _unavailable_result(provider, f"Unknown AI provider: {provider!r}")
+    last_error = "All configured AI providers failed or are unavailable."
+
+    for provider_name, is_fallback in provider_chain:
+        if provider_name == "none":
+            continue
+
+        logger.info(
+            "Trying AI provider %r (fallback=%s) for dataset_id=%d",
+            provider_name, is_fallback, dataset_id,
+        )
+
+        try:
+            result = _call_provider(
+                provider_name=provider_name,
+                is_fallback=is_fallback,
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+            )
+        except Exception as exc:  # noqa: BLE001
+            last_error = f"{provider_name}: unexpected error — {exc}"
+            logger.warning("Provider %r raised unexpectedly: %s", provider_name, exc)
+            continue
+
+        # Soft failures: try next provider
+        if result.status in ("failed", "unavailable"):
+            last_error = f"{provider_name}: {result.error or result.status}"
+            logger.info(
+                "Provider %r returned %r — trying next in chain (reason: %s)",
+                provider_name, result.status, last_error,
+            )
+            continue
+
+        # Success — validated output, return immediately
+        logger.info(
+            "Provider %r succeeded (dataset_id=%d, verdict=%s, confidence=%.2f)",
+            provider_name, dataset_id, result.verdict, result.confidence,
+        )
+        return result
+
+    # All providers exhausted
+    logger.warning("All AI providers failed for dataset_id=%d: %s", dataset_id, last_error)
+    return _unavailable_result("chain_exhausted", last_error)
+
+
+def _call_provider(
+    provider_name: str,
+    is_fallback: bool,
+    system_prompt: str,
+    user_prompt: str,
+) -> LlmAnalysisResult:
+    """
+    Dispatch a single provider call. Returns LlmAnalysisResult (never raises).
+    """
+    if provider_name == "gemini":
+        api_key = _get_provider_key("gemini", is_fallback)
+        return _call_gemini(system_prompt, user_prompt, api_key=api_key)
+    if provider_name == "groq":
+        api_key = _get_provider_key("groq", is_fallback)
+        return _call_groq(system_prompt, user_prompt, api_key=api_key)
+    if provider_name == "ollama":
+        return _call_ollama(system_prompt, user_prompt)
+    logger.warning("Unknown provider name %r — skipping", provider_name)
+    return _unavailable_result(provider_name, f"Unknown provider: {provider_name!r}")
 
 
 # ─── Provider Implementations ─────────────────────────────────────────────────
 
-def _call_gemini(system_prompt: str, user_prompt: str) -> LlmAnalysisResult:
+def _call_gemini(
+    system_prompt: str,
+    user_prompt: str,
+    *,
+    api_key: str | None = None,   # When None, reads from settings (primary)
+) -> LlmAnalysisResult:
     model_name = settings.gemini_model or "gemini-2.0-flash"
-    api_key = settings.gemini_api_key
+    api_key = api_key or settings.gemini_api_key
 
     if not api_key:
         return _unavailable_result(model_name, "GEMINI_API_KEY not configured")
@@ -383,9 +480,14 @@ def _call_gemini(system_prompt: str, user_prompt: str) -> LlmAnalysisResult:
         return _failed_result(model_name, "Gemini API error")
 
 
-def _call_groq(system_prompt: str, user_prompt: str) -> LlmAnalysisResult:
+def _call_groq(
+    system_prompt: str,
+    user_prompt: str,
+    *,
+    api_key: str | None = None,   # When None, reads from settings (primary)
+) -> LlmAnalysisResult:
     model_name = settings.groq_model or "llama-3.1-8b-instant"
-    api_key = settings.groq_api_key
+    api_key = api_key or settings.groq_api_key
 
     if not api_key:
         return _unavailable_result(model_name, "GROQ_API_KEY not configured")
