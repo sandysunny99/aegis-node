@@ -58,7 +58,7 @@ class Settings(BaseSettings):
 
     # ─── LLM (Google Gemini) ──────────────────────────────────────────────────
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.0-flash"
+    gemini_model: str = "gemini-flash-latest"
     gemini_timeout_seconds: int = 30
 
     # ─── LLM (Groq Cloud — free tier, ultra-fast Llama 3) ────────────────────
