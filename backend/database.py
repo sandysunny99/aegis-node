@@ -3,18 +3,18 @@ Aegis Node — SQLite database engine and session factory.
 Uses SQLAlchemy 2.x with synchronous driver (sqlite3 stdlib — no extra driver needed).
 """
 
-from pathlib import Path
-
+from config import settings
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-# ─── Database file sits at the project root (gitignored) ─────────────────────
-_DB_PATH = Path(__file__).parent / "aegis_node.db"
-DATABASE_URL = f"sqlite:///{_DB_PATH}"
+# Database engine uses database_url configured in settings
+DATABASE_URL = settings.database_url
+is_sqlite = DATABASE_URL.startswith("sqlite")
+connect_args = {"check_same_thread": False} if is_sqlite else {}
 
 engine = create_engine(
     DATABASE_URL,
-    connect_args={"check_same_thread": False},  # required for SQLite + FastAPI
+    connect_args=connect_args,
     echo=False,
 )
 
@@ -27,10 +27,13 @@ class Base(DeclarativeBase):
 
 
 def get_db():
-    """FastAPI dependency — yields a database session, always closes after request."""
+    """FastAPI dependency — yields a database session, rolls back on exception, always closes."""
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
 

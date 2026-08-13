@@ -203,15 +203,53 @@ def _sanitize_llm_output(parsed: LlmAnalysisOutput) -> LlmAnalysisOutput:
 
     clean_limitations = [_clean_field(lim) for lim in parsed.limitations[:_MAX_LIST_ITEMS]]
 
-    return LlmAnalysisOutput(
-        verdict=clean_verdict,
-        severity=clean_severity,
-        confidence=parsed.confidence,
-        summary=clean_summary,
-        evidence=clean_evidence,
-        recommendations=clean_recommendations,
-        limitations=clean_limitations,
-    )
+    try:
+        return LlmAnalysisOutput(
+            verdict=clean_verdict,
+            severity=clean_severity,
+            confidence=parsed.confidence,
+            summary=clean_summary,
+            evidence=clean_evidence,
+            recommendations=clean_recommendations,
+            limitations=clean_limitations,
+        )
+    except (ValidationError, Exception) as exc:
+        logger.warning("Sanitized LLM output failed Pydantic re-validation: %s", exc)
+        return None
+
+
+def _extract_first_json_object(text: str) -> str | None:
+    """
+    Extract the first complete JSON object '{ ... }' using stack-based bracket matching.
+    Prevents taking trailing injected JSON or text after the first object.
+    """
+    start = text.find("{")
+    if start == -1:
+        return None
+
+    depth = 0
+    in_string = False
+    escape = False
+
+    for i in range(start, len(text)):
+        char = text[i]
+        if in_string:
+            if escape:
+                escape = False
+            elif char == "\\":
+                escape = True
+            elif char == '"':
+                in_string = False
+        else:
+            if char == '"':
+                in_string = True
+            elif char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+                if depth == 0:
+                    return text[start : i + 1]
+    return None
 
 
 def _validate_and_parse(raw_text: str) -> LlmAnalysisOutput | None:
@@ -226,25 +264,25 @@ def _validate_and_parse(raw_text: str) -> LlmAnalysisOutput | None:
         raw_text = raw_text[:4000]
 
     # 2. Dangerous command-string rejection (prompt injection defense)
-    # _DANGEROUS_PATTERNS is module-level (compiled once) — Improvement 6
     if _DANGEROUS_PATTERNS.search(raw_text):
         logger.warning("AI response contains dangerous/injected content — rejecting response entirely")
         return None
 
-    # 3. Parse JSON (with markdown code block fallback)
+    # 3. Parse JSON (direct parse first, then stack-based extracted object)
     parsed: LlmAnalysisOutput | None = None
     try:
         parsed = LlmAnalysisOutput.model_validate_json(raw_text)
     except (ValidationError, Exception):
-        try:
-            start = raw_text.index("{")
-            end = raw_text.rindex("}") + 1
-            candidate = raw_text[start:end]
+        candidate = _extract_first_json_object(raw_text)
+        if candidate:
             if _DANGEROUS_PATTERNS.search(candidate):
                 logger.warning("Extracted AI JSON contains dangerous content — rejecting")
                 return None
-            parsed = LlmAnalysisOutput.model_validate_json(candidate)
-        except Exception:
+            try:
+                parsed = LlmAnalysisOutput.model_validate_json(candidate)
+            except Exception:
+                return None
+        else:
             return None
 
     if parsed is None:
@@ -474,7 +512,7 @@ def _call_gemini(
         prompt_tok = getattr(usage, "prompt_token_count", 0) or 0
         comp_tok = getattr(usage, "candidates_token_count", 0) or 0
 
-        logger.info("Gemini analysis complete — dataset_id=? model=%s tokens=%d+%d verdict=%s",
+        logger.info("Gemini analysis complete — model=%s tokens=%d+%d verdict=%s",
                     model_name, prompt_tok, comp_tok, parsed.verdict)
 
         return LlmAnalysisResult(

@@ -7,7 +7,7 @@ import json
 from datetime import UTC, datetime
 
 from database import Base
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 
@@ -27,7 +27,7 @@ class DatasetRecord(Base):
     sha256_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     mime_type: Mapped[str] = mapped_column(String(128), nullable=False, default="application/octet-stream")
     file_format: Mapped[str] = mapped_column(String(32), nullable=False, default="unknown")
-    uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, server_default=func.now())
     # status: uploaded | scanning | clean | quarantined | suspicious | remediated | partial_remediated | error
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="uploaded")
 
@@ -60,10 +60,11 @@ class ScanReportRecord(Base):
     # Content rule stage
     threats_found_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     risk_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    verdict: Mapped[str] = mapped_column(String(32), nullable=False, default="clean")
 
     # Timing
     scan_duration_ms: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    scanned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    scanned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, server_default=func.now())
 
     # Full findings stored as JSON text
     findings_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
@@ -78,7 +79,7 @@ class ScanReportRecord(Base):
     def __repr__(self) -> str:
         return (
             f"<ScanReportRecord id={self.id} dataset_id={self.dataset_id} "
-            f"risk={self.risk_score:.1f} threats={self.threats_found_count}>"
+            f"verdict={self.verdict!r} risk={self.risk_score:.1f} threats={self.threats_found_count}>"
         )
 
 
@@ -110,7 +111,7 @@ class LlmAnalysisRecord(Base):
     completion_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     error_message: Mapped[str] = mapped_column(Text, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, server_default=func.now())
 
     dataset: Mapped["DatasetRecord"] = relationship("DatasetRecord", back_populates="llm_analyses")
 
@@ -146,6 +147,7 @@ class RemediationRecord(Base):
     download_token: Mapped[str] = mapped_column(String(64), unique=True, nullable=True, index=True)
     # Timestamp when the token was generated — used to enforce expiry (default 60 min)
     token_created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+    used: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     remediation_status: Mapped[str] = mapped_column(String(32), nullable=False, default="completed")  # completed | partial | failed
 
@@ -163,7 +165,7 @@ class RemediationRecord(Base):
     integrity_preserved: Mapped[float] = mapped_column(Float, nullable=False, default=100.0)
     remediation_actions_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
 
-    remediated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    remediated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, server_default=func.now())
 
     dataset: Mapped["DatasetRecord"] = relationship("DatasetRecord", back_populates="remediations")
 

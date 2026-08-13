@@ -98,7 +98,7 @@ class RemediationResponse(BaseModel):
     dataset_id: int
     original_sha256: str
     sanitized_sha256: str
-    download_token: str = Field(default="", description="One-time secure token required for downloading the sanitized file")
+    download_token: str | None = Field(default=None, description="One-time secure token required for downloading the sanitized file")
     remediation_status: str = Field(..., description="completed | partial | failed")
     original_risk_score: float
     sanitized_risk_score: float

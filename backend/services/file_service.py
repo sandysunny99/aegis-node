@@ -16,8 +16,7 @@ import re
 import uuid
 from pathlib import Path
 
-# ─── Allowed file extensions (case-insensitive) ───────────────────────────────
-_ALLOWED_EXTENSIONS = {".csv", ".parquet", ".json", ".jsonl"}
+from config import settings
 
 # ─── Data directories ─────────────────────────────────────────────────────────
 _PROJECT_ROOT = Path(__file__).parent.parent.parent   # aegis-node/
@@ -30,11 +29,32 @@ _SAMPLES_DIR.mkdir(parents=True, exist_ok=True)
 _QUARANTINE_DIR.mkdir(parents=True, exist_ok=True)
 _SANITIZED_DIR.mkdir(parents=True, exist_ok=True)
 
+# Reserved Windows device names
+_WINDOWS_RESERVED_NAMES = {
+    "CON", "PRN", "AUX", "NUL",
+    "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+    "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+}
+
 
 def _sanitize_filename(name: str) -> str:
-    """Strip path separators and control characters from the original filename."""
+    """
+    Strip path separators, null bytes, Unicode bidi control characters,
+    and Windows device names from the original filename.
+    """
+    # Strip null bytes & path separators
     name = re.sub(r'[\\\/\0]', '_', name)
-    return name[:255]   # hard cap
+    # Strip Unicode bidi control characters (\u202a-\u202e, \u2066-\u2069)
+    name = re.sub(r'[\u202a-\u202e\u2066-\u2069]', '', name)
+    # Strip leading/trailing dots and spaces
+    name = name.strip('. ')
+
+    # Check for Windows reserved names (e.g. CON.csv -> _CON.csv)
+    stem = Path(name).stem.upper()
+    if stem in _WINDOWS_RESERVED_NAMES:
+        name = f"_{name}"
+
+    return name[:255] if name else "unnamed"
 
 
 def _detect_mime(file_path: Path) -> str:
@@ -49,8 +69,35 @@ def _detect_mime(file_path: Path) -> str:
 def _detect_format(filename: str) -> str:
     """Return normalised format label based on file extension."""
     ext = Path(filename).suffix.lower()
-    _map = {".csv": "csv", ".parquet": "parquet", ".json": "json", ".jsonl": "jsonl"}
+    _map = {
+        ".csv": "csv",
+        ".parquet": "parquet",
+        ".json": "json",
+        ".jsonl": "jsonl",
+        ".xlsx": "xlsx",
+        ".txt": "txt",
+    }
     return _map.get(ext, "unknown")
+
+
+def validate_magic_bytes(content: bytes, filename: str) -> bool:
+    """
+    Verify magic byte headers to reject executable binary anomalies (PE/MZ, ELF, MACH-O)
+    disguised under allowed dataset extensions.
+    """
+    if not content:
+        return True
+
+    # Block Windows executables (MZ), ELF binaries, Mach-O binaries
+    if content.startswith(b"MZ") or content.startswith(b"\x7fELF") or content.startswith(b"\xfe\xed\xfa"):
+        return False
+
+    ext = Path(filename).suffix.lower()
+    if ext == ".parquet" and len(content) >= 4:
+        # Parquet files must start with PAR1
+        return content.startswith(b"PAR1")
+
+    return True
 
 
 def compute_sha256(path: Path) -> str:
@@ -68,7 +115,7 @@ class FileService:
     def validate_extension(self, filename: str) -> bool:
         """Return True if the file extension is in the allow-list."""
         ext = Path(filename).suffix.lower()
-        return ext in _ALLOWED_EXTENSIONS
+        return ext in settings.allowed_extensions
 
     def save_upload(self, original_filename: str, content: bytes) -> dict:
         """

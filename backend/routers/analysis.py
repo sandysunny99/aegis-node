@@ -12,9 +12,12 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 import json  # noqa: E402
+import functools  # noqa: E402
 
 from database import get_db  # noqa: E402
-from fastapi import APIRouter, Depends, HTTPException  # noqa: E402
+from fastapi import APIRouter, Depends, HTTPException, Request  # noqa: E402
+from fastapi.concurrency import run_in_threadpool  # noqa: E402
+from limiter import limiter  # noqa: E402
 from models import DatasetRecord, LlmAnalysisRecord  # noqa: E402
 from schemas import AnalysisResponse  # noqa: E402
 from services.llm_service import analyse  # noqa: E402
@@ -29,7 +32,9 @@ router = APIRouter(prefix="/api/v1/datasets", tags=["analysis"])
     response_model=AnalysisResponse,
     summary="Run AI threat analysis on a scanned dataset (triggers external API call)",
 )
-def analyse_dataset(
+@limiter.limit("5/minute")   # F7: AI calls are expensive — cap at 5/min per IP
+async def analyse_dataset(
+    request: Request,         # Required by slowapi for IP tracking
     dataset_id: int,
     db: Session = Depends(get_db),  # noqa: B008
     _auth: None = Depends(require_api_key),  # noqa: B008  # Guard — triggers paid AI calls
@@ -48,14 +53,17 @@ def analyse_dataset(
     latest_report = sorted(record.scan_reports, key=lambda r: r.scanned_at)[-1]
     findings = latest_report.findings
 
-    # Call LLM service with compact evidence payload
-    result = analyse(
-        dataset_id=record.id,
-        file_format=record.file_format,
-        file_size_bytes=record.file_size_bytes,
-        clamav_status=latest_report.clamav_status,
-        risk_score=latest_report.risk_score,
-        findings=findings,
+    # F1: Run blocking LLM network call in threadpool — keeps event loop free
+    result = await run_in_threadpool(
+        functools.partial(
+            analyse,
+            dataset_id=record.id,
+            file_format=record.file_format,
+            file_size_bytes=record.file_size_bytes,
+            clamav_status=latest_report.clamav_status,
+            risk_score=latest_report.risk_score,
+            findings=findings,
+        )
     )
 
     # Persist result record
@@ -103,7 +111,13 @@ def analyse_dataset(
     response_model=AnalysisResponse,
     summary="Get the latest AI analysis for a dataset",
 )
-def get_analysis(dataset_id: int, db: Session = Depends(get_db)) -> AnalysisResponse:  # noqa: B008
+@limiter.limit("60/minute")
+def get_analysis(
+    request: Request,
+    dataset_id: int,
+    db: Session = Depends(get_db),  # noqa: B008
+    _auth: None = Depends(require_api_key),  # noqa: B008
+) -> AnalysisResponse:
     record: DatasetRecord | None = db.get(DatasetRecord, dataset_id)
     if not record:
         raise HTTPException(status_code=404, detail=f"Dataset {dataset_id} not found.")

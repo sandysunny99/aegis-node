@@ -3,7 +3,11 @@ Aegis Node — Application Settings
 Loaded once at startup via pydantic-settings.
 """
 
+import logging
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger("aegis.config")
 
 
 class Settings(BaseSettings):
@@ -20,6 +24,8 @@ class Settings(BaseSettings):
     app_host: str = "0.0.0.0"
     app_port: int = 8000
     secret_key: str = "change-me-before-production"
+    allowed_origins: list[str] = ["*"]
+    trusted_proxies: list[str] = ["127.0.0.1", "::1"]
 
     # ─── API Key Guard (optional) ─────────────────────────────────────────────
     # If empty (default), write endpoints are open — suitable for local dev.
@@ -32,20 +38,16 @@ class Settings(BaseSettings):
     # Default: 60 minutes (1 hour). Set to 0 to disable expiry.
     download_token_expiry_minutes: int = 60
 
+    # ─── Supported File Extensions ─────────────────────────────────────────────
+    allowed_extensions: set[str] = {".csv", ".parquet", ".json", ".jsonl", ".xlsx", ".txt"}
 
     # ─── AI Provider ─────────────────────────────────────────────────────────
     # Primary AI provider: gemini | groq | ollama | none
     ai_provider: str = "gemini"
 
     # ─── AI Fallback Chain ────────────────────────────────────────────────────
-    # Comma-separated list of providers to try after the primary fails.
-    # Example: "groq,ollama"  — tries Groq, then Ollama if Groq also fails.
-    # Empty string (default) = no fallback, behaves exactly as before.
     ai_fallback_chain: str = ""
 
-    # Optional separate API keys for fallback providers (so you can use a
-    # different key for fallback than your primary).  If empty, the primary
-    # key for that provider is used instead.
     fallback_gemini_api_key: str = ""
     fallback_groq_api_key: str = ""
 
@@ -71,6 +73,17 @@ class Settings(BaseSettings):
 
     # ─── Database ────────────────────────────────────────────────────────────
     database_url: str = "sqlite:///./aegis_node.db"
+
+    @model_validator(mode="after")
+    def validate_production_settings(self) -> "Settings":
+        if self.app_env.lower() == "production":
+            if self.secret_key == "change-me-before-production":
+                raise ValueError("SECRET_KEY must be set to a secure secret in production!")
+            if not self.api_key:
+                logger.warning("SECURITY WARNING: API_KEY is empty in production environment. Write endpoints are unprotected.")
+        elif not self.api_key and self.app_env.lower() != "development":
+            logger.warning("API_KEY is not configured — write endpoints are publicly accessible.")
+        return self
 
 
 # Singleton — import this from anywhere in the backend.

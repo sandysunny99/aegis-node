@@ -54,6 +54,25 @@ services:
       - key: DATABASE_URL
         value: sqlite:///./aegis_node.db
 
+      # ── Auth & Token ──────────────────────────────────────────────────────────
+      # Set API_KEY in Render dashboard to enable write-endpoint protection.
+      # Leave empty (default) for open demo access.
+      - key: API_KEY
+        sync: false
+
+      - key: DOWNLOAD_TOKEN_EXPIRY_MINUTES
+        value: "60"
+
+      # ── AI Fallback Chain ─────────────────────────────────────────────────────
+      - key: AI_FALLBACK_CHAIN
+        value: ""
+
+      - key: FALLBACK_GEMINI_API_KEY
+        sync: false
+
+      - key: FALLBACK_GROQ_API_KEY
+        sync: false
+
       # ── Render injects PORT automatically — uvicorn uses it ───────────────────
       - key: PORT
         value: "8000"

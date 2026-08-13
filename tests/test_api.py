@@ -59,7 +59,7 @@ class TestHealthEndpoint:
         assert data["status"] == "ok"
 
     def test_health_has_required_fields(self, client):
-        resp = client.get("/health")
+        resp = client.get("/health/diagnostics")
         data = resp.json()
         assert "clamav_running" in data
         assert "ai_configured" in data
@@ -68,7 +68,7 @@ class TestHealthEndpoint:
         assert "max_file_size_mb" in data
 
     def test_health_supported_formats(self, client):
-        resp = client.get("/health")
+        resp = client.get("/health/diagnostics")
         data = resp.json()
         formats = data["supported_formats"]
         assert "csv" in formats

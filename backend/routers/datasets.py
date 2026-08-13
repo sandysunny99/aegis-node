@@ -15,6 +15,7 @@ if str(_ROOT) not in sys.path:
 from database import get_db  # noqa: E402
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status  # noqa: E402
 from fastapi.concurrency import run_in_threadpool  # noqa: E402
+from limiter import limiter  # noqa: E402
 from models import DatasetRecord, ScanReportRecord  # noqa: E402
 from schemas import (  # noqa: E402
     DatasetStatusResponse,
@@ -22,9 +23,7 @@ from schemas import (  # noqa: E402
     ScanResultResponse,
     ThreatFinding,
 )
-from services.file_service import file_service  # noqa: E402
-from slowapi import Limiter
-from slowapi.util import get_remote_address
+from services.file_service import file_service, validate_magic_bytes  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 from utils.auth import require_api_key  # noqa: E402
 
@@ -32,11 +31,9 @@ from scanner.engine import run_scan  # noqa: E402
 
 router = APIRouter(prefix="/api/v1/datasets", tags=["datasets"])
 
-# Rate limiter instance (shares state with main app via singleton key function)
-limiter = Limiter(key_func=get_remote_address)
-
 # ─── Limits ───────────────────────────────────────────────────────────────────
 _MAX_UPLOAD_BYTES = 500 * 1024 * 1024  # 500 MB (matches MAX_UPLOAD_SIZE_MB in config)
+_CHUNK_SIZE_BYTES = 1024 * 1024       # 1 MB chunk size for streaming upload
 
 
 # ─── Upload ───────────────────────────────────────────────────────────────────
@@ -54,25 +51,41 @@ async def upload_dataset(
     db: Session = Depends(get_db),  # noqa: B008
     _auth: None = Depends(require_api_key),  # noqa: B008  # API key guard (optional in dev)
 ) -> DatasetUploadResponse:
+    filename = file.filename or "upload"
+
     # 1. Extension validation
-    if not file_service.validate_extension(file.filename or ""):
+    if not file_service.validate_extension(filename):
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail=f"File type not allowed. Accepted: csv, parquet, json, jsonl. Got: {Path(file.filename or '').suffix!r}",
+            detail=f"File type not allowed. Accepted extensions: {sorted(list(file_service.validate_extension.__self__.validate_extension)) if hasattr(file_service, 'allowed_extensions') else 'csv, parquet, json, jsonl, xlsx, txt'}. Got: {Path(filename).suffix!r}",
         )
 
-    # 2. Read content with size cap
-    content = await file.read()
-    if len(content) > _MAX_UPLOAD_BYTES:
+    # 2. Stream content in 1 MB chunks to prevent OOM
+    buffer = bytearray()
+    while True:
+        chunk = await file.read(_CHUNK_SIZE_BYTES)
+        if not chunk:
+            break
+        buffer.extend(chunk)
+        if len(buffer) > _MAX_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"File too large. Maximum size is {_MAX_UPLOAD_BYTES // (1024*1024)} MB.",
+            )
+
+    content = bytes(buffer)
+
+    # 3. Magic byte header verification (reject executable binary anomalies)
+    if not validate_magic_bytes(content, filename):
         raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File too large. Maximum size is {_MAX_UPLOAD_BYTES // (1024*1024)} MB.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File content header (magic bytes) does not match expected format or contains executable binary data.",
         )
 
-    # 3. Save to data/samples/ under UUID filename
-    meta = file_service.save_upload(file.filename or "upload", content)
+    # 4. Save to data/samples/ under UUID filename
+    meta = file_service.save_upload(filename, content)
 
-    # 4. Persist to database
+    # 5. Persist to database
     record = DatasetRecord(
         original_filename=meta["original_filename"],
         stored_filename=meta["stored_filename"],
@@ -125,13 +138,25 @@ async def scan_dataset(
     if record.status == "scanning":
         raise HTTPException(status_code=409, detail="Scan already in progress for this dataset. Please wait.")
 
+    # FINDING-025: Guard against re-scanning already remediated datasets
+    if record.status in ("remediated", "partial_remediated") or record.remediations:
+        raise HTTPException(
+            status_code=409,
+            detail="Dataset has already been remediated. Re-scanning original is not permitted.",
+        )
+
     # Mark as scanning
     record.status = "scanning"
     db.commit()
 
-    # Run blocking scan in threadpool — keeps the event loop free for health checks
+    # FINDING-011: Wrap blocking scan in try/except; reset status to 'error' on failure
     file_path = str(file_service.get_sample_path(record.stored_filename))
-    result = await run_in_threadpool(run_scan, file_path)
+    try:
+        result = await run_in_threadpool(run_scan, file_path)
+    except Exception as exc:
+        record.status = "error"
+        db.commit()
+        raise HTTPException(status_code=500, detail="Scan execution failed") from exc
 
     # Update status
     if result.verdict == "malicious":
@@ -143,13 +168,14 @@ async def scan_dataset(
         record.status = "clean"
     db.commit()
 
-    # Persist scan report
+    # FINDING-018: Persist scan report including verdict
     report = ScanReportRecord(
         dataset_id=record.id,
         clamav_status=result.clamav_status,
         clamav_virus_name=result.clamav_virus_name,
         threats_found_count=result.threats_found_count,
         risk_score=result.risk_score,
+        verdict=result.verdict,
         scan_duration_ms=result.scan_duration_ms,
         findings_json=json.dumps(result.to_findings_dicts()),
     )
@@ -168,7 +194,7 @@ async def scan_dataset(
         risk_score=report.risk_score,
         scan_duration_ms=report.scan_duration_ms,
         scanned_at=report.scanned_at,
-        verdict=result.verdict,
+        verdict=report.verdict,
         findings=findings,
     )
 
@@ -180,7 +206,12 @@ async def scan_dataset(
     response_model=DatasetStatusResponse,
     summary="Get dataset upload status",
 )
-def get_dataset_status(dataset_id: int, db: Session = Depends(get_db)) -> DatasetStatusResponse:  # noqa: B008
+@limiter.limit("60/minute")
+def get_dataset_status(
+    request: Request,
+    dataset_id: int,
+    db: Session = Depends(get_db),  # noqa: B008
+) -> DatasetStatusResponse:
     record: DatasetRecord | None = db.get(DatasetRecord, dataset_id)
     if not record:
         raise HTTPException(status_code=404, detail=f"Dataset {dataset_id} not found.")
@@ -201,7 +232,12 @@ def get_dataset_status(dataset_id: int, db: Session = Depends(get_db)) -> Datase
     response_model=ScanResultResponse,
     summary="Retrieve the latest scan report for a dataset",
 )
-def get_scan_report(dataset_id: int, db: Session = Depends(get_db)) -> ScanResultResponse:  # noqa: B008
+@limiter.limit("60/minute")
+def get_scan_report(
+    request: Request,
+    dataset_id: int,
+    db: Session = Depends(get_db),  # noqa: B008
+) -> ScanResultResponse:
     record: DatasetRecord | None = db.get(DatasetRecord, dataset_id)
     if not record:
         raise HTTPException(status_code=404, detail=f"Dataset {dataset_id} not found.")
@@ -212,9 +248,11 @@ def get_scan_report(dataset_id: int, db: Session = Depends(get_db)) -> ScanResul
     report: ScanReportRecord = sorted(record.scan_reports, key=lambda r: r.scanned_at)[-1]
     findings = [ThreatFinding(**f) for f in report.findings]
 
-    # Derive verdict from stored status
-    verdict_map = {"quarantined": "malicious", "suspicious": "suspicious", "clean": "clean"}
-    verdict = verdict_map.get(record.status, "clean")
+    # FINDING-018: Use stored verdict from ScanReportRecord if available
+    verdict = getattr(report, "verdict", None)
+    if not verdict:
+        verdict_map = {"quarantined": "malicious", "suspicious": "suspicious", "clean": "clean"}
+        verdict = verdict_map.get(record.status, "clean")
 
     return ScanResultResponse(
         scan_id=report.id,

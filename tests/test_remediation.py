@@ -74,8 +74,9 @@ def test_formula_remediation_and_rescan():
     orig_path = file_service.get_sample_path(res_up.json()["stored_filename"])
     assert orig_path.read_bytes() == csv_payload
 
-    # 5. Verify Sanitized File Content & Download endpoint check
-    res_dl = client.get(f"/api/v1/datasets/{ds_id}/download-sanitized")
+    # 5. Verify Sanitized File Content & Download endpoint check (must supply token)
+    dl_token = body["download_token"]
+    res_dl = client.get(f"/api/v1/datasets/{ds_id}/download-sanitized", params={"token": dl_token})
     assert res_dl.status_code == 200
     assert b"'=CMD" in res_dl.content
 
@@ -141,20 +142,22 @@ def test_clean_dataset_remediation():
 
 def test_download_sanitized_endpoint_and_path_traversal():
     """Test GET /download-sanitized endpoint behavior and path traversal protection."""
-    # 1. Un-remediated dataset download should return 404
+    # 1. Un-remediated dataset: no remediation record yet -> 404
     res_up = client.post(
         "/api/v1/datasets/upload",
         files={"file": ("dummy.csv", b"a,b\n1,2", "text/csv")},
     )
     ds_id = res_up.json()["dataset_id"]
 
+    # No token provided and no remediation record -> 404 (checked before token validation)
     res_dl_none = client.get(f"/api/v1/datasets/{ds_id}/download-sanitized")
     assert res_dl_none.status_code == 404
 
-    # 2. After remediation, download succeeds
+    # 2. After remediation, download succeeds with valid token
     client.post(f"/api/v1/datasets/{ds_id}/scan")
-    client.post(f"/api/v1/datasets/{ds_id}/remediate")
+    rem_body = client.post(f"/api/v1/datasets/{ds_id}/remediate").json()
+    dl_token = rem_body["download_token"]
 
-    res_dl_ok = client.get(f"/api/v1/datasets/{ds_id}/download-sanitized")
+    res_dl_ok = client.get(f"/api/v1/datasets/{ds_id}/download-sanitized", params={"token": dl_token})
     assert res_dl_ok.status_code == 200
     assert "attachment; filename=\"sanitized_dummy.csv\"" in res_dl_ok.headers.get("content-disposition", "")

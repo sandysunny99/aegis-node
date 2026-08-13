@@ -17,11 +17,13 @@ _ROOT = Path(__file__).parent.parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
+import logging
 from config import settings  # noqa: E402
 from database import get_db  # noqa: E402
-from fastapi import APIRouter, Depends, HTTPException, Query, status  # noqa: E402
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status  # noqa: E402
 from fastapi.concurrency import run_in_threadpool  # noqa: E402
 from fastapi.responses import FileResponse  # noqa: E402
+from limiter import limiter  # noqa: E402
 from models import DatasetRecord, RemediationRecord  # noqa: E402
 from schemas import RemediationActionSchema, RemediationResponse  # noqa: E402
 from services.file_service import file_service  # noqa: E402
@@ -31,29 +33,30 @@ from utils.auth import require_api_key  # noqa: E402
 from scanner.engine import run_scan  # noqa: E402
 from scanner.sanitizer import sanitize_file  # noqa: E402
 
+logger = logging.getLogger("aegis.remediation")
+
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
 _SAFE_FILENAME_RE = re.compile(r'[^\w.\-]')   # Allow only word chars, dots, hyphens
 
 
 def _read_sample_df(path: str, fmt: str):  # type: ignore[return]
-    """Read one header row from any supported format to get column count."""
+    """Read sample header row from format to compute column and row counts."""
+    import pandas as pd
     try:
-        import pandas as pd
         if fmt == "csv":
-            return pd.read_csv(path, nrows=1)
+            return pd.read_csv(path, nrows=100)
         if fmt == "xlsx":
-            return pd.read_excel(path, nrows=1)
+            return pd.read_excel(path, nrows=100)
         if fmt == "json":
-            return pd.read_json(path).head(1)
+            return pd.read_json(path).head(100)
         if fmt == "jsonl":
-            return pd.read_json(path, lines=True).head(1)
+            return pd.read_json(path, lines=True).head(100)
         if fmt == "parquet":
             import pyarrow.parquet as pq
-            return pq.read_table(path).to_pandas().head(1)
-    except Exception:  # noqa: BLE001
-        pass
-    import pandas as pd
+            return pq.read_table(path).to_pandas().head(100)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Could not parse sample dataframe for integrity calculation (%s): %s", path, exc)
     return pd.DataFrame()
 
 
@@ -66,7 +69,9 @@ router = APIRouter(prefix="/api/v1/datasets", tags=["remediation"])
     status_code=status.HTTP_200_OK,
     summary="Remediate dataset threats, generate sanitized artifact, and execute verification re-scan",
 )
+@limiter.limit("5/minute")
 async def remediate_dataset(
+    request: Request,
     dataset_id: int,
     db: Session = Depends(get_db),  # noqa: B008
     _auth: None = Depends(require_api_key),  # noqa: B008  # API key guard
@@ -93,11 +98,16 @@ async def remediate_dataset(
     except (FileNotFoundError, ValueError) as err:
         raise HTTPException(status_code=404, detail="Source file unavailable for remediation.") from err
 
-    # Run blocking sanitize in threadpool — may process large DataFrames
-    san_result = await run_in_threadpool(sanitize_file, orig_source_path, record.file_format)
+    # FINDING-012: Catch sanitization exceptions, log full traceback, return generic 500 error
+    try:
+        san_result = await run_in_threadpool(sanitize_file, orig_source_path, record.file_format)
+    except Exception as exc:
+        logger.exception("Unexpected exception during dataset remediation for dataset_id=%d", dataset_id)
+        raise HTTPException(status_code=500, detail="Internal server error during remediation execution.") from exc
 
     if san_result.error:
-        raise HTTPException(status_code=500, detail=f"Sanitization failed: {san_result.error}")
+        logger.error("Sanitization process failed for dataset %d: %s", dataset_id, san_result.error)
+        raise HTTPException(status_code=500, detail="Sanitization failed. Check server logs for details.")
 
     # 4. Save sanitized file to data/sanitized/ (Original remains untouched)
     san_filename, san_sha256, san_path = file_service.save_sanitized(
@@ -105,8 +115,13 @@ async def remediate_dataset(
         content=san_result.sanitized_bytes,
     )
 
-    # 5. Automated Verification Re-Scan of Sanitized Artifact (also blocking — run in threadpool)
-    rescan_result = await run_in_threadpool(run_scan, str(san_path))
+    # 5. Automated Verification Re-Scan of Sanitized Artifact
+    try:
+        rescan_result = await run_in_threadpool(run_scan, str(san_path))
+    except Exception as exc:
+        logger.exception("Re-scan failed during remediation for dataset_id=%d", dataset_id)
+        raise HTTPException(status_code=500, detail="Verification re-scan failed during remediation.") from exc
+
     san_risk = rescan_result.risk_score
     remaining_count = rescan_result.threats_found_count
     resolved_count = max(0, orig_findings_count - remaining_count)
@@ -118,22 +133,19 @@ async def remediate_dataset(
         reduction_pct = 100.0 if remaining_count == 0 else 0.0
 
     # ── Compute data integrity preservation score ──────────────────────────
-    # Formula: 100 * (1 - changes / total_fields)
-    # Uses format-aware reader for accurate column count across all 6 formats.
     import os
     try:
         sample_df = _read_sample_df(orig_source_path, record.file_format)
         _total_cols = max(len(sample_df.columns), 1)
         _file_bytes = os.path.getsize(orig_source_path)
-        _avg_row_bytes = max(_file_bytes // max(_total_cols * 10, 1), 1)
-        _est_rows = max(_file_bytes // _avg_row_bytes, 1)
+        # Improved row estimate (FINDING-020)
+        _est_rows = max(_file_bytes // max(_total_cols * 20, 1), 1)
         _total_fields = _est_rows * _total_cols
         integrity_preserved = round(
             100.0 * (1.0 - san_result.changes_count / max(_total_fields, 1)), 2
         )
         integrity_preserved = max(0.0, min(100.0, integrity_preserved))
     except Exception:  # noqa: BLE001
-        # Fallback: derive from change ratio vs an assumed baseline of 1000 clean fields
         integrity_preserved = round(
             100.0 * (1.0 - san_result.changes_count / max(san_result.changes_count + 1000, 1)), 2
         )
@@ -169,6 +181,7 @@ async def remediate_dataset(
         stored_sanitized_filename=san_filename,
         download_token=download_token,
         token_created_at=token_created_at,
+        used=False,
         remediation_status=rem_status,
         original_risk_score=orig_risk,
         sanitized_risk_score=san_risk,
@@ -177,7 +190,7 @@ async def remediate_dataset(
         resolved_findings_count=resolved_count,
         threat_reduction_percent=reduction_pct,
         changes_count=san_result.changes_count,
-        integrity_preserved=integrity_preserved,        # ← persisted to DB
+        integrity_preserved=integrity_preserved,
         remediation_actions_json=json.dumps(action_dicts),
     )
     db.add(db_record)
@@ -191,7 +204,7 @@ async def remediate_dataset(
         dataset_id=db_record.dataset_id,
         original_sha256=db_record.original_sha256,
         sanitized_sha256=db_record.sanitized_sha256,
-        download_token=db_record.download_token or "",
+        download_token=db_record.download_token,
         remediation_status=db_record.remediation_status,
         original_risk_score=db_record.original_risk_score,
         sanitized_risk_score=db_record.sanitized_risk_score,
@@ -211,7 +224,12 @@ async def remediate_dataset(
     response_model=RemediationResponse,
     summary="Get the latest remediation report for a dataset",
 )
-def get_remediation_report(dataset_id: int, db: Session = Depends(get_db)) -> RemediationResponse:  # noqa: B008
+@limiter.limit("60/minute")
+def get_remediation_report(
+    request: Request,
+    dataset_id: int,
+    db: Session = Depends(get_db),  # noqa: B008
+) -> RemediationResponse:
     record: DatasetRecord | None = db.get(DatasetRecord, dataset_id)
     if not record:
         raise HTTPException(status_code=404, detail=f"Dataset {dataset_id} not found.")
@@ -227,7 +245,7 @@ def get_remediation_report(dataset_id: int, db: Session = Depends(get_db)) -> Re
         dataset_id=latest.dataset_id,
         original_sha256=latest.original_sha256,
         sanitized_sha256=latest.sanitized_sha256,
-        download_token=latest.download_token or "",         # Bug 2 fix
+        download_token=latest.download_token if not latest.used else None,
         remediation_status=latest.remediation_status,
         original_risk_score=latest.original_risk_score,
         sanitized_risk_score=latest.sanitized_risk_score,
@@ -235,7 +253,7 @@ def get_remediation_report(dataset_id: int, db: Session = Depends(get_db)) -> Re
         remaining_findings_count=latest.remaining_findings_count,
         resolved_findings_count=latest.resolved_findings_count,
         threat_reduction_percent=latest.threat_reduction_percent,
-        integrity_preserved=latest.integrity_preserved,      # Bug 2 fix (from DB)
+        integrity_preserved=latest.integrity_preserved,
         changes_count=latest.changes_count,
         remediated_at=latest.remediated_at,
         actions=action_schemas,
@@ -246,16 +264,17 @@ def get_remediation_report(dataset_id: int, db: Session = Depends(get_db)) -> Re
     "/{dataset_id}/download-sanitized",
     summary="Download the sanitized dataset file (requires valid download token)",
 )
+@limiter.limit("60/minute")
 def download_sanitized_dataset(
+    request: Request,
     dataset_id: int,
-    # Improvement 7: validate token is non-empty via Query constraint
-    token: str = Query(..., min_length=1, description="Download token from remediation response"),
+    token: str | None = Query(default=None, description="Download token from remediation response"),
+    authorization: str | None = Header(default=None, alias="Authorization"),
     db: Session = Depends(get_db),  # noqa: B008
 ) -> FileResponse:
     """
     Serve the sanitized dataset artifact.
-    Requires the `token` query parameter generated during remediation.
-    Without a valid token, returns HTTP 403.
+    Accepts token via 'Authorization: Bearer <token>' header OR '?token=...' query parameter.
     """
     record: DatasetRecord | None = db.get(DatasetRecord, dataset_id)
     if not record:
@@ -266,18 +285,34 @@ def download_sanitized_dataset(
 
     latest = sorted(record.remediations, key=lambda r: r.remediated_at)[-1]
 
-    # ── Token validation (constant-time comparison to prevent timing attacks) ──
+    # Extract token from Authorization header if present ("Bearer <token>")
+    provided_token = token
+    if authorization and authorization.lower().startswith("bearer "):
+        provided_token = authorization.split(" ", 1)[1].strip()
+
+    # FINDING-023: Check single-use status
+    if getattr(latest, "used", False):
+        raise HTTPException(
+            status_code=403,
+            detail="Download token has already been used. Re-run remediation to generate a new token.",
+        )
+
+    # ── Token validation (constant-time comparison) ──
     expected_token = latest.download_token or ""
-    if not expected_token or not secrets.compare_digest(expected_token, token):
+    req_token = provided_token or ""
+    if not expected_token or not secrets.compare_digest(expected_token, req_token):
         raise HTTPException(
             status_code=403,
             detail="Invalid or missing download token. Re-run remediation to obtain a valid token.",
         )
 
-    # ── Token expiry check ───────────────────────────────────────────────────────
+    # ── FINDING-005: Timezone-safe expiry check ─────────────────────────
     expiry_minutes = settings.download_token_expiry_minutes
     if expiry_minutes > 0 and latest.token_created_at:
-        age = datetime.now(UTC) - latest.token_created_at.replace(tzinfo=UTC)
+        created = latest.token_created_at
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=UTC)
+        age = datetime.now(UTC) - created
         if age > timedelta(minutes=expiry_minutes):
             raise HTTPException(
                 status_code=403,
@@ -292,16 +327,18 @@ def download_sanitized_dataset(
     if not san_path.exists():
         raise HTTPException(status_code=404, detail="Sanitized file artifact missing from storage.")
 
-    # Improvement 4: sanitize original_filename before embedding in Content-Disposition
-    # Prevents header injection if filename contains special characters or path separators.
-    safe_name = Path(record.original_filename).name          # basename only
-    safe_name = _SAFE_FILENAME_RE.sub("_", safe_name)        # strip unsafe chars
+    # Mark token as used upon successful download (FINDING-023)
+    latest.used = True
+    db.commit()
+
+    safe_name = Path(record.original_filename).name
+    safe_name = _SAFE_FILENAME_RE.sub("_", safe_name)
     download_name = f"sanitized_{safe_name}"
     mime = record.mime_type or "application/octet-stream"
 
+    # FINDING-028: Rely on filename parameter in FileResponse (no duplicate headers dict)
     return FileResponse(
         path=str(san_path),
         filename=download_name,
         media_type=mime,
-        headers={"Content-Disposition": f'attachment; filename="{download_name}"'},
     )
