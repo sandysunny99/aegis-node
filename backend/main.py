@@ -65,20 +65,7 @@ app.include_router(remediation_router)
 @app.get("/health", tags=["system"])
 @limiter.limit("60/minute")
 async def health(request: Request) -> dict:
-    """Public lightweight health probe."""
-    return {
-        "status": "ok",
-        "version": "0.1.0",
-    }
-
-
-@app.get("/health/diagnostics", tags=["system"])
-@limiter.limit("30/minute")
-async def health_diagnostics(
-    request: Request,
-    _auth: None = Depends(require_api_key),
-) -> dict:
-    """Protected extended health probe — actively checks ClamAV and AI configuration."""
+    """Public health probe with UI status fields."""
     # ClamAV ping
     try:
         from scanner.clamd_client import ping as clamav_ping
@@ -108,10 +95,19 @@ async def health_diagnostics(
         "clamav_running": clamav_running,
         "ai_configured": ai_configured,
         "ai_provider": settings.ai_provider,
-        "ai_fallback_chain": settings.ai_fallback_chain or "none",
         "max_file_size_mb": settings.max_upload_size_mb,
         "supported_formats": [ext.lstrip(".") for ext in sorted(settings.allowed_extensions)],
     }
+
+
+@app.get("/health/diagnostics", tags=["system"])
+@limiter.limit("30/minute")
+async def health_diagnostics(
+    request: Request,
+    _auth: None = Depends(require_api_key),
+) -> dict:
+    """Protected extended health probe — actively checks ClamAV and AI configuration."""
+    return await health(request)
 
 
 # ─── Frontend Static Files (React SPA) ───────────────────────────────────────

@@ -69,7 +69,7 @@ export default function AiSummary({ datasetId }) {
           <div>
             <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>AI Analysis Unavailable</div>
             <div style={{ color: 'var(--text-3)' }}>
-              {result?.summary || 'No AI API key is configured. Set GEMINI_API_KEY or GROQ_API_KEY in .env to enable AI-assisted analysis.'}
+              {result?.error ? `${result.error} — set GEMINI_API_KEY or GROQ_API_KEY in your environment to enable AI threat analysis.` : (result?.summary || 'No AI API key is configured. Set GEMINI_API_KEY or GROQ_API_KEY in .env to enable AI-assisted analysis.')}
             </div>
           </div>
         </div>
