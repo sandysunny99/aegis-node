@@ -28,12 +28,7 @@ export default function FindingsList({ findings = [] }) {
   }, {});
 
   if (findings.length === 0) {
-    return (
-      <div className="empty">
-        <div className="empty-icon">✅</div>
-        <div>No threats detected — dataset appears clean.</div>
-      </div>
-    );
+    return null;
   }
 
   return (
