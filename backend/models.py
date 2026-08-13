@@ -144,6 +144,8 @@ class RemediationRecord(Base):
 
     # Secure one-time download token — generated on remediation, required for download
     download_token: Mapped[str] = mapped_column(String(64), unique=True, nullable=True, index=True)
+    # Timestamp when the token was generated — used to enforce expiry (default 60 min)
+    token_created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
 
     remediation_status: Mapped[str] = mapped_column(String(32), nullable=False, default="completed")  # completed | partial | failed
 

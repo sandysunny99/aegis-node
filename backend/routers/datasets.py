@@ -26,6 +26,7 @@ from services.file_service import file_service  # noqa: E402
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session  # noqa: E402
+from utils.auth import require_api_key  # noqa: E402
 
 from scanner.engine import run_scan  # noqa: E402
 
@@ -51,6 +52,7 @@ async def upload_dataset(
     request: Request,             # Required by slowapi for rate limit tracking
     file: UploadFile = File(..., description="Dataset file — CSV, Parquet, JSON, JSONL, XLSX, TXT"),  # noqa: B008
     db: Session = Depends(get_db),  # noqa: B008
+    _auth: None = Depends(require_api_key),  # noqa: B008  # API key guard (optional in dev)
 ) -> DatasetUploadResponse:
     # 1. Extension validation
     if not file_service.validate_extension(file.filename or ""):

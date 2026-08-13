@@ -21,6 +21,18 @@ class Settings(BaseSettings):
     app_port: int = 8000
     secret_key: str = "change-me-before-production"
 
+    # ─── API Key Guard (optional) ─────────────────────────────────────────────
+    # If empty (default), write endpoints are open — suitable for local dev.
+    # Set to a long random string in .env to protect upload/scan/remediate routes.
+    # Clients must send:  X-API-Key: <value>
+    api_key: str = ""
+
+    # ─── Download Token Expiry ────────────────────────────────────────────────
+    # How long a download token is valid after remediation (in minutes).
+    # Default: 60 minutes (1 hour). Set to 0 to disable expiry.
+    download_token_expiry_minutes: int = 60
+
+
     # ─── AI Provider ─────────────────────────────────────────────────────────
     # Select active AI provider: gemini | groq | ollama | none
     ai_provider: str = "gemini"

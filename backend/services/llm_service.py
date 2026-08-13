@@ -375,6 +375,10 @@ def _call_gemini(system_prompt: str, user_prompt: str) -> LlmAnalysisResult:
             prompt_tokens=prompt_tok, completion_tokens=comp_tok,
         )
     except Exception as exc:  # noqa: BLE001
+        exc_str = str(exc).lower()
+        if "429" in exc_str or "quota" in exc_str or "rate" in exc_str:
+            logger.warning("Gemini rate limit hit: %s", exc)
+            return _unavailable_result(model_name, "Gemini API rate limit exceeded — AI temporarily unavailable. Try again in a moment.")
         logger.error("Gemini call failed: %s", exc)
         return _failed_result(model_name, "Gemini API error")
 
@@ -411,6 +415,10 @@ def _call_groq(system_prompt: str, user_prompt: str) -> LlmAnalysisResult:
             limitations=parsed.limitations,
         )
     except Exception as exc:  # noqa: BLE001
+        exc_str = str(exc).lower()
+        if "429" in exc_str or "quota" in exc_str or "rate" in exc_str:
+            logger.warning("Groq rate limit hit: %s", exc)
+            return _unavailable_result(model_name, "Groq API rate limit exceeded — AI temporarily unavailable. Try again in a moment.")
         logger.error("Groq call failed: %s", exc)
         return _failed_result(model_name, "Groq API error")
 
@@ -444,5 +452,11 @@ def _call_ollama(system_prompt: str, user_prompt: str) -> LlmAnalysisResult:
             limitations=parsed.limitations,
         )
     except Exception as exc:  # noqa: BLE001
+        exc_str = str(exc).lower()
+        if "429" in exc_str or "quota" in exc_str or "rate" in exc_str:
+            logger.warning("Ollama rate limit hit: %s", exc)
+            return _unavailable_result(f"ollama/{model_name}", "Ollama rate limit exceeded — AI temporarily unavailable.")
+        if "connect" in exc_str or "refused" in exc_str or "timeout" in exc_str:
+            return _unavailable_result(f"ollama/{model_name}", "Ollama not reachable — is it running on the configured host?")
         logger.error("Ollama call failed: %s", exc)
         return _failed_result(f"ollama/{model_name}", "Ollama API error")

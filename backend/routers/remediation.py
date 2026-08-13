@@ -9,12 +9,14 @@ Endpoints:
 import json
 import secrets
 import sys
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 _ROOT = Path(__file__).parent.parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
+from config import settings  # noqa: E402
 from database import get_db  # noqa: E402
 from fastapi import APIRouter, Depends, HTTPException, status  # noqa: E402
 from fastapi.concurrency import run_in_threadpool  # noqa: E402
@@ -23,6 +25,7 @@ from models import DatasetRecord, RemediationRecord  # noqa: E402
 from schemas import RemediationActionSchema, RemediationResponse  # noqa: E402
 from services.file_service import file_service  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
+from utils.auth import require_api_key  # noqa: E402
 
 from scanner.engine import run_scan  # noqa: E402
 from scanner.sanitizer import sanitize_file  # noqa: E402
@@ -36,7 +39,11 @@ router = APIRouter(prefix="/api/v1/datasets", tags=["remediation"])
     status_code=status.HTTP_200_OK,
     summary="Remediate dataset threats, generate sanitized artifact, and execute verification re-scan",
 )
-async def remediate_dataset(dataset_id: int, db: Session = Depends(get_db)) -> RemediationResponse:  # noqa: B008
+async def remediate_dataset(
+    dataset_id: int,
+    db: Session = Depends(get_db),  # noqa: B008
+    _auth: None = Depends(require_api_key),  # noqa: B008  # API key guard
+) -> RemediationResponse:
     # 1. Retrieve dataset record
     record: DatasetRecord | None = db.get(DatasetRecord, dataset_id)
     if not record:
@@ -120,8 +127,9 @@ async def remediate_dataset(dataset_id: int, db: Session = Depends(get_db)) -> R
         for a in san_result.actions
     ]
 
-    # Generate a cryptographically secure one-time download token
+    # Generate a cryptographically secure download token + record its creation time
     download_token = secrets.token_urlsafe(32)
+    token_created_at = datetime.now(UTC)
 
     # 6. Persist RemediationRecord
     db_record = RemediationRecord(
@@ -130,6 +138,7 @@ async def remediate_dataset(dataset_id: int, db: Session = Depends(get_db)) -> R
         sanitized_sha256=san_sha256,
         stored_sanitized_filename=san_filename,
         download_token=download_token,
+        token_created_at=token_created_at,
         remediation_status=rem_status,
         original_risk_score=orig_risk,
         sanitized_risk_score=san_risk,
@@ -230,6 +239,16 @@ def download_sanitized_dataset(
             status_code=403,
             detail="Invalid or missing download token. Re-run remediation to obtain a valid token.",
         )
+
+    # ── Token expiry check ───────────────────────────────────────────────────────
+    expiry_minutes = settings.download_token_expiry_minutes
+    if expiry_minutes > 0 and latest.token_created_at:
+        age = datetime.now(UTC) - latest.token_created_at.replace(tzinfo=UTC)
+        if age > timedelta(minutes=expiry_minutes):
+            raise HTTPException(
+                status_code=403,
+                detail=f"Download token expired ({expiry_minutes} min limit). Re-run remediation to get a fresh token.",
+            )
 
     try:
         san_path = file_service.get_sanitized_path(latest.stored_sanitized_filename)
