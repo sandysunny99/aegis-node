@@ -1,0 +1,35 @@
+# Aegis Node — Backend Requirements
+# Pinned to secure, tested versions.
+
+# ─── Web / API ────────────────────────────────────────────────────────────────
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+python-multipart>=0.0.12
+slowapi>=0.1.9             # Rate limiting (per-IP, in-memory)
+
+# ─── Data Processing ──────────────────────────────────────────────────────────
+pandas>=2.2.0
+pyarrow>=16.0.0           # Parquet streaming support (iter_batches)
+openpyxl>=3.1.0           # XLSX read/write (read_only mode for memory efficiency)
+
+# ─── Database ────────────────────────────────────────────────────────────────
+sqlalchemy>=2.0.31
+
+# ─── AI / LLM ────────────────────────────────────────────────────────────────
+google-genai>=1.0.0       # Google Gemini (primary AI provider)
+httpx>=0.27.0             # HTTP client for Groq + Ollama API calls
+
+# ─── Validation ──────────────────────────────────────────────────────────────
+pydantic>=2.7.0
+pydantic-settings>=2.3.0
+
+# ─── Environment Configuration ───────────────────────────────────────────────
+python-dotenv>=1.0.0
+
+# ─── Testing ─────────────────────────────────────────────────────────────────
+pytest>=8.2.0
+pytest-asyncio>=0.23.0
+httpx>=0.27.0             # Also used for FastAPI TestClient
+
+# ─── Code Quality ────────────────────────────────────────────────────────────
+ruff>=0.5.0

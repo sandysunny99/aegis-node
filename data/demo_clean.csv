@@ -1,0 +1,16 @@
+id,name,email,department,salary,city,joined_date,notes
+1,Alice Johnson,alice.johnson@company.com,Engineering,95000,Bangalore,2022-03-15,Senior software engineer with 8 years experience
+2,Bob Smith,bob.smith@company.com,Marketing,72000,Mumbai,2021-07-22,Digital marketing specialist focused on B2B campaigns
+3,Charlie Brown,charlie.brown@company.com,Sales,68000,Delhi,2023-01-10,Account executive managing enterprise clients
+4,Diana Prince,diana.prince@company.com,HR,71000,Chennai,2020-11-05,HR business partner with recruitment expertise
+5,Edward Norton,edward.norton@company.com,Finance,88000,Hyderabad,2019-06-30,Senior financial analyst managing quarterly reports
+6,Fiona Green,fiona.green@company.com,Engineering,92000,Pune,2022-08-17,Backend engineer specializing in distributed systems
+7,George Hall,george.hall@company.com,Product,85000,Bangalore,2021-04-11,Product manager with 5 years in SaaS products
+8,Hannah White,hannah.white@company.com,Design,74000,Mumbai,2023-05-20,UX designer focused on accessibility and user research
+9,Ivan Black,ivan.black@company.com,Operations,67000,Kolkata,2020-09-14,Operations coordinator managing vendor relationships
+10,Jane Doe,jane.doe@company.com,Engineering,98000,Bangalore,2018-12-03,Staff engineer and technical lead for core platform
+11,Kevin Lee,kevin.lee@company.com,Sales,65000,Delhi,2023-03-01,Junior account executive in SMB segment
+12,Laura Martin,laura.martin@company.com,Marketing,77000,Chennai,2021-10-18,Content strategist and brand communications lead
+13,Mike Chen,mike.chen@company.com,Engineering,91000,Hyderabad,2022-01-25,DevOps engineer managing CI/CD and cloud infrastructure
+14,Nancy Park,nancy.park@company.com,Finance,82000,Pune,2020-07-08,Financial controller with audit and compliance background
+15,Oscar Silva,oscar.silva@company.com,HR,69000,Mumbai,2023-07-15,HR coordinator handling onboarding and employee relations

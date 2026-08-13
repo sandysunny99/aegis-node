@@ -1,0 +1,16 @@
+id,name,email,notes,user_input
+1,Alice,alice@example.com,normal data - regular customer,benign value
+2,Bob,' OR '1'='1' --,SQL injection attempt in email field,'; DROP TABLE users; --
+3,Charlie,charlie@corp.com,"=cmd|' /C calc'!A0",formula injection in notes
+4,Dave,dave@test.com,<script>alert('XSS attack')</script>,cross-site scripting attempt
+5,Eve,eve@normal.com,clean row - no issues detected,safe value here
+6,Frank,frank@evil.com,javascript:alert(document.cookie),javascript protocol injection
+7,Grace,grace@demo.com,"=HYPERLINK(""http://evil.com"",""Click me"")",hyperlink formula
+8,Hank,hank@example.com,+CONCATENATE(""http://"",""evil.com""),concatenation formula
+9,Ivy,ivy@test.com,UNION SELECT username password FROM users,SQL UNION select injection
+10,Jack,jack@demo.com,normal record with clean data,another safe value
+11,Kate,kate@corp.com,"DDE(""cmd"",""/C whoami"","""",8)",DDE command execution
+12,Leo,leo@example.com,-2+3+cmd|' /C notepad'!A0,formula trigger character injection
+13,Mia,mia@test.com,<img src=x onerror=alert(1)>,XSS via onerror attribute
+14,Ned,ned@example.com,regular customer data,completely safe row
+15,Ora,ora@demo.com,@SUM(1+1)*cmd|' /C calc'!A0,AT formula injection

@@ -1,0 +1,61 @@
+# ─── Secrets & Environment ───────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ─── Python ──────────────────────────────────────────────────────────────────
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pdb
+*.egg-info/
+build/
+*.egg
+.pytest_cache/
+.ruff_cache/
+*.coverage
+htmlcov/
+
+# ─── Node / Frontend ─────────────────────────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+.vite/
+
+# ─── Data — never commit runtime uploads, quarantine, or scan artifacts ───────
+data/samples/*
+data/quarantine/*
+data/sanitized/*
+data/reports/*
+data/benchmarks/
+
+# Keep tracked empty directory markers
+!data/samples/.gitkeep
+!data/quarantine/.gitkeep
+!data/sanitized/.gitkeep
+!data/reports/.gitkeep
+
+# Keep the demo datasets (small, safe, needed for demo)
+!data/demo_malicious.csv
+!data/demo_clean.csv
+
+# ─── Database (SQLite runtime file) ──────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ─── Logs ────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ─── Docker volumes ──────────────────────────────────────────────────────────
+docker-volumes/
+
+# ─── IDE / OS ────────────────────────────────────────────────────────────────
+.idea/
+.vscode/settings.json
+.DS_Store
+Thumbs.db
