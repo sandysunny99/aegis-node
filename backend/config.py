@@ -87,7 +87,7 @@ class Settings(BaseSettings):
 
     # ─── LLM (xAI / Grok — OpenAI-compatible API) ────────────────────────────
     xai_api_key: str = ""
-    xai_model: str = "grok-3-mini"
+    xai_model: str = "grok-2-latest"
     xai_timeout_seconds: int = 30
 
     # ─── LLM (Ollama — local, 100% free) ─────────────────────────────────────

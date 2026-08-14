@@ -487,55 +487,66 @@ def _call_gemini(
     api_key: str | None = None,   # When None, reads from settings (primary)
 ) -> LlmAnalysisResult:
     model_name = settings.gemini_model or "gemini-2.0-flash"
-    api_key = api_key or settings.gemini_api_key
+    api_key = (api_key or settings.gemini_api_key or "").strip()
 
     if not api_key:
         return _unavailable_result(model_name, "GEMINI_API_KEY not configured")
 
-    try:
-        from google import genai
-        from google.genai import types
+    models_to_try = [model_name]
+    for fallback_m in ("gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"):
+        if fallback_m not in models_to_try:
+            models_to_try.append(fallback_m)
 
-        client = genai.Client(api_key=api_key)
-        config = types.GenerateContentConfig(
-            system_instruction=system_prompt,
-            temperature=0.2,
-            max_output_tokens=1024,
-            response_mime_type="application/json",
-            response_schema=LlmAnalysisOutput,
-        )
-        response = client.models.generate_content(
-            model=model_name,
-            contents=user_prompt,
-            config=config,
-        )
-        raw_text = response.text or ""
-        parsed = _validate_and_parse(raw_text)
-        if not parsed:
-            return _failed_result(model_name, "Failed to parse Gemini structured response")
+    last_error: Exception | None = None
 
-        usage = getattr(response, "usage_metadata", None)
-        prompt_tok = getattr(usage, "prompt_token_count", 0) or 0
-        comp_tok = getattr(usage, "candidates_token_count", 0) or 0
+    for current_model in models_to_try:
+        try:
+            from google import genai
+            from google.genai import types
 
-        logger.info("Gemini analysis complete — model=%s tokens=%d+%d verdict=%s",
-                    model_name, prompt_tok, comp_tok, parsed.verdict)
+            client = genai.Client(api_key=api_key)
+            config = types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                temperature=0.2,
+                max_output_tokens=1024,
+                response_mime_type="application/json",
+                response_schema=LlmAnalysisOutput,
+            )
+            response = client.models.generate_content(
+                model=current_model,
+                contents=user_prompt,
+                config=config,
+            )
+            raw_text = response.text or ""
+            parsed = _validate_and_parse(raw_text)
+            if not parsed:
+                return _failed_result(current_model, "Failed to parse Gemini structured response")
 
-        return LlmAnalysisResult(
-            status="completed", model_name=model_name,
-            verdict=parsed.verdict, severity=parsed.severity,
-            confidence=round(parsed.confidence, 2), summary=parsed.summary,
-            evidence=parsed.evidence, recommendations=parsed.recommendations,
-            limitations=parsed.limitations,
-            prompt_tokens=prompt_tok, completion_tokens=comp_tok,
-        )
-    except Exception as exc:  # noqa: BLE001
-        exc_str = str(exc).lower()
-        if "429" in exc_str or "quota" in exc_str or "resource_exhausted" in exc_str:
-            logger.warning("Gemini rate limit hit: %s", exc)
-            return _unavailable_result(model_name, "Gemini API quota/rate limit reached — AI temporarily unavailable. Try again in a moment.")
-        logger.error("Gemini call failed: %s", exc)
-        return _failed_result(model_name, f"Gemini API error: {exc}")
+            usage = getattr(response, "usage_metadata", None)
+            prompt_tok = getattr(usage, "prompt_token_count", 0) or 0
+            comp_tok = getattr(usage, "candidates_token_count", 0) or 0
+
+            logger.info("Gemini analysis complete — model=%s tokens=%d+%d verdict=%s",
+                        current_model, prompt_tok, comp_tok, parsed.verdict)
+
+            return LlmAnalysisResult(
+                status="completed", model_name=current_model,
+                verdict=parsed.verdict, severity=parsed.severity,
+                confidence=round(parsed.confidence, 2), summary=parsed.summary,
+                evidence=parsed.evidence, recommendations=parsed.recommendations,
+                limitations=parsed.limitations,
+                prompt_tokens=prompt_tok, completion_tokens=comp_tok,
+            )
+        except Exception as exc:  # noqa: BLE001
+            last_error = exc
+            exc_str = str(exc).lower()
+            if "429" in exc_str or "quota" in exc_str or "resource_exhausted" in exc_str:
+                logger.warning("Gemini rate limit hit: %s", exc)
+                return _unavailable_result(current_model, "Gemini API quota/rate limit reached — trying next provider.")
+            logger.warning("Gemini model %s failed: %s", current_model, exc)
+
+    logger.error("Gemini call failed on all models: %s", last_error)
+    return _failed_result(model_name, f"Gemini API error: {last_error}")
 
 
 def _call_xai(
@@ -544,8 +555,8 @@ def _call_xai(
     *,
     api_key: str | None = None,
 ) -> LlmAnalysisResult:
-    model_name = settings.xai_model or "grok-3-mini"
-    api_key = api_key or settings.xai_api_key
+    model_name = settings.xai_model or "grok-2-latest"
+    api_key = (api_key or settings.xai_api_key or "").strip()
 
     if not api_key:
         return _unavailable_result(model_name, "XAI_API_KEY not configured")
@@ -560,7 +571,7 @@ def _call_xai(
             timeout=settings.xai_timeout_seconds,
         )
         if not raw_text:
-            return _failed_result(model_name, "xAI API returned empty response")
+            return _failed_result(model_name, "xAI API returned empty response — check API key validity/quota at console.x.ai")
 
         parsed = _validate_and_parse(raw_text)
         if not parsed:
@@ -580,7 +591,7 @@ def _call_xai(
             logger.warning("xAI rate limit hit: %s", exc)
             return _unavailable_result(model_name, "xAI API rate limit exceeded — trying next provider.")
         logger.error("xAI call failed: %s", exc)
-        return _failed_result(model_name, "xAI API error")
+        return _failed_result(model_name, f"xAI API error: {exc}")
 
 
 def _call_groq(
