@@ -334,6 +334,9 @@ def _get_provider_key(provider: str, is_fallback: bool = False) -> str:
     if provider == "groq":
         fallback_key = settings.fallback_groq_api_key
         return (fallback_key if is_fallback and fallback_key else settings.groq_api_key)
+    if provider == "xai":
+        fallback_key = settings.fallback_xai_api_key
+        return (fallback_key if is_fallback and fallback_key else settings.xai_api_key)
     return ""   # ollama / none need no key
 
 
@@ -350,7 +353,7 @@ def _build_provider_chain(cfg=None) -> list[tuple[str, bool]]:
              Pass a custom config in tests to avoid patching the module global.
     """
     cfg = cfg or settings
-    _KNOWN = {"gemini", "groq", "ollama", "none"}
+    _KNOWN = {"gemini", "groq", "xai", "ollama", "none"}
     chain: list[tuple[str, bool]] = []
     seen: set[str] = set()   # Improvement 8: dedup by provider name
 
@@ -466,6 +469,9 @@ def _call_provider(
     if provider_name == "groq":
         api_key = _get_provider_key("groq", is_fallback)
         return _call_groq(system_prompt, user_prompt, api_key=api_key)
+    if provider_name == "xai":
+        api_key = _get_provider_key("xai", is_fallback)
+        return _call_xai(system_prompt, user_prompt, api_key=api_key)
     if provider_name == "ollama":
         return _call_ollama(system_prompt, user_prompt)
     logger.warning("Unknown provider name %r — skipping", provider_name)
@@ -530,6 +536,51 @@ def _call_gemini(
             return _unavailable_result(model_name, "Gemini API quota/rate limit reached — AI temporarily unavailable. Try again in a moment.")
         logger.error("Gemini call failed: %s", exc)
         return _failed_result(model_name, f"Gemini API error: {exc}")
+
+
+def _call_xai(
+    system_prompt: str,
+    user_prompt: str,
+    *,
+    api_key: str | None = None,
+) -> LlmAnalysisResult:
+    model_name = settings.xai_model or "grok-3-mini"
+    api_key = api_key or settings.xai_api_key
+
+    if not api_key:
+        return _unavailable_result(model_name, "XAI_API_KEY not configured")
+
+    try:
+        from services.ai_providers.xai_provider import call_xai
+        raw_text = call_xai(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            api_key=api_key,
+            model=model_name,
+            timeout=settings.xai_timeout_seconds,
+        )
+        if not raw_text:
+            return _failed_result(model_name, "xAI API returned empty response")
+
+        parsed = _validate_and_parse(raw_text)
+        if not parsed:
+            return _failed_result(model_name, "Failed to parse xAI/Grok response as structured JSON")
+
+        logger.info("xAI Grok analysis complete — model=%s verdict=%s", model_name, parsed.verdict)
+        return LlmAnalysisResult(
+            status="completed", model_name=f"xai/{model_name}",
+            verdict=parsed.verdict, severity=parsed.severity,
+            confidence=round(parsed.confidence, 2), summary=parsed.summary,
+            evidence=parsed.evidence, recommendations=parsed.recommendations,
+            limitations=parsed.limitations,
+        )
+    except Exception as exc:  # noqa: BLE001
+        exc_str = str(exc).lower()
+        if "429" in exc_str or "quota" in exc_str or "rate" in exc_str:
+            logger.warning("xAI rate limit hit: %s", exc)
+            return _unavailable_result(model_name, "xAI API rate limit exceeded — trying next provider.")
+        logger.error("xAI call failed: %s", exc)
+        return _failed_result(model_name, "xAI API error")
 
 
 def _call_groq(

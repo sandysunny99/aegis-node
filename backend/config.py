@@ -55,6 +55,7 @@ class Settings(BaseSettings):
 
     fallback_gemini_api_key: str = ""
     fallback_groq_api_key: str = ""
+    fallback_xai_api_key: str = ""
 
     # ─── LLM (Google Gemini) ──────────────────────────────────────────────────
     gemini_api_key: str = ""
@@ -65,6 +66,11 @@ class Settings(BaseSettings):
     groq_api_key: str = ""
     groq_model: str = "llama-3.1-8b-instant"
     groq_timeout_seconds: int = 20
+
+    # ─── LLM (xAI / Grok — OpenAI-compatible API) ────────────────────────────
+    xai_api_key: str = ""
+    xai_model: str = "grok-3-mini"
+    xai_timeout_seconds: int = 30
 
     # ─── LLM (Ollama — local, 100% free) ─────────────────────────────────────
     ollama_base_url: str = "http://localhost:11434"

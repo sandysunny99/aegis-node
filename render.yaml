@@ -35,6 +35,12 @@ services:
       - key: GROQ_API_KEY
         sync: false
 
+      # xAI / Grok — secondary AI provider (auto-failover from Gemini)
+      # Key format: xai-...
+      # Dashboard: https://console.x.ai/
+      - key: XAI_API_KEY
+        sync: false       # Set manually in Render dashboard
+
       # ── ClamAV ────────────────────────────────────────────────────────────────
       # No ClamAV sidecar on free Render tier (too much RAM).
       # The app handles this gracefully — rule-based detection still runs fully.
@@ -72,13 +78,18 @@ services:
         value: "60"
 
       # ── AI Fallback Chain ─────────────────────────────────────────────────────
+      # Auto-failover: Gemini (primary) → xAI Grok (secondary)
+      # If Gemini hits rate limit or errors, xAI is tried automatically.
       - key: AI_FALLBACK_CHAIN
-        value: ""
+        value: "xai"
 
       - key: FALLBACK_GEMINI_API_KEY
         sync: false
 
       - key: FALLBACK_GROQ_API_KEY
+        sync: false
+
+      - key: FALLBACK_XAI_API_KEY
         sync: false
 
 
