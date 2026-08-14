@@ -31,8 +31,13 @@ _SAMPLE_MAX_LEN = 200  # max chars shown in finding sample
 # ─── Threat Detection Rules ──────────────────────────────────────────────────
 # Each rule: (rule_id, severity, category, description, compiled_regex)
 
+_EICAR = b"X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
+
+# ─── Threat Detection Rules ──────────────────────────────────────────────────
+# Each rule: (rule_id, severity, category, description, compiled_regex)
+
 _RULES: list[tuple[str, str, str, str, re.Pattern]] = [
-    # CSV Formula Injection (OWASP: https://owasp.org/www-community/attacks/CSV_Injection)
+    # ── CSV Formula Injection (OWASP) ──────────────────────────────────────────
     (
         "FORM-001", "high", "formula_injection",
         "CSV formula injection — cell starts with Excel formula trigger character",
@@ -48,7 +53,7 @@ _RULES: list[tuple[str, str, str, str, re.Pattern]] = [
         "HYPERLINK formula with external URL detected",
         re.compile(r'HYPERLINK\s*\(', re.IGNORECASE),
     ),
-    # Script Injection
+    # ── Script Injection ───────────────────────────────────────────────────────
     (
         "SCRP-001", "critical", "script_injection",
         "HTML/JavaScript <script> tag found inside dataset field",
@@ -64,7 +69,7 @@ _RULES: list[tuple[str, str, str, str, re.Pattern]] = [
         "eval() or exec() call found in field value",
         re.compile(r'\beval\s*\(|\bexec\s*\(', re.IGNORECASE),
     ),
-    # SQL Injection
+    # ── SQL Injection ──────────────────────────────────────────────────────────
     (
         "SQLI-001", "high", "sql_injection",
         "Classic SQL injection payload detected",
@@ -75,13 +80,83 @@ _RULES: list[tuple[str, str, str, str, re.Pattern]] = [
         "UNION SELECT injection pattern detected",
         re.compile(r"UNION\s+(ALL\s+)?SELECT", re.IGNORECASE),
     ),
-    # Null byte / binary anomaly in text fields
+    # ── Binary Anomaly ─────────────────────────────────────────────────────────
     (
         "BIN-001", "medium", "binary_anomaly",
         "Null byte (\\x00) found in text field — possible binary data injection",
         re.compile(r'\x00'),
     ),
+    # ── EICAR Test String ─────────────────────────────────────────────────────
+    (
+        "MAL-001", "critical", "malware_signature",
+        "EICAR antivirus test string detected — confirms AV detection pipeline is working",
+        re.compile(r'X5O!P%@AP\[4\\\\PZX54\(P\^\)7CC\)7\}', re.IGNORECASE),
+    ),
+    # ── Executable / Binary Headers in Text Fields ────────────────────────────
+    (
+        "MAL-002", "critical", "malware_signature",
+        "Windows PE/MZ executable header detected in field value",
+        re.compile(r'\bMZ\x90|\bMZP\x00|\b4d5a90|\b4d5a50', re.IGNORECASE),
+    ),
+    (
+        "MAL-003", "critical", "malware_signature",
+        "ELF binary header detected in field value (Linux executable)",
+        re.compile(r'\x7fELF|7f454c46', re.IGNORECASE),
+    ),
+    (
+        "MAL-004", "critical", "malware_signature",
+        "Base64-encoded Windows PE executable detected (TVoA or TVJQ prefix = MZ header)",
+        re.compile(r'\bTVo[Aqw]|\bTVJQ|\bTVpQ', re.IGNORECASE),
+    ),
+    # ── PowerShell / Shellcode ────────────────────────────────────────────────
+    (
+        "MAL-005", "critical", "shellcode",
+        "PowerShell encoded command (Base64) detected — common malware dropper technique",
+        re.compile(r'powershell\s.*-[Ee]nc(?:odedCommand)?\s+[A-Za-z0-9+/=]{20,}', re.IGNORECASE),
+    ),
+    (
+        "MAL-006", "critical", "shellcode",
+        "PowerShell download-and-execute cradle detected",
+        re.compile(r'IEX\s*\(|Invoke-Expression\s*\(|DownloadString\s*\(|WebClient\(\)', re.IGNORECASE),
+    ),
+    (
+        "MAL-007", "high", "shellcode",
+        "Reverse shell payload pattern detected",
+        re.compile(r'bash\s+-i\s+>&\s*/dev/tcp|nc\s+-e\s*/bin/|/bin/sh\s+-i', re.IGNORECASE),
+    ),
+    # ── Suspicious Macro / OLE patterns ──────────────────────────────────────
+    (
+        "MAL-008", "high", "macro_threat",
+        "Auto-execute macro trigger keyword detected (AutoOpen, Document_Open, etc.)",
+        re.compile(r'\b(AutoOpen|Document_Open|Workbook_Open|Auto_Open|Shell|CreateObject|WScript\.Shell)\b', re.IGNORECASE),
+    ),
+    # ── Known Malware Family Names in Filenames / Fields ─────────────────────
+    (
+        "MAL-009", "critical", "malware_reference",
+        "Known malware family name detected in field — dataset contains malware analysis data",
+        re.compile(
+            r'\b(Trojan|Ransomware|Spyware|Adware|Rootkit|Backdoor|Worm|Virus|Keylogger|'
+            r'Botnet|RAT|Dropper|Downloader|Infostealer|Cryptominer|Fileless|'
+            r'Mirai|WannaCry|Petya|NotPetya|Emotet|TrickBot|Ryuk|Conti|'
+            r'BlackCat|ALPHV|LockBit|REvil|Sodinokibi|DarkSide|Maze|'
+            r'Stuxnet|Duqu|Flame|Carbanak|APT|TIBS|ZeuS|Conficker|'
+            r'Dridex|Ursnif|Qakbot|IcedID|BazarLoader)\b',
+            re.IGNORECASE,
+        ),
+    ),
+    # ── Suspicious URLs / C2 Patterns ────────────────────────────────────────
+    (
+        "MAL-010", "high", "c2_communication",
+        "Suspicious URL with IP address and port (potential C2 server)",
+        re.compile(r'https?://\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{2,5}', re.IGNORECASE),
+    ),
+    (
+        "MAL-011", "high", "c2_communication",
+        "Hex-encoded shellcode pattern detected (\\x41\\x42 style sequences)",
+        re.compile(r'(\\x[0-9a-fA-F]{2}){6,}', re.IGNORECASE),
+    ),
 ]
+
 
 # Severity → numeric weight for risk score calculation
 _SEVERITY_WEIGHT = {"critical": 3.5, "high": 2.0, "medium": 1.0, "low": 0.3}
@@ -246,14 +321,108 @@ def _load_dataframe(path: Path) -> tuple[pd.DataFrame | None, str | None]:
         return None, f"Failed to parse dataset: {exc}"
 
 
+def raw_bytes_scan(path: Path) -> list[ContentFinding]:
+    """
+    Stage 0: Scan raw file bytes BEFORE parsing as a dataset.
+    Catches binary malware (EICAR, PE/ELF executables, shellcode) that would be
+    lost or corrupted when the file is parsed through pandas/openpyxl.
+
+    This is critical: a CSV containing an EICAR string or embedded PE header
+    must be caught at the binary level, not after text-field parsing.
+    """
+    findings = []
+    try:
+        raw = path.read_bytes()
+    except Exception as exc:
+        logger.warning("raw_bytes_scan: could not read %s — %s", path.name, exc)
+        return findings
+
+    # ── EICAR test string (exact bytes) ──────────────────────────────────────
+    if _EICAR in raw:
+        findings.append(ContentFinding(
+            rule_id="MAL-001",
+            severity="critical",
+            category="malware_signature",
+            description="EICAR antivirus test string detected in raw file bytes",
+            location="raw_bytes",
+            sample="X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR...",
+        ))
+
+    # ── Windows PE / MZ executable header ────────────────────────────────────
+    if raw[:2] == b"MZ" or b"MZ\x90\x00" in raw[:4096] or b"MZP\x00" in raw[:4096]:
+        findings.append(ContentFinding(
+            rule_id="MAL-002",
+            severity="critical",
+            category="malware_signature",
+            description="Windows PE/MZ executable header found in raw file bytes",
+            location="raw_bytes:offset=0",
+            sample="MZ (PE executable header)",
+        ))
+
+    # ── ELF Linux executable header ───────────────────────────────────────────
+    if raw[:4] == b"\x7fELF":
+        findings.append(ContentFinding(
+            rule_id="MAL-003",
+            severity="critical",
+            category="malware_signature",
+            description="ELF Linux/Unix executable binary detected in raw file bytes",
+            location="raw_bytes:offset=0",
+            sample="\\x7fELF (ELF binary header)",
+        ))
+
+    # ── Embedded PE header anywhere in file (polyglot files) ─────────────────
+    if raw[:2] != b"MZ" and b"MZ" in raw[512:]:
+        mz_offset = raw.index(b"MZ", 512)
+        findings.append(ContentFinding(
+            rule_id="MAL-002",
+            severity="critical",
+            category="malware_signature",
+            description=f"Embedded Windows PE/MZ executable found at offset {mz_offset} (polyglot file)",
+            location=f"raw_bytes:offset={mz_offset}",
+            sample=f"MZ header at byte {mz_offset}",
+        ))
+
+    # ── Shellcode NOP sled pattern (repeated 0x90 bytes) ─────────────────────
+    if b"\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90" in raw:
+        findings.append(ContentFinding(
+            rule_id="MAL-011",
+            severity="high",
+            category="shellcode",
+            description="NOP sled pattern detected in raw bytes (classic shellcode technique)",
+            location="raw_bytes",
+            sample="\\x90 * 12+ (NOP sled)",
+        ))
+
+    logger.info(
+        "raw_bytes_scan: %s — %d bytes, %d raw findings",
+        path.name, len(raw), len(findings),
+    )
+    return findings
+
+
 def check_file(file_path: str) -> ContentCheckResult:
     """
-    Entry point: inspect all string columns of the dataset for threat patterns.
+    Entry point: inspect dataset for threat patterns.
+
+    Pipeline:
+      Stage 0 — Raw bytes scan (EICAR, PE/ELF headers, shellcode) — runs FIRST
+      Stage 1 — Dataframe content inspection (injection, script, SQL, malware names)
+
     Returns a ContentCheckResult with findings, row count, and risk score.
     """
     path = Path(file_path)
     result = ContentCheckResult()
 
+    # ── Stage 0: Raw bytes scan (catches binary malware before parsing) ───────
+    raw_findings = raw_bytes_scan(path)
+    result.findings.extend(raw_findings)
+    if raw_findings:
+        logger.warning(
+            "Stage 0 raw scan: %d binary threat(s) found in %s",
+            len(raw_findings), path.name,
+        )
+
+    # ── Stage 1: Dataframe content inspection ─────────────────────────────────
     df, error = _load_dataframe(path)
     if error:
         result.error = error
@@ -261,7 +430,11 @@ def check_file(file_path: str) -> ContentCheckResult:
         return result
 
     result.rows_inspected = len(df)
-    seen_rules_per_column: set[tuple[str, str]] = set()  # deduplicate per (column, rule)
+    seen_rules_per_column: set[tuple[str, str]] = set()
+
+    # Pre-seed seen set with rules already triggered by raw scan
+    for f in raw_findings:
+        seen_rules_per_column.add((f.rule_id, "raw_bytes"))
 
     for col in df.columns:
         try:
@@ -277,3 +450,4 @@ def check_file(file_path: str) -> ContentCheckResult:
                     result.findings.append(finding)
 
     return result
+
