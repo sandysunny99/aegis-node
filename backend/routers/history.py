@@ -7,7 +7,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-_ROOT = Path(__file__).parent.parent.parent
+_curr = Path(__file__).resolve().parent
+_ROOT = _curr.parent.parent if _curr.parent.name == "backend" else _curr.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 

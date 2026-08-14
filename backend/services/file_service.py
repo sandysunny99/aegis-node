@@ -19,15 +19,25 @@ from pathlib import Path
 from config import settings
 
 # ─── Data directories ─────────────────────────────────────────────────────────
-_PROJECT_ROOT = Path(__file__).parent.parent.parent   # aegis-node/
-_SAMPLES_DIR = _PROJECT_ROOT / "data" / "samples"
-_QUARANTINE_DIR = _PROJECT_ROOT / "data" / "quarantine"
-_SANITIZED_DIR = _PROJECT_ROOT / "data" / "sanitized"
+# Project root resolution (handles both local dev under /backend and Docker container under /app)
+_CURR_DIR = Path(__file__).resolve().parent  # .../services
+_PROJECT_ROOT = _CURR_DIR.parent.parent if _CURR_DIR.parent.name == "backend" else _CURR_DIR.parent
 
-# Ensure directories exist
-_SAMPLES_DIR.mkdir(parents=True, exist_ok=True)
-_QUARANTINE_DIR.mkdir(parents=True, exist_ok=True)
-_SANITIZED_DIR.mkdir(parents=True, exist_ok=True)
+
+def _ensure_dir(d: Path) -> Path:
+    """Ensure directory exists with graceful fallback to /tmp/data if permission denied."""
+    try:
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+    except (PermissionError, OSError):
+        fallback = Path("/tmp") / "data" / d.name
+        fallback.mkdir(parents=True, exist_ok=True)
+        return fallback
+
+
+_SAMPLES_DIR = _ensure_dir(_PROJECT_ROOT / "data" / "samples")
+_QUARANTINE_DIR = _ensure_dir(_PROJECT_ROOT / "data" / "quarantine")
+_SANITIZED_DIR = _ensure_dir(_PROJECT_ROOT / "data" / "sanitized")
 
 # Reserved Windows device names
 _WINDOWS_RESERVED_NAMES = {
