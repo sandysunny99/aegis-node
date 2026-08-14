@@ -2,7 +2,7 @@
 
 An enterprise-grade, security-hardened dataset threat detection and automated remediation platform. Aegis Node scans datasets (CSV, JSON, JSONL, Parquet, XLSX, TXT) for malware, formula injections, script injections, and SQL anomalies, explains findings using AI, and neutralizes threats in-place while maintaining schema integrity.
 
-[![Build Status](https://img.shields.io/badge/tests-151%20passed-success)](https://github.com/sandysunny99/aegis-node)
+[![Build Status](https://img.shields.io/badge/tests-184%20passed-success)](https://github.com/sandysunny99/aegis-node)
 [![Python](https://img.shields.io/badge/python-3.12-blue)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109+-009688)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/React-18-61dafb)](https://react.dev/)
@@ -15,7 +15,7 @@ An enterprise-grade, security-hardened dataset threat detection and automated re
 
 | Category | Features & Technical Highlights |
 |----------|---------------------------------|
-| 🔍 **Multi-Stage Detection Engine** | **Stage 0: Raw byte scan** (EICAR, PE/ELF headers, NOP sled) → ClamAV INSTREAM → **19-rule** Regex Engine with Deobfuscation. |
+| 🔍 **Multi-Stage Detection Engine** | **Stage 0** raw byte scan (EICAR/PE/ELF) → **Stage 0.5** heuristics (entropy, packers, injection APIs) → ClamAV INSTREAM → **27-rule** Regex Engine. |
 | ⚡ **Threat Neutralization** | Neutralizes Formula Injections (`=`, `@`, `+`, `-`, `DDE`, `HYPERLINK`), Script/XSS Tags, SQL Injection patterns, and Null bytes. |
 | 🧹 **Deobfuscation Pipeline** | Recursive URL decoding, HTML entity unescaping, SQL comment stripping, and whitespace normalization prior to pattern matching. |
 | 🤖 **Multi-Provider AI Analysis** | Real-time threat explanation via Google Gemini, xAI Grok (auto-failover), Groq Cloud (Llama 3.1), or offline Ollama with fallback chains. |
@@ -64,14 +64,15 @@ An enterprise-grade, security-hardened dataset threat detection and automated re
 
 ```
 pytest tests/ -v
-151 passed in 11.98s
+184 passed in 13.21s
 ```
 
 | Test Module | Tests | Coverage |
 |---|---|---|
+| `test_heuristics.py` | **33** (NEW) | Entropy math, HEUR-001…HEUR-008, engine integration, disable flag |
 | `test_real_samples.py` | 18 | Raw bytes scan, EICAR, PE/ELF, real samples, full pipeline |
+| `test_scanner_rules.py` | 26 | All 27 detection rules, deobfuscation |
 | `test_scanner.py` | 12 | Engine verdicts, format support, SHA-256 |
-| `test_scanner_rules.py` | 26 | All 19 detection rules, deobfuscation |
 | `test_sanitizer.py` | 13 | Formula/script/SQL/null-byte neutralization |
 | `test_security.py` | 11 | AI output validation, prompt injection defence |
 | `test_upload.py` | 7 | Upload, magic-byte validation, SHA-256 |
@@ -114,6 +115,23 @@ pytest tests/ -v
 | MAL-009 | `malware_reference` | **Critical** | 40+ known malware family names |
 | MAL-010 | `c2_communication` | High | Suspicious IP:port C2 URLs |
 | MAL-011 | `c2_communication` | High | Hex shellcode sequences (`\x41\x42...`) |
+
+---
+
+### Stage 0.5 — Heuristic Rules (Signature-Less Detection)
+| Rule | Category | Severity | What it Detects |
+|---|---|---|---|
+| HEUR-001 | `heuristic_malware` | High / Medium | Shannon entropy > 7.2 (packed/encrypted/obfuscated file) |
+| HEUR-002 | `heuristic_malware` | High | >70% non-printable bytes in text-expected file type |
+| HEUR-003 | `heuristic_malware` | High | Process injection APIs (`CreateRemoteThread`, `VirtualAllocEx`, `WriteProcessMemory`…) |
+| HEUR-004 | `heuristic_malware` | **Critical** | Script downloader / LOLBIN strings (`powershell -enc`, `IEX`, `certutil -decode`…) |
+| HEUR-005 | `heuristic_malware` | **Critical** | Valid embedded PE (MZ+PE sig) past byte 512 — polyglot/dropper |
+| HEUR-006 | `heuristic_malware` | High | Packer section names (`.UPX0`, `.aspack`, `.themida`, `.MPRESS1`…) |
+| HEUR-007 | `heuristic_malware` | High | MIME type / file extension mismatch (requires `python-magic`) |
+| HEUR-008 | `heuristic_malware` | High | Dense base64 block ≥80 chars with entropy ≥4.5 (encoded payload) |
+
+> **Disable heuristics:** Set `ENABLE_HEURISTICS=false` in `.env` to skip Stage 0.5 entirely.
+> **Optional dependencies:** `pip install python-magic pefile` to enable HEUR-007 (MIME detection) and enhanced HEUR-003 PE import analysis.
 
 ---
 

@@ -82,6 +82,8 @@ class Settings(BaseSettings):
     clamav_port: int = 3310
     clamav_mock_mode: bool = False
     max_upload_size_mb: int = 500
+    enable_heuristics: bool = True  # Set ENABLE_HEURISTICS=false to disable Stage 0.5
+
 
     # ─── Database ────────────────────────────────────────────────────────────
     database_url: str = "sqlite:///./aegis_node.db"

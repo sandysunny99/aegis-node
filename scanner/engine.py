@@ -2,8 +2,10 @@
 Aegis Node — Multi-Stage Scan Orchestration Engine.
 
 Pipeline:
-  Stage 1 → ClamAV INSTREAM virus scan (graceful fallback if daemon offline)
-  Stage 2 → Rule-based content inspection (formula, script, SQL, binary)
+  Stage 0   → raw_bytes_scan() inside check_file() — EICAR, PE/ELF, NOP sled
+  Stage 0.5 → Heuristic scan (entropy, process injection, packers, MIME mismatch…)
+  Stage 1   → ClamAV INSTREAM virus scan (graceful fallback if daemon offline)
+  Stage 2   → Rule-based content inspection (formula, script, SQL, malware names)
 
 Returns a structured ScanEngineResult for persistence and API response.
 """
@@ -18,14 +20,16 @@ try:
     from scanner.clamd_client import ClamAVResult
     from scanner.clamd_client import scan_file as clamd_scan
     from scanner.content_checker import ContentCheckResult, ContentFinding, check_file
+    from scanner.heuristics import heuristic_scan
 except ImportError:
     from clamd_client import ClamAVResult  # type: ignore[no-redef]
-    from clamd_client import scan_file as clamd_scan
+    from clamd_client import scan_file as clamd_scan  # type: ignore[no-redef]
     from content_checker import (  # type: ignore[no-redef]
         ContentCheckResult,
         ContentFinding,
         check_file,
     )
+    from heuristics import heuristic_scan  # type: ignore[no-redef]
 
 logger = logging.getLogger(__name__)
 
@@ -44,9 +48,13 @@ class ScanEngineResult:
     clamav_status: str = "skipped"        # clean | infected | skipped | error
     clamav_virus_name: str | None = None
 
-    # Content rules
+    # Content rules (Stage 0 raw scan + Stage 2 content rules)
     content_findings: list[ContentFinding] = field(default_factory=list)
     rows_inspected: int = 0
+
+    # Heuristic findings (Stage 0.5)
+    heuristic_findings: list[ContentFinding] = field(default_factory=list)
+    heuristic_risk_score: float = 0.0
 
     # Aggregated
     threats_found_count: int = 0
@@ -60,6 +68,16 @@ class ScanEngineResult:
     def to_findings_dicts(self) -> list[dict]:
         """Serialise all findings to a list of dicts for JSON persistence."""
         out = []
+        # Heuristic findings first (highest-signal for unknown threats)
+        for f in self.heuristic_findings:
+            out.append({
+                "rule_id": f.rule_id,
+                "severity": f.severity,
+                "category": f.category,
+                "description": f.description,
+                "location": f.location,
+                "sample": f.sample,
+            })
         for f in self.content_findings:
             out.append({
                 "rule_id": f.rule_id,
@@ -80,6 +98,11 @@ class ScanEngineResult:
             })
         return out
 
+    @property
+    def all_findings(self) -> list[ContentFinding]:
+        """Combined list of heuristic + content findings."""
+        return self.heuristic_findings + self.content_findings
+
 
 def _compute_sha256(path: Path) -> str:
     """Compute SHA-256 hash of a file safely in 64 KB chunks."""
@@ -90,23 +113,43 @@ def _compute_sha256(path: Path) -> str:
     return h.hexdigest()
 
 
-def _determine_verdict(clamav_result: ClamAVResult, content_result: ContentCheckResult) -> tuple[str, float]:
+def _determine_verdict(
+    clamav_result: ClamAVResult,
+    content_result: ContentCheckResult,
+    heur_findings: list[ContentFinding],
+    heur_risk: float,
+) -> tuple[str, float]:
     """
-    Determine final verdict and composite risk score.
-    - malicious: ClamAV infected OR critical content findings
-    - suspicious: high/medium content findings only
-    - clean: no threats
+    Determine final verdict and composite risk score from all pipeline stages.
+
+    Verdict priority:
+      malicious  — ClamAV infected, OR critical finding from any stage
+      suspicious — high/medium finding from content rules OR significant heuristic risk
+      clean      — no threats detected
     """
+    # Content-rule base score (0–10 scale from content_checker)
     base_score = content_result.risk_score
 
+    # Add heuristic contribution (heur_risk is 0–1, scale to 0–3 headroom)
+    heur_contribution = heur_risk * 3.0
+    composite_score = min(base_score + heur_contribution, 10.0)
+
+    # All findings combined for severity checks
+    all_findings = content_result.findings + heur_findings
+
     if clamav_result.infected:
-        return "malicious", min(base_score + 5.0, 10.0)
+        return "malicious", min(composite_score + 5.0, 10.0)
 
-    if any(f.severity == "critical" for f in content_result.findings):
-        return "malicious", min(base_score, 10.0)
+    if any(f.severity == "critical" for f in all_findings):
+        return "malicious", min(composite_score, 10.0)
 
-    if any(f.severity in ("high", "medium") for f in content_result.findings):
-        return "suspicious", min(base_score, 10.0)
+    if any(f.severity in ("high", "medium") for f in all_findings):
+        return "suspicious", min(composite_score, 10.0)
+
+    # Even with no individual critical/high findings, significant heuristic risk
+    # alone warrants a suspicious verdict
+    if heur_risk >= 0.4:
+        return "suspicious", round(composite_score, 2)
 
     return "clean", 0.0
 
@@ -122,6 +165,17 @@ def run_scan(file_path: str, clamav_host: str = _CLAMAV_HOST, clamav_port: int =
 
     # ─── Hash verification ────────────────────────────────────────────────────
     result.sha256_hash = _compute_sha256(path)
+
+    # ─── Stage 0.5: Heuristic Scan ───────────────────────────────────────────
+    logger.info("Stage 0.5: Heuristic scan for %s", path.name)
+    heur_findings, heur_risk = heuristic_scan(file_path)
+    result.heuristic_findings = heur_findings
+    result.heuristic_risk_score = heur_risk
+    if heur_findings:
+        logger.warning(
+            "Heuristics: %d finding(s), risk=%.4f for %s",
+            len(heur_findings), heur_risk, path.name,
+        )
 
     # ─── Stage 1: ClamAV ─────────────────────────────────────────────────────
     logger.info("Stage 1: ClamAV scan for %s", path.name)
@@ -146,12 +200,21 @@ def run_scan(file_path: str, clamav_host: str = _CLAMAV_HOST, clamav_port: int =
     result.content_error = content.error
 
     # ─── Aggregate ────────────────────────────────────────────────────────────
-    result.verdict, result.risk_score = _determine_verdict(clam, content)
-    result.threats_found_count = content.threat_count + (1 if clam.infected else 0)
+    result.verdict, result.risk_score = _determine_verdict(clam, content, heur_findings, heur_risk)
+    result.threats_found_count = (
+        content.threat_count
+        + len(heur_findings)
+        + (1 if clam.infected else 0)
+    )
     result.scan_duration_ms = int((time.monotonic() - start_ms) * 1000)
 
     logger.info(
-        "Scan complete — %s | verdict=%s risk=%.1f threats=%d duration=%dms",
-        path.name, result.verdict, result.risk_score, result.threats_found_count, result.scan_duration_ms,
+        "Scan complete — %s | verdict=%s risk=%.1f threats=%d "
+        "(heur=%d content=%d clam=%s) duration=%dms",
+        path.name, result.verdict, result.risk_score, result.threats_found_count,
+        len(heur_findings), content.threat_count,
+        "infected" if clam.infected else "clean",
+        result.scan_duration_ms,
     )
     return result
+
