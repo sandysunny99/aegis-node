@@ -16,6 +16,19 @@ _ROOT_ENV = Path(__file__).resolve().parent.parent / ".env"
 _LOCAL_ENV = Path(__file__).resolve().parent / ".env"
 
 
+def _read_secret_file(name: str) -> str:
+    """Read secret from Render / Docker secret files (/etc/secrets/<name> or /app/<name>)."""
+    for p in (Path("/etc/secrets") / name, Path("/app") / name, Path(name)):
+        try:
+            if p.is_file():
+                content = p.read_text(encoding="utf-8").strip()
+                if content:
+                    return content
+        except Exception:
+            pass
+    return ""
+
+
 class Settings(BaseSettings):
     """All settings are read from the .env file or environment variables."""
 
@@ -116,6 +129,22 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_settings(self) -> "Settings":
+        # Check Render / Docker Secret Files if environment variables are empty
+        if not self.gemini_api_key:
+            self.gemini_api_key = _read_secret_file("GEMINI_API_KEY")
+        if not self.xai_api_key:
+            self.xai_api_key = _read_secret_file("XAI_API_KEY")
+        if not self.groq_api_key:
+            self.groq_api_key = _read_secret_file("GROQ_API_KEY")
+        if not self.api_key:
+            self.api_key = _read_secret_file("API_KEY")
+        if not self.fallback_gemini_api_key:
+            self.fallback_gemini_api_key = _read_secret_file("FALLBACK_GEMINI_API_KEY")
+        if not self.fallback_xai_api_key:
+            self.fallback_xai_api_key = _read_secret_file("FALLBACK_XAI_API_KEY")
+        if not self.fallback_groq_api_key:
+            self.fallback_groq_api_key = _read_secret_file("FALLBACK_GROQ_API_KEY")
+
         if self.app_env.lower() == "production":
             if not self.api_key:
                 logger.warning(
