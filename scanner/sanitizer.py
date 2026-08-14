@@ -148,7 +148,7 @@ def _remediate_sql_cell(
 # Malware signature patterns for cell-level neutralization (EICAR, malware tools, etc.)
 _EICAR_STR = "X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
 _MALWARE_PATTERNS = [
-    (re.compile(re.escape(_EICAR_STR), re.IGNORECASE), "MAL-001"),
+    (re.compile(re.escape(_EICAR_STR) + r"|EICAR-STANDARD-ANTIVIRUS-TEST-FILE", re.IGNORECASE), "MAL-001"),
     (re.compile(r"\b(mimikatz|sekurlsa|kerberos::|lsadump)\b", re.IGNORECASE), "MAL-004"),
     (re.compile(r"\b(cobalt\s*strike|beacon\.dll|beacon\.exe)\b", re.IGNORECASE), "MAL-005"),
     (re.compile(r"\b(metasploit|meterpreter|reverse_tcp)\b", re.IGNORECASE), "MAL-006"),

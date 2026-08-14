@@ -90,7 +90,7 @@ _RULES: list[tuple[str, str, str, str, re.Pattern]] = [
     (
         "MAL-001", "critical", "malware_signature",
         "EICAR antivirus test string detected — confirms AV detection pipeline is working",
-        re.compile(r'X5O!P%@AP\[4\\\\PZX54\(P\^\)7CC\)7\}', re.IGNORECASE),
+        re.compile(r'X5O!P%@AP\[4\\PZX54\(P\^\)7CC\)7\}|EICAR-STANDARD-ANTIVIRUS-TEST-FILE', re.IGNORECASE),
     ),
     # ── Executable / Binary Headers in Text Fields ────────────────────────────
     (
@@ -337,8 +337,8 @@ def raw_bytes_scan(path: Path) -> list[ContentFinding]:
         logger.warning("raw_bytes_scan: could not read %s — %s", path.name, exc)
         return findings
 
-    # ── EICAR test string (exact bytes) ──────────────────────────────────────
-    if _EICAR in raw:
+    # ── EICAR test string (exact bytes or standard token) ────────────────────
+    if _EICAR in raw or b"EICAR-STANDARD-ANTIVIRUS-TEST-FILE" in raw:
         findings.append(ContentFinding(
             rule_id="MAL-001",
             severity="critical",

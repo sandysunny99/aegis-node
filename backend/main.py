@@ -97,10 +97,10 @@ app.include_router(remediation_router)
 @limiter.limit("60/minute")
 async def health(request: Request) -> dict:
     """Public health probe with UI status fields."""
-    # ClamAV ping — skip real socket when mock mode is active
+    # ClamAV ping — test live socket unless in mock mode
     clamav_mock = bool(settings.clamav_mock_mode)
     if clamav_mock:
-        clamav_running = True
+        clamav_running = False  # Explicitly false: running simulated/mock, not live daemon
     else:
         try:
             from scanner.clamd_client import ping as clamav_ping

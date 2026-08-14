@@ -132,19 +132,19 @@ function HealthStatus({ health }) {
       </div>
 
       {/* ClamAV */}
-      <div className="header-status" title={health.clamav_mock ? 'ClamAV: Mock mode active (heuristics active)' : 'ClamAV daemon status'}>
+      <div className="header-status" title={health.clamav_running ? 'ClamAV daemon active' : (health.clamav_mock ? 'ClamAV: Simulated (heuristics active)' : 'ClamAV offline — rule-based scanning active')}>
         <span style={{
           width: 7, height: 7, borderRadius: '50%', display: 'inline-block',
           background: health.clamav_running
-            ? (health.clamav_mock ? 'var(--cyan)' : 'var(--emerald)')
-            : 'var(--amber)',
+            ? 'var(--emerald)'
+            : (health.clamav_mock ? 'var(--cyan)' : 'var(--amber)'),
           boxShadow: health.clamav_running
-            ? (health.clamav_mock ? '0 0 6px var(--cyan)' : '0 0 6px var(--emerald)')
-            : '0 0 6px var(--amber)',
+            ? '0 0 6px var(--emerald)'
+            : (health.clamav_mock ? '0 0 6px var(--cyan)' : '0 0 6px var(--amber)'),
         }} />
         {health.clamav_running
-          ? (health.clamav_mock ? 'AV: Simulated' : 'ClamAV: Live')
-          : 'AV: Skipped'}
+          ? 'ClamAV: Live'
+          : (health.clamav_mock ? 'AV: Simulated' : 'No AV')}
       </div>
 
       {/* AI */}

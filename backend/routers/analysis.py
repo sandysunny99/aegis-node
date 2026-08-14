@@ -41,7 +41,7 @@ async def analyse_dataset(
 ) -> AnalysisResponse:
     record: DatasetRecord | None = db.get(DatasetRecord, dataset_id)
     if not record:
-        raise HTTPException(status_code=404, detail=f"Dataset {dataset_id} not found.")
+        raise HTTPException(status_code=404, detail="Resource not found.")
 
     if not record.scan_reports:
         raise HTTPException(
@@ -120,7 +120,7 @@ def get_analysis(
 ) -> AnalysisResponse:
     record: DatasetRecord | None = db.get(DatasetRecord, dataset_id)
     if not record:
-        raise HTTPException(status_code=404, detail=f"Dataset {dataset_id} not found.")
+        raise HTTPException(status_code=404, detail="Resource not found.")
 
     if not record.llm_analyses:
         raise HTTPException(status_code=404, detail="No AI analysis found. Run /analyse first.")
