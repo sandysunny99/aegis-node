@@ -2,7 +2,7 @@
 
 An enterprise-grade, security-hardened dataset threat detection and automated remediation platform. Aegis Node scans datasets (CSV, JSON, JSONL, Parquet, XLSX, TXT) for malware, formula injections, script injections, and SQL anomalies, explains findings using AI, and neutralizes threats in-place while maintaining schema integrity.
 
-[![Build Status](https://img.shields.io/badge/tests-133%20passed-success)](https://github.com/sandysunny99/aegis-node)
+[![Build Status](https://img.shields.io/badge/tests-151%20passed-success)](https://github.com/sandysunny99/aegis-node)
 [![Python](https://img.shields.io/badge/python-3.12-blue)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109+-009688)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/React-18-61dafb)](https://react.dev/)
@@ -15,10 +15,10 @@ An enterprise-grade, security-hardened dataset threat detection and automated re
 
 | Category | Features & Technical Highlights |
 |----------|---------------------------------|
-| 🔍 **Multi-Stage Detection Engine** | ClamAV INSTREAM antivirus scanning + Deobfuscation pre-processor + 9-rule Regex Engine + Local Dev Mock Mode. |
+| 🔍 **Multi-Stage Detection Engine** | **Stage 0: Raw byte scan** (EICAR, PE/ELF headers, NOP sled) → ClamAV INSTREAM → **19-rule** Regex Engine with Deobfuscation. |
 | ⚡ **Threat Neutralization** | Neutralizes Formula Injections (`=`, `@`, `+`, `-`, `DDE`, `HYPERLINK`), Script/XSS Tags, SQL Injection patterns, and Null bytes. |
 | 🧹 **Deobfuscation Pipeline** | Recursive URL decoding, HTML entity unescaping, SQL comment stripping, and whitespace normalization prior to pattern matching. |
-| 🤖 **Multi-Provider AI Analysis** | Real-time threat explanation via Google Gemini (`gemini-flash-latest`), Groq Cloud (Llama 3.1), or offline local Ollama with fallback chains. |
+| 🤖 **Multi-Provider AI Analysis** | Real-time threat explanation via Google Gemini, xAI Grok (auto-failover), Groq Cloud (Llama 3.1), or offline Ollama with fallback chains. |
 | 🛡️ **Hardened Security Architecture** | Evaluated against 38 security & architectural audit findings. Includes magic-byte header validation, chunked upload streaming, single-use download tokens, and strict `Cache-Control` response guards. |
 | ⚡ **Database & Performance** | SQLite WAL mode (`PRAGMA journal_mode=WAL`) for high-concurrency connection handling without database lock failures. |
 | 📊 **Format Support** | Full native support for `.csv`, `.json`, `.jsonl`, `.parquet`, `.xlsx`, and `.txt` format datasets. |
@@ -60,7 +60,65 @@ An enterprise-grade, security-hardened dataset threat detection and automated re
 
 ---
 
+## 🧪 Test Results
+
+```
+pytest tests/ -v
+151 passed in 11.98s
+```
+
+| Test Module | Tests | Coverage |
+|---|---|---|
+| `test_real_samples.py` | 18 | Raw bytes scan, EICAR, PE/ELF, real samples, full pipeline |
+| `test_scanner.py` | 12 | Engine verdicts, format support, SHA-256 |
+| `test_scanner_rules.py` | 26 | All 19 detection rules, deobfuscation |
+| `test_sanitizer.py` | 13 | Formula/script/SQL/null-byte neutralization |
+| `test_security.py` | 11 | AI output validation, prompt injection defence |
+| `test_upload.py` | 7 | Upload, magic-byte validation, SHA-256 |
+| `test_remediation.py` | 5 | Remediation, download token, path traversal |
+| `test_llm.py` | 6 | AI provider chain, fallback, mocked calls |
+| `test_api.py` + `test_smoke.py` | 53 | API endpoints, auth, rate limiting, health |
+
+---
+
+## 🛡️ Detection Rules Reference
+
+### Stage 0 — Raw Bytes Scan (Before Parsing)
+| Rule | Category | Severity | What it Detects |
+|---|---|---|---|
+| MAL-001 | `malware_signature` | **Critical** | EICAR antivirus test string (exact bytes) |
+| MAL-002 | `malware_signature` | **Critical** | Windows PE/MZ executable header |
+| MAL-003 | `malware_signature` | **Critical** | ELF Linux/Unix binary header |
+| MAL-011 | `shellcode` | High | NOP sled (`\x90 * 12+`) shellcode pattern |
+
+### Stage 2 — Content Inspection Rules
+| Rule | Category | Severity | What it Detects |
+|---|---|---|---|
+| FORM-001 | `formula_injection` | High | CSV formula triggers (`=`,`+`,`-`,`@`,`\|`) |
+| FORM-002 | `formula_injection` | **Critical** | DDE/cmd/PowerShell formula payload |
+| FORM-003 | `formula_injection` | High | HYPERLINK external URL formula |
+| SCRP-001 | `script_injection` | **Critical** | `<script>` HTML/JS tag |
+| SCRP-002 | `script_injection` | High | `javascript:` protocol handler |
+| SCRP-003 | `script_injection` | High | `eval()` / `exec()` call |
+| SQLI-001 | `sql_injection` | High | Classic SQL injection (`OR 1=1`, `DROP TABLE`) |
+| SQLI-002 | `sql_injection` | High | `UNION SELECT` injection |
+| BIN-001 | `binary_anomaly` | Medium | Null byte `\x00` in text field |
+| MAL-001 | `malware_signature` | **Critical** | EICAR string in cell value |
+| MAL-002 | `malware_signature` | **Critical** | MZ/PE header string in cell |
+| MAL-003 | `malware_signature` | **Critical** | ELF header string in cell |
+| MAL-004 | `malware_signature` | **Critical** | Base64-encoded PE (TVoA/TVJQ prefix) |
+| MAL-005 | `shellcode` | **Critical** | PowerShell `-EncodedCommand` |
+| MAL-006 | `shellcode` | **Critical** | IEX / DownloadString / WebClient cradle |
+| MAL-007 | `shellcode` | High | Reverse shell (`/dev/tcp`, `nc -e /bin/sh`) |
+| MAL-008 | `macro_threat` | High | Auto-execute macros (AutoOpen, WScript.Shell) |
+| MAL-009 | `malware_reference` | **Critical** | 40+ known malware family names |
+| MAL-010 | `c2_communication` | High | Suspicious IP:port C2 URLs |
+| MAL-011 | `c2_communication` | High | Hex shellcode sequences (`\x41\x42...`) |
+
+---
+
 ## ⚡ Quick Start & Local Setup
+
 
 ### Option A: Local Native Execution (Fastest)
 

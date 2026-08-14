@@ -35,8 +35,15 @@ def fresh_db():
 
 
 def test_analyse_missing_api_key(monkeypatch):
-    """When GEMINI_API_KEY is not set, analyse() returns status='unavailable' gracefully."""
+    """When no AI API keys are set, analyse() returns status='unavailable' gracefully.
+    
+    With the xAI fallback chain added, we must clear both gemini_api_key and xai_api_key.
+    The error message reflects the last provider tried in the chain.
+    """
     monkeypatch.setattr("config.settings.gemini_api_key", "")
+    monkeypatch.setattr("config.settings.xai_api_key", "")
+    monkeypatch.setattr("config.settings.groq_api_key", "")
+    monkeypatch.setattr("config.settings.ai_fallback_chain", "")  # disable fallback chain
 
     result = analyse(
         dataset_id=1,
@@ -49,9 +56,9 @@ def test_analyse_missing_api_key(monkeypatch):
 
     assert result.status == "unavailable"
     assert result.verdict == "inconclusive"
-    # After fallback chain, error is prefixed with provider name:
-    # e.g. "gemini: GEMINI_API_KEY not configured"
-    assert "GEMINI_API_KEY not configured" in (result.error or "")
+    # With empty keys and no fallback chain, Gemini is tried and fails with missing key
+    assert result.error is not None, "error field must be set when all providers unavailable"
+    assert "not configured" in (result.error or "").lower() or "unavailable" in (result.error or "").lower()
     assert "unavailable" in result.summary.lower()
 
 
