@@ -66,12 +66,16 @@ app.include_router(remediation_router)
 @limiter.limit("60/minute")
 async def health(request: Request) -> dict:
     """Public health probe with UI status fields."""
-    # ClamAV ping
-    try:
-        from scanner.clamd_client import ping as clamav_ping
-        clamav_running = clamav_ping(host=settings.clamav_host, port=settings.clamav_port)
-    except Exception:
-        clamav_running = False
+    # ClamAV ping — skip real socket when mock mode is active
+    clamav_mock = bool(settings.clamav_mock_mode)
+    if clamav_mock:
+        clamav_running = True
+    else:
+        try:
+            from scanner.clamd_client import ping as clamav_ping
+            clamav_running = clamav_ping(host=settings.clamav_host, port=settings.clamav_port)
+        except Exception:
+            clamav_running = False
 
     # AI availability check
     ai_provider = settings.ai_provider.strip().lower()
@@ -85,11 +89,13 @@ async def health(request: Request) -> dict:
         "status": "ok",
         "version": "0.1.0",
         "clamav_running": clamav_running,
+        "clamav_mock": clamav_mock,
         "ai_configured": ai_configured,
         "ai_provider": settings.ai_provider,
         "max_file_size_mb": settings.max_upload_size_mb,
         "supported_formats": [ext.lstrip(".") for ext in sorted(settings.allowed_extensions)],
     }
+
 
 
 @app.get("/health/diagnostics", tags=["system"])

@@ -96,12 +96,16 @@ def ping(host: str = _DEFAULT_HOST, port: int = _DEFAULT_PORT) -> bool:
     """Returns True if clamd is reachable and responds to PING."""
     if host.lower() == "mock":
         return True
-    try:
-        from backend.config import settings
-        if getattr(settings, "clamav_mock_mode", False):
-            return True
-    except Exception:
-        pass
+    # Check mock mode — try both import paths (container: 'config', local dev: 'backend.config')
+    for _mod in ("config", "backend.config"):
+        try:
+            import importlib
+            _cfg = importlib.import_module(_mod)
+            if getattr(_cfg, "settings", None) and getattr(_cfg.settings, "clamav_mock_mode", False):
+                return True
+            break
+        except Exception:
+            continue
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.settimeout(_CONNECT_TIMEOUT)
@@ -119,11 +123,15 @@ def scan_file(path: str, host: str = _DEFAULT_HOST, port: int = _DEFAULT_PORT) -
     If clamd is unreachable, returns ClamAVResult(available=False, infected=False).
     """
     if host.lower() == "mock":
-        return ClamAVResult(available=True, infected=False, virus_name=None, raw_response="stream: OK (Dev Mock Engine)", error=None)
-    try:
-        from backend.config import settings
-        if getattr(settings, "clamav_mock_mode", False):
-            return ClamAVResult(available=True, infected=False, virus_name=None, raw_response="stream: OK (Dev Mock Engine)", error=None)
-    except Exception:
-        pass
+        return ClamAVResult(available=True, infected=False, virus_name=None, raw_response="stream: OK (Mock)", error=None)
+    # Check mock mode — try both import paths (container: 'config', local dev: 'backend.config')
+    for _mod in ("config", "backend.config"):
+        try:
+            import importlib
+            _cfg = importlib.import_module(_mod)
+            if getattr(_cfg, "settings", None) and getattr(_cfg.settings, "clamav_mock_mode", False):
+                return ClamAVResult(available=True, infected=False, virus_name=None, raw_response="stream: OK (Mock)", error=None)
+            break
+        except Exception:
+            continue
     return _clamd_instream(path, host, port)
