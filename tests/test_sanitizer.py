@@ -158,3 +158,53 @@ class TestCellSanitizationPipeline:
         _, actions = _sanitize_cell_value("=HYPERLINK(evil)", "my_col", "42")
         assert any("my_col" in a.location for a in actions)
         assert any("42" in a.location for a in actions)
+
+
+class TestMalwareAndFormatSanitization:
+    """Verify malware removal, sample_after truncation, and TXT/Parquet support."""
+
+    def test_eicar_cell_removed(self):
+        eicar_str = "X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
+        new_val, actions = _sanitize_cell_value(eicar_str, "payload", "0")
+        assert new_val == "[REMOVED]"
+        assert len(actions) == 1
+        assert actions[0].rule_id == "MAL-001"
+        assert actions[0].sample_after == "[REMOVED]"
+
+    def test_sample_after_truncated(self):
+        long_formula = "=HYPERLINK('http://malicious-site.example.com/exploit/very/long/path/that/exceeds/fifty/characters')"
+        _, actions = _sanitize_cell_value(long_formula, "url", "1")
+        assert len(actions) >= 1
+        assert len(actions[0].sample_after) <= 50
+
+    def test_txt_file_sanitization(self, tmp_path):
+        from scanner.sanitizer import sanitize_file
+        txt_file = tmp_path / "threats.txt"
+        txt_file.write_text("safe line\n=cmd|' /C calc'!A0\n<script>alert(1)</script>\n", encoding="utf-8")
+        result = sanitize_file(str(txt_file), "txt")
+        assert result.error is None
+        assert result.changes_count >= 2
+        content = result.sanitized_bytes.decode("utf-8")
+        assert "'=cmd|" in content
+        assert "[script_removed]" in content
+
+    def test_eicar_csv_file_remediation_rescan(self, tmp_path):
+        from scanner.engine import run_scan
+        from scanner.sanitizer import sanitize_file
+        eicar_file = tmp_path / "eicar.csv"
+        eicar_file.write_text("id,payload\n1,X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*\n", encoding="utf-8")
+        
+        # Scan before
+        scan_before = run_scan(str(eicar_file))
+        assert scan_before.verdict == "malicious"
+        
+        # Remediate
+        res = sanitize_file(str(eicar_file), "csv")
+        clean_file = tmp_path / "eicar_clean.csv"
+        clean_file.write_bytes(res.sanitized_bytes)
+        
+        # Scan after -> must be clean with 0 threats
+        scan_after = run_scan(str(clean_file))
+        assert scan_after.verdict == "clean"
+        assert scan_after.threats_found_count == 0
+

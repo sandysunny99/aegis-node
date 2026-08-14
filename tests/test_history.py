@@ -114,3 +114,19 @@ def test_history_page_size_max_limit():
     """page_size > 100 should be rejected by Pydantic validation with 422."""
     res = client.get("/api/v1/history?page_size=200")
     assert res.status_code == 422
+
+
+def test_history_requires_api_key_when_configured(monkeypatch):
+    """When API key is configured, GET /history without key must return 401 (A-011)."""
+    import utils.auth
+    monkeypatch.setattr(utils.auth.settings, "api_key", "secret-test-key")
+
+    # Request without key
+    unauth = client.get("/api/v1/history")
+    assert unauth.status_code == 401
+
+    # Request with valid key
+    auth_resp = client.get("/api/v1/history", headers={"X-API-Key": "secret-test-key"})
+    assert auth_resp.status_code == 200
+
+

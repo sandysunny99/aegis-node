@@ -9,6 +9,7 @@ Protocol reference: https://linux.die.net/man/8/clamd
 import logging
 import socket
 import struct
+import threading
 import time
 from dataclasses import dataclass
 
@@ -24,6 +25,7 @@ _MAX_RESPONSE_BYTES = 1024
 # Cache offline status for 5 seconds to avoid repeated socket timeouts when daemon is down
 _OFFLINE_CACHE_TTL = 5.0
 _last_failed_check: float = 0.0
+_offline_lock = threading.Lock()  # A-013: thread-safe offline cache
 
 
 @dataclass
@@ -43,15 +45,16 @@ def _clamd_instream(path: str, host: str, port: int) -> ClamAVResult:
     """
     global _last_failed_check  # noqa: PLW0603
 
-    now = time.time()
-    if now - _last_failed_check < _OFFLINE_CACHE_TTL:
-        return ClamAVResult(
-            available=False,
-            infected=False,
-            virus_name=None,
-            raw_response="",
-            error="ClamAV daemon offline (cached)",
-        )
+    # A-013: thread-safe offline cache check (read-compare-write inside lock)
+    with _offline_lock:
+        if time.time() - _last_failed_check < _OFFLINE_CACHE_TTL:
+            return ClamAVResult(
+                available=False,
+                infected=False,
+                virus_name=None,
+                raw_response="",
+                error="ClamAV daemon offline (cached)",
+            )
 
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:

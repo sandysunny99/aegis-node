@@ -59,9 +59,14 @@ def _sanitize_filename(name: str) -> str:
 
 def _detect_mime(file_path: Path) -> str:
     """
-    Detect MIME type from file extension only (python-magic requires libmagic).
-    Falls back to application/octet-stream for unknown types.
+    Detect MIME type from file content using python-magic (A-017/A-023).
+    Falls back to extension-based detection if python-magic is unavailable.
     """
+    try:
+        import magic  # python-magic (not magic stdlib)
+        return magic.from_file(str(file_path), mime=True)
+    except (ImportError, Exception):
+        pass
     mime, _ = mimetypes.guess_type(str(file_path))
     return mime or "application/octet-stream"
 
@@ -80,6 +85,16 @@ def _detect_format(filename: str) -> str:
     return _map.get(ext, "unknown")
 
 
+# A-008: Complete binary magic byte block list (PE/MZ, ELF, all Mach-O variants)
+_BINARY_MAGIC: list[bytes] = [
+    b"MZ",             # Windows PE/DOS executable
+    b"\x7fELF",        # ELF binary (Linux/Unix)
+    b"\xfe\xed\xfa",   # Mach-O big-endian 32-bit
+    b"\xcf\xfa\xed\xfe",  # Mach-O 64-bit little-endian
+    b"\xca\xfe\xba\xbe",  # Mach-O fat/universal binary
+]
+
+
 def validate_magic_bytes(content: bytes, filename: str) -> bool:
     """
     Verify magic byte headers to reject executable binary anomalies (PE/MZ, ELF, MACH-O)
@@ -88,8 +103,8 @@ def validate_magic_bytes(content: bytes, filename: str) -> bool:
     if not content:
         return True
 
-    # Block Windows executables (MZ), ELF binaries, Mach-O binaries
-    if content.startswith(b"MZ") or content.startswith(b"\x7fELF") or content.startswith(b"\xfe\xed\xfa"):
+    # Block all known binary executable headers (A-008)
+    if any(content.startswith(m) for m in _BINARY_MAGIC):
         return False
 
     ext = Path(filename).suffix.lower()

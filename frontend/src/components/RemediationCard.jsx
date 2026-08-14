@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { getSanitizedDownloadUrl, remediateDataset } from '../api';
+import { downloadSanitized, remediateDataset } from '../api';
 
 function CircleProgress({ value, size = 56, strokeWidth = 5, color }) {
   const r = (size - strokeWidth) / 2;
@@ -34,10 +34,6 @@ export default function RemediationCard({ datasetId, scanResult }) {
       setError(e.message); setState('error');
     }
   }, [datasetId]);
-
-  const downloadUrl = report?.download_token
-    ? getSanitizedDownloadUrl(datasetId, report.download_token)
-    : null;
 
   if (!hasThreats) {
     return (
@@ -130,18 +126,22 @@ export default function RemediationCard({ datasetId, scanResult }) {
             <ActionsList actions={report.actions} />
           )}
 
-          {/* Download — only shown when download_token is available */}
-          {downloadUrl && (
+          {/* Download — only shown when download_token is available (A-002, A-018) */}
+          {report.download_token && (
             <div style={{ marginTop: '1rem', display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-              <a
-                href={downloadUrl}
-                download
+              <button
+                onClick={async () => {
+                  try {
+                    await downloadSanitized(datasetId, report.download_token);
+                  } catch (err) {
+                    setError(err.message);
+                  }
+                }}
                 className="btn btn-primary"
                 id="download-sanitized-btn"
-                style={{ textDecoration: 'none' }}
               >
                 ⬇ Download Clean Dataset
-              </a>
+              </button>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-3)' }}>
                 SHA-256: <span style={{ fontFamily: 'var(--mono)', color: 'var(--text-2)', fontSize: '0.7rem' }}>
                   {report.sanitized_sha256?.slice(0, 12)}…

@@ -10,7 +10,7 @@ from config import settings
 from database import create_all_tables
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from limiter import limiter
 from routers.analysis import router as analysis_router
@@ -20,6 +20,8 @@ from routers.remediation import router as remediation_router
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.types import ASGIApp
 from utils.auth import require_api_key
 
 
@@ -30,11 +32,37 @@ async def lifespan(app: FastAPI):
     yield
 
 
+# ─── Security Headers Middleware (A-006) ──────────────────────────────────────
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Adds essential HTTP security headers to every response."""
+
+    async def dispatch(self, request: Request, call_next):
+        response: Response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data:; "
+            "connect-src 'self'"
+        )
+        return response
+
+
+# ─── Production mode: disable OpenAPI docs (A-021) ───────────────────────────
+_is_production = settings.app_env.lower() == "production"
+
 app = FastAPI(
     title="Aegis Node API",
     description="AI-Assisted Dataset Threat Detection and Remediation",
     version="0.1.0",
     lifespan=lifespan,
+    docs_url=None if _is_production else "/docs",
+    redoc_url=None if _is_production else "/redoc",
+    openapi_url=None if _is_production else "/openapi.json",
 )
 
 # ─── Rate Limiting ────────────────────────────────────────────────────────────
@@ -42,7 +70,10 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
-# ─── CORS ─────────────────────────────────────────────────────────────────────
+# ─── Security Headers (A-006) ───────────────────────────────────────────────────
+app.add_middleware(SecurityHeadersMiddleware)
+
+# ─── CORS ────────────────────────────────────────────────────────────────────
 # Configured via settings.allowed_origins ("*" in dev, domain list in production)
 allow_all = "*" in settings.allowed_origins
 app.add_middleware(
@@ -82,6 +113,7 @@ async def health(request: Request) -> dict:
     ai_configured = (
         (ai_provider == "gemini" and bool(settings.gemini_api_key.strip()))
         or (ai_provider == "groq" and bool(settings.groq_api_key.strip()))
+        or (ai_provider == "xai" and bool(settings.xai_api_key.strip()))
         or (ai_provider == "ollama")
     )
 
@@ -90,6 +122,7 @@ async def health(request: Request) -> dict:
         "version": "0.1.0",
         "clamav_running": clamav_running,
         "clamav_mock": clamav_mock,
+        "clamav_mock_mode": clamav_mock,  # A-019: explicit field for UI banner
         "ai_configured": ai_configured,
         "ai_provider": settings.ai_provider,
         "max_file_size_mb": settings.max_upload_size_mb,

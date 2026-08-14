@@ -198,7 +198,7 @@ def _sanitize_llm_output(parsed: LlmAnalysisOutput) -> LlmAnalysisOutput:
         if _RISKY_ACTION_RE.search(rec_clean):
             # Don't discard — flag it so reviewers know it was flagged
             rec_clean = f"[flagged: contains high-risk verb] {rec_clean}"
-            logger.warning("AI recommendation flagged for high-risk verb: %.80s", rec_clean)
+            logger.warning("AI recommendation flagged for high-risk verb (rule: risky_action)")
         clean_recommendations.append(rec_clean)
 
     clean_limitations = [_clean_field(lim) for lim in parsed.limitations[:_MAX_LIST_ITEMS]]

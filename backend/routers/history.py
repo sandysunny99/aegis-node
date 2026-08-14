@@ -18,6 +18,7 @@ from models import DatasetRecord  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 from sqlalchemy import desc  # noqa: E402
 from sqlalchemy.orm import Session, joinedload  # noqa: E402
+from utils.auth import require_api_key  # noqa: E402
 
 router = APIRouter(prefix="/api/v1", tags=["history"])
 
@@ -54,6 +55,7 @@ def get_history(
     page: int = Query(default=1, ge=1, description="Page number starting at 1"),
     page_size: int = Query(default=20, ge=1, le=100, description="Items per page (max 100)"),
     db: Session = Depends(get_db),  # noqa: B008
+    _auth: None = Depends(require_api_key),  # noqa: B008  # A-011: protect scan history
 ) -> HistoryResponse:
     # Separate count query to avoid joinedload subquery overhead (FINDING-019)
     total = db.query(DatasetRecord).count()

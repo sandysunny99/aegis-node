@@ -79,7 +79,7 @@ async def remediate_dataset(
     # 1. Retrieve dataset record
     record: DatasetRecord | None = db.get(DatasetRecord, dataset_id)
     if not record:
-        raise HTTPException(status_code=404, detail=f"Dataset {dataset_id} not found.")
+        raise HTTPException(status_code=404, detail="Resource not found.")
 
     if not file_service.sample_exists(record.stored_filename):
         raise HTTPException(status_code=404, detail="Original dataset file not found on disk.")
@@ -229,10 +229,11 @@ def get_remediation_report(
     request: Request,
     dataset_id: int,
     db: Session = Depends(get_db),  # noqa: B008
+    _auth: None = Depends(require_api_key),  # noqa: B008  # A-014
 ) -> RemediationResponse:
     record: DatasetRecord | None = db.get(DatasetRecord, dataset_id)
     if not record:
-        raise HTTPException(status_code=404, detail=f"Dataset {dataset_id} not found.")
+        raise HTTPException(status_code=404, detail="Resource not found.")
 
     if not record.remediations:
         raise HTTPException(status_code=404, detail="No remediation report found. Run /remediate first.")
@@ -278,7 +279,7 @@ def download_sanitized_dataset(
     """
     record: DatasetRecord | None = db.get(DatasetRecord, dataset_id)
     if not record:
-        raise HTTPException(status_code=404, detail=f"Dataset {dataset_id} not found.")
+        raise HTTPException(status_code=404, detail="Resource not found.")
 
     if not record.remediations:
         raise HTTPException(status_code=404, detail="No sanitized artifact exists for this dataset.")

@@ -21,10 +21,16 @@ services:
     plan: free          # Free tier: 512MB RAM, shared CPU, sleeps after 15min inactivity
     healthCheckPath: /health
 
+    # Persistent storage for uploads and SQLite database (A-007)
+    disk:
+      name: aegis-data
+      mountPath: /app/data
+      sizeGB: 1
+
     envVars:
       # ── AI Provider ───────────────────────────────────────────────────────────
-      # Set to: gemini | groq | ollama | none
-      # If none/key missing, app still works — AI panel is hidden in the UI.
+      # Set to: gemini | groq | xai | ollama | none
+      # If none/key missing, app still works — AI panel shows setup instructions.
       - key: AI_PROVIDER
         value: gemini
 
@@ -42,8 +48,6 @@ services:
         sync: false       # Set manually in Render dashboard
 
       # ── ClamAV ────────────────────────────────────────────────────────────────
-      # No ClamAV sidecar on free Render tier (too much RAM).
-      # The app handles this gracefully — rule-based detection still runs fully.
       - key: CLAMAV_HOST
         value: "localhost"
 
@@ -51,22 +55,27 @@ services:
         value: "3310"
 
       - key: CLAMAV_MOCK_MODE
+        value: "${CLAMAV_MOCK_MODE:-false}"
+
+      # ── Heuristic Scanning ────────────────────────────────────────────────────
+      - key: ENABLE_HEURISTICS
         value: "true"
 
       # ── App Config ────────────────────────────────────────────────────────────
       - key: APP_ENV
         value: production
 
-      # SECRET_KEY is required in production — must be a long random string.
-      # Generated with: python -c "import secrets; print(secrets.token_hex(32))"
-      - key: SECRET_KEY
-        generateValue: true   # Render auto-generates a secure random value
-
       - key: MAX_UPLOAD_SIZE_MB
         value: "100"      # Lower limit for free tier (512MB RAM)
 
       - key: DATABASE_URL
-        value: sqlite:///./aegis_node.db
+        value: sqlite:////app/data/aegis_node.db
+
+      - key: ALLOWED_ORIGINS
+        value: "*"
+
+      - key: TRUSTED_PROXIES
+        value: "10.0.0.0/8,127.0.0.1"
 
       # ── Auth & Token ──────────────────────────────────────────────────────────
       # Set API_KEY in Render dashboard to enable write-endpoint protection.

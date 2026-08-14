@@ -24,6 +24,7 @@ from schemas import (  # noqa: E402
     ThreatFinding,
 )
 from services.file_service import file_service, validate_magic_bytes  # noqa: E402
+from sqlalchemy import update  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 from utils.auth import require_api_key  # noqa: E402
 
@@ -129,25 +130,31 @@ async def scan_dataset(
     # Retrieve dataset record
     record: DatasetRecord | None = db.get(DatasetRecord, dataset_id)
     if not record:
-        raise HTTPException(status_code=404, detail=f"Dataset {dataset_id} not found.")
+        raise HTTPException(status_code=404, detail="Resource not found.")
 
     if not file_service.sample_exists(record.stored_filename):
         raise HTTPException(status_code=404, detail="Dataset file not found on disk.")
 
-    # Guard against concurrent double-scan on same dataset
-    if record.status == "scanning":
+    # Guard against concurrent double-scan: atomic UPDATE WHERE status != 'scanning' (A-003)
+    updated = db.execute(
+        update(DatasetRecord)
+        .where(DatasetRecord.id == dataset_id, DatasetRecord.status != "scanning")
+        .values(status="scanning")
+    )
+    db.commit()
+    if updated.rowcount == 0:
         raise HTTPException(status_code=409, detail="Scan already in progress for this dataset. Please wait.")
 
     # FINDING-025: Guard against re-scanning already remediated datasets
-    if record.status in ("remediated", "partial_remediated") or record.remediations:
+    db.refresh(record)
+    if record.status == "scanning" and (record.remediations or record.status in ("remediated", "partial_remediated")):
+        # Reset status since we set it to scanning atomically
+        record.status = "error"
+        db.commit()
         raise HTTPException(
             status_code=409,
             detail="Dataset has already been remediated. Re-scanning original is not permitted.",
         )
-
-    # Mark as scanning
-    record.status = "scanning"
-    db.commit()
 
     # FINDING-011: Wrap blocking scan in try/except; reset status to 'error' on failure
     file_path = str(file_service.get_sample_path(record.stored_filename))
@@ -211,10 +218,11 @@ def get_dataset_status(
     request: Request,
     dataset_id: int,
     db: Session = Depends(get_db),  # noqa: B008
+    _auth: None = Depends(require_api_key),  # noqa: B008  # A-014
 ) -> DatasetStatusResponse:
     record: DatasetRecord | None = db.get(DatasetRecord, dataset_id)
     if not record:
-        raise HTTPException(status_code=404, detail=f"Dataset {dataset_id} not found.")
+        raise HTTPException(status_code=404, detail="Resource not found.")
     return DatasetStatusResponse(
         dataset_id=record.id,
         original_filename=record.original_filename,
@@ -237,10 +245,11 @@ def get_scan_report(
     request: Request,
     dataset_id: int,
     db: Session = Depends(get_db),  # noqa: B008
+    _auth: None = Depends(require_api_key),  # noqa: B008  # A-014
 ) -> ScanResultResponse:
     record: DatasetRecord | None = db.get(DatasetRecord, dataset_id)
     if not record:
-        raise HTTPException(status_code=404, detail=f"Dataset {dataset_id} not found.")
+        raise HTTPException(status_code=404, detail="Resource not found.")
 
     if not record.scan_reports:
         raise HTTPException(status_code=404, detail="No scan report found. Run /scan first.")

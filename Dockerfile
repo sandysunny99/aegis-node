@@ -40,6 +40,11 @@ COPY --from=frontend-builder /frontend/dist ./static/
 # Runtime data directories
 RUN mkdir -p /app/data/samples /app/data/quarantine /app/data/sanitized /app/data/reports
 
+# ─── Security: run as non-root user (A-001) ───────────────────────────────────
+RUN useradd --no-create-home --shell /bin/false aegis && \
+    chown -R aegis:aegis /app
+USER aegis
+
 EXPOSE 8000
 
 # Single worker on free tier (limited RAM); increase for paid plans

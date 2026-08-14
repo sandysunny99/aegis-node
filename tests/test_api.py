@@ -197,21 +197,48 @@ class TestRemediationEndpoint:
         assert resp.status_code == 400
 
 
-class TestHistoryEndpoint:
-    """Test the GET /api/v1/history endpoint."""
+class TestSecurityEnhancements:
+    """Tests covering security headers, Mach-O checks, and token downloads."""
 
-    def test_history_returns_list(self, client):
-        resp = client.get("/api/v1/history")
+    def test_security_headers_present_on_response(self, client):
+        resp = client.get("/health")
         assert resp.status_code == 200
-        data = resp.json()
-        assert "items" in data
-        assert "total" in data
-        assert isinstance(data["items"], list)
+        assert "Content-Security-Policy" in resp.headers
+        assert resp.headers["X-Content-Type-Options"] == "nosniff"
+        assert resp.headers["X-Frame-Options"] == "DENY"
+        assert resp.headers["Referrer-Policy"] == "no-referrer"
 
-    def test_history_pagination(self, client):
-        resp = client.get("/api/v1/history?page=1&page_size=5")
+    def test_upload_rejects_macho_64bit_magic_bytes(self, client):
+        macho_64 = b"\xcf\xfa\xed\xfe\x07\x00\x00\x01" + b"\x00" * 32
+        resp = client.post(
+            "/api/v1/datasets/upload",
+            files={"file": ("fake_dataset.csv", io.BytesIO(macho_64), "text/csv")},
+        )
+        assert resp.status_code == 400
+
+    def test_upload_rejects_macho_fat_magic_bytes(self, client):
+        macho_fat = b"\xca\xfe\xba\xbe\x00\x00\x00\x02" + b"\x00" * 32
+        resp = client.post(
+            "/api/v1/datasets/upload",
+            files={"file": ("fake_fat.csv", io.BytesIO(macho_fat), "text/csv")},
+        )
+        assert resp.status_code == 400
+
+    def test_header_based_sanitized_download(self, client, demo_csv):
+        up = client.post(
+            "/api/v1/datasets/upload",
+            files={"file": ("download_test.csv", demo_csv, "text/csv")},
+        )
+        dataset_id = up.json()["dataset_id"]
+        client.post(f"/api/v1/datasets/{dataset_id}/scan")
+        rem = client.post(f"/api/v1/datasets/{dataset_id}/remediate").json()
+        token = rem["download_token"]
+
+        # Download using Authorization: Bearer <token>
+        resp = client.get(
+            f"/api/v1/datasets/{dataset_id}/download-sanitized",
+            headers={"Authorization": f"Bearer {token}"},
+        )
         assert resp.status_code == 200
-        data = resp.json()
-        assert data["page"] == 1
-        assert data["page_size"] == 5
-        assert len(data["items"]) <= 5
+        assert len(resp.content) > 0
+

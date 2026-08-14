@@ -118,9 +118,46 @@ export async function getRemediationReport(datasetId) {
 }
 
 /**
- * Build a download URL for a sanitized dataset, with the required download token.
+ * Download a sanitized dataset file using Authorization header (A-002, A-018).
+ * Token is sent via 'Authorization: Bearer <token>' to avoid URL exposure in access logs and browser history.
  * @param {number} datasetId
- * @param {string} token - The download_token returned from the remediation API response
+ * @param {string} token - The download_token from remediation response
+ */
+export async function downloadSanitized(datasetId, token) {
+  const headers = {
+    ...authHeader(),
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${BASE}/api/v1/datasets/${datasetId}/download-sanitized`, {
+    headers,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(friendlyError(res.status, err.detail ?? 'Download failed'));
+  }
+
+  const blob = await res.blob();
+  // Extract filename from Content-Disposition if present, else fallback
+  const cd = res.headers.get('Content-Disposition') || '';
+  const match = cd.match(/filename="?([^"]+)"?/);
+  const filename = match ? match[1] : `sanitized_dataset_${datasetId}`;
+
+  const blobUrl = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = blobUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(blobUrl);
+}
+
+/**
+ * @deprecated Use downloadSanitized() instead to avoid leaking download tokens in query params.
  */
 export function getSanitizedDownloadUrl(datasetId, token) {
   const url = `${BASE}/api/v1/datasets/${datasetId}/download-sanitized`;

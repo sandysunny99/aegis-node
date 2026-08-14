@@ -371,8 +371,8 @@ def raw_bytes_scan(path: Path) -> list[ContentFinding]:
         ))
 
     # ── Embedded PE header anywhere in file (polyglot files) ─────────────────
-    if raw[:2] != b"MZ" and b"MZ" in raw[512:]:
-        mz_offset = raw.index(b"MZ", 512)
+    mz_offset = raw.find(b"MZ", 512)   # A-010: .find() returns -1, never raises ValueError
+    if raw[:2] != b"MZ" and mz_offset != -1:
         findings.append(ContentFinding(
             rule_id="MAL-002",
             severity="critical",

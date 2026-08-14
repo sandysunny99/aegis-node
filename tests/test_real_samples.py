@@ -309,3 +309,65 @@ class TestFullPipeline:
             assert all(c in "0123456789abcdef" for c in result.sha256_hash)
         finally:
             os.unlink(path)
+
+    def test_eicar_offline_clamav_still_detected(self, monkeypatch):
+        """EICAR file must produce verdict=malicious even when ClamAV is offline."""
+        for mod in ("config", "backend.config"):
+            try:
+                import importlib
+                m = importlib.import_module(mod)
+                if hasattr(m, "settings"):
+                    monkeypatch.setattr(m.settings, "clamav_mock_mode", False)
+            except ImportError:
+                pass
+        eicar = b"X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
+        path = _tmp_bytes(b"payload\n" + eicar + b"\n")
+        try:
+            # Force ClamAV to an unreachable port
+            result = run_scan(str(path), clamav_host="127.0.0.1", clamav_port=59999)
+            assert result.clamav_status == "skipped"
+            assert result.verdict == "malicious"
+            rule_ids = [f["rule_id"] for f in result.to_findings_dicts()]
+            assert "MAL-001" in rule_ids
+        finally:
+            os.unlink(path)
+
+    def test_eicar_mock_clamav_still_detected(self, monkeypatch):
+        """EICAR file must produce verdict=malicious even in mock ClamAV mode."""
+        for mod in ("config", "backend.config"):
+            try:
+                import importlib
+                m = importlib.import_module(mod)
+                if hasattr(m, "settings"):
+                    monkeypatch.setattr(m.settings, "clamav_mock_mode", True)
+            except ImportError:
+                pass
+        eicar = b"X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
+        path = _tmp_bytes(b"payload\n" + eicar + b"\n")
+        try:
+            result = run_scan(str(path))
+            assert result.verdict == "malicious"
+            rule_ids = [f["rule_id"] for f in result.to_findings_dicts()]
+            assert "MAL-001" in rule_ids
+        finally:
+            os.unlink(path)
+
+    def test_eicar_remediation_removes_all_threats(self):
+        """Remediating a dataset containing EICAR removes the threat so re-scan is clean."""
+        from scanner.sanitizer import sanitize_file
+        eicar = b"X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
+        path = _tmp_bytes(b"id,payload\n1," + eicar + b"\n")
+        try:
+            res = sanitize_file(str(path), "csv")
+            assert res.error is None
+            assert res.changes_count >= 1
+            clean_path = _tmp_bytes(res.sanitized_bytes)
+            try:
+                rescan = run_scan(str(clean_path))
+                assert rescan.verdict == "clean"
+                assert rescan.threats_found_count == 0
+            finally:
+                os.unlink(clean_path)
+        finally:
+            os.unlink(path)
+

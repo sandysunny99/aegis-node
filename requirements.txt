@@ -12,6 +12,7 @@ slowapi>=0.1.9             # Rate limiting (per-IP, in-memory)
 pandas>=2.2.0
 pyarrow>=16.0.0           # Parquet streaming support (iter_batches)
 openpyxl>=3.1.0           # XLSX read/write (read_only mode for memory efficiency)
+python-magic==0.4.27      # Content-based MIME detection (A-017, A-023)
 
 # ─── Database ────────────────────────────────────────────────────────────────
 sqlalchemy>=2.0.31

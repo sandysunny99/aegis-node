@@ -145,6 +145,30 @@ def _remediate_sql_cell(
     return new_val, True, rule_id
 
 
+# Malware signature patterns for cell-level neutralization (EICAR, malware tools, etc.)
+_EICAR_STR = "X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
+_MALWARE_PATTERNS = [
+    (re.compile(re.escape(_EICAR_STR), re.IGNORECASE), "MAL-001"),
+    (re.compile(r"\b(mimikatz|sekurlsa|kerberos::|lsadump)\b", re.IGNORECASE), "MAL-004"),
+    (re.compile(r"\b(cobalt\s*strike|beacon\.dll|beacon\.exe)\b", re.IGNORECASE), "MAL-005"),
+    (re.compile(r"\b(metasploit|meterpreter|reverse_tcp)\b", re.IGNORECASE), "MAL-006"),
+    (re.compile(r"\b(wannacry|wcry|wncry)\b", re.IGNORECASE), "MAL-007"),
+    (re.compile(r"\b(lockbit|revil|sodinokibi)\b", re.IGNORECASE), "MAL-008"),
+    (re.compile(r"\b(Invoke-Mimikatz|Invoke-ReflectivePEInjection)\b", re.IGNORECASE), "MAL-009"),
+]
+
+
+def _remediate_malware_cell(val: str) -> tuple[str, bool, str]:
+    """
+    Neutralize malware signatures/strings (EICAR, malware tool names, etc.)
+    For critical/high malware signatures, replaces the ENTIRE field with [REMOVED].
+    """
+    for pattern, rule_id in _MALWARE_PATTERNS:
+        if pattern.search(val):
+            return "[REMOVED]", True, rule_id
+    return val, False, ""
+
+
 def _remediate_binary_cell(val: str) -> tuple[str, bool, str]:
     """Strip null bytes (\\x00) from string fields."""
     if '\x00' in val:
@@ -153,17 +177,35 @@ def _remediate_binary_cell(val: str) -> tuple[str, bool, str]:
     return val, False, ""
 
 
+def _format_sample_after(val: str, is_redacted: bool = False) -> str:
+    """Format sample_after with max 50 chars and redaction support (A-012)."""
+    if is_redacted or val == "[REMOVED]":
+        return "[REMOVED]"
+    return val[:50]
+
+
 def _sanitize_cell_value(val: str, col_name: str, row_idx: str) -> tuple[str, list[RemediationAction]]:
     """Apply all category transformations sequentially to a single cell string."""
     actions = []
     current = val
+
+    # 0. Malware signatures & EICAR test string removal (CRITICAL -> full field removal)
+    current, c0, r0 = _remediate_malware_cell(current)
+    if c0:
+        actions.append(RemediationAction(
+            rule_id=r0, category="malware_signature", location=f"col='{col_name}', row={row_idx}",
+            action_taken="Completely removed malware signature from field (severity=critical)",
+            sample_after="[REMOVED]",
+        ))
+        return current, actions
 
     # 1. Null byte removal
     current, c1, r1 = _remediate_binary_cell(current)
     if c1:
         actions.append(RemediationAction(
             rule_id=r1, category="binary_anomaly", location=f"col='{col_name}', row={row_idx}",
-            action_taken="Stripped null byte (\\x00) control characters", sample_after=current[:100],
+            action_taken="Stripped null byte (\\x00) control characters",
+            sample_after=_format_sample_after(current),
         ))
 
     # 2. Formula injection neutralization
@@ -171,7 +213,8 @@ def _sanitize_cell_value(val: str, col_name: str, row_idx: str) -> tuple[str, li
     if c2:
         actions.append(RemediationAction(
             rule_id=r2, category="formula_injection", location=f"col='{col_name}', row={row_idx}",
-            action_taken="Prefixed formula trigger with single quote (') to prevent execution", sample_after=current[:100],
+            action_taken="Prefixed formula trigger with single quote (') to prevent execution",
+            sample_after=_format_sample_after(current),
         ))
 
     # 3. Script / HTML injection neutralization
@@ -179,7 +222,8 @@ def _sanitize_cell_value(val: str, col_name: str, row_idx: str) -> tuple[str, li
     if c3:
         actions.append(RemediationAction(
             rule_id=r3, category="script_injection", location=f"col='{col_name}', row={row_idx}",
-            action_taken="Replaced executable script markup with inert text tag", sample_after=current[:100],
+            action_taken="Replaced executable script markup with inert text tag",
+            sample_after=_format_sample_after(current),
         ))
 
     # 4. SQL injection string neutralization (HIGH/CRITICAL → full field removal)
@@ -193,7 +237,8 @@ def _sanitize_cell_value(val: str, col_name: str, row_idx: str) -> tuple[str, li
         )
         actions.append(RemediationAction(
             rule_id=r4, category="sql_injection", location=f"col='{col_name}', row={row_idx}",
-            action_taken=action_desc, sample_after=current[:100],
+            action_taken=action_desc,
+            sample_after=_format_sample_after(current, is_redacted=(current == "[REMOVED]")),
         ))
 
     return current, actions
@@ -276,6 +321,34 @@ def sanitize_file(file_path: str, file_format: str) -> SanitizerResult:
             out_buffer = io.BytesIO()
             df_clean.to_parquet(out_buffer, index=False)
             result.sanitized_bytes = out_buffer.getvalue()
+            result.changes_count = total_changes
+            result.actions = actions
+
+        elif fmt == "xlsx" or ext == ".xlsx":
+            df = pd.read_excel(path, nrows=_MAX_ROWS, dtype=str)
+            df_clean, total_changes, actions = sanitize_dataframe(df)
+
+            out_buffer = io.BytesIO()
+            df_clean.to_excel(out_buffer, index=False)
+            result.sanitized_bytes = out_buffer.getvalue()
+            result.changes_count = total_changes
+            result.actions = actions
+
+        elif fmt == "txt" or ext == ".txt":
+            with path.open("r", encoding="utf-8", errors="replace") as fh:
+                lines = [line.rstrip("\r\n") for line in fh]
+
+            sanitized_lines = []
+            total_changes = 0
+            actions = []
+            for idx, line in enumerate(lines[:_MAX_ROWS]):
+                clean_line, line_actions = _sanitize_cell_value(line, "line", str(idx + 1))
+                sanitized_lines.append(clean_line)
+                if line_actions:
+                    total_changes += len(line_actions)
+                    actions.extend(line_actions)
+
+            result.sanitized_bytes = "\n".join(sanitized_lines).encode("utf-8")
             result.changes_count = total_changes
             result.actions = actions
 
