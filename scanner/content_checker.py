@@ -133,9 +133,9 @@ _RULES: list[tuple[str, str, str, str, re.Pattern]] = [
     # ── Known Malware Family Names in Filenames / Fields ─────────────────────
     (
         "MAL-009", "critical", "malware_reference",
-        "Known malware family name detected in field — dataset contains malware analysis data",
+        "Known malware family name or classification detected in field — dataset contains malware analysis data",
         re.compile(
-            r'\b(Trojan|Ransomware|Spyware|Adware|Rootkit|Backdoor|Worm|Virus|Keylogger|'
+            r'\b(Malware|Malicious|Exploit|Trojan|Ransomware|Spyware|Adware|Rootkit|Backdoor|Worm|Virus|Keylogger|'
             r'Botnet|RAT|Dropper|Downloader|Infostealer|Cryptominer|Fileless|'
             r'Mirai|WannaCry|Petya|NotPetya|Emotet|TrickBot|Ryuk|Conti|'
             r'BlackCat|ALPHV|LockBit|REvil|Sodinokibi|DarkSide|Maze|'

@@ -160,7 +160,18 @@ _MALWARE_PATTERNS = [
     (re.compile(r"\b(metasploit|meterpreter|reverse_tcp)\b", re.IGNORECASE), "MAL-006"),
     (re.compile(r"\b(wannacry|wcry|wncry)\b", re.IGNORECASE), "MAL-007"),
     (re.compile(r"\b(lockbit|revil|sodinokibi)\b", re.IGNORECASE), "MAL-008"),
-    (re.compile(r"\b(Invoke-Mimikatz|Invoke-ReflectivePEInjection)\b", re.IGNORECASE), "MAL-009"),
+    (
+        re.compile(
+            r'\b(Malware|Malicious|Exploit|Trojan|Ransomware|Spyware|Adware|Rootkit|Backdoor|Worm|Virus|Keylogger|'
+            r'Botnet|RAT|Dropper|Downloader|Infostealer|Cryptominer|Fileless|'
+            r'Mirai|WannaCry|Petya|NotPetya|Emotet|TrickBot|Ryuk|Conti|'
+            r'BlackCat|ALPHV|LockBit|REvil|Sodinokibi|DarkSide|Maze|'
+            r'Stuxnet|Duqu|Flame|Carbanak|APT|TIBS|ZeuS|Conficker|'
+            r'Dridex|Ursnif|Qakbot|IcedID|BazarLoader|Invoke-Mimikatz|Invoke-ReflectivePEInjection)\b',
+            re.IGNORECASE,
+        ),
+        "MAL-009",
+    ),
 ]
 
 
