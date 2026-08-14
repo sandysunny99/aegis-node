@@ -49,21 +49,27 @@ class SanitizerResult:
 def _remediate_formula_cell(val: str) -> tuple[str, bool, str]:
     """
     Neutralize CSV Formula Injection.
-    Prepend a single quote (') if val starts with =, +, -, @, |, DDE, cmd|, powershell|.
-    Returns (new_val, changed, rule_id).
+    Prepends a single quote (') and neutralizes executable keywords (DDE, cmd, powershell, HYPERLINK).
     """
-    # Check DDE/cmd patterns first
-    if re.search(r'DDE\s*\(|cmd\s*\||powershell\s*\|', val, re.IGNORECASE):
-        new_val = "'" + val
+    new_val = val
+    # Check DDE/cmd patterns first (FORM-002 critical)
+    if re.search(r'DDE\s*\(|cmd\s*\||powershell\s*\|', new_val, re.IGNORECASE):
+        new_val = re.sub(r'DDE\s*\(', '[dde_neutralized](', new_val, flags=re.IGNORECASE)
+        new_val = re.sub(r'cmd\s*\|', '[cmd_neutralized]|', new_val, flags=re.IGNORECASE)
+        new_val = re.sub(r'powershell\s*\|', '[powershell_neutralized]|', new_val, flags=re.IGNORECASE)
+        if not new_val.startswith("'"):
+            new_val = "'" + new_val
         return new_val, True, "FORM-002"
 
-    if re.search(r'HYPERLINK\s*\(', val, re.IGNORECASE):
-        new_val = "'" + val
+    if re.search(r'HYPERLINK\s*\(', new_val, re.IGNORECASE):
+        new_val = re.sub(r'HYPERLINK\s*\(', '[hyperlink_neutralized](', new_val, flags=re.IGNORECASE)
+        if not new_val.startswith("'"):
+            new_val = "'" + new_val
         return new_val, True, "FORM-003"
 
-    # Standard formula trigger character check
-    if re.match(r'^\s*[=+\-@|]', val):
-        new_val = "'" + val
+    # Standard formula trigger character check (FORM-001)
+    if re.match(r'^\s*[=+\-@|]', new_val):
+        new_val = "'" + new_val
         return new_val, True, "FORM-001"
 
     return val, False, ""
@@ -148,7 +154,7 @@ def _remediate_sql_cell(
 # Malware signature patterns for cell-level neutralization (EICAR, malware tools, etc.)
 _EICAR_STR = "X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
 _MALWARE_PATTERNS = [
-    (re.compile(re.escape(_EICAR_STR) + r"|EICAR-STANDARD-ANTIVIRUS-TEST-FILE", re.IGNORECASE), "MAL-001"),
+    (re.compile(r"X5O!P%@AP\[4\\PZX54\(P\^\)7CC\)7\}|EICAR-STANDARD-ANTIVIRUS-TEST-FILE", re.IGNORECASE), "MAL-001"),
     (re.compile(r"\b(mimikatz|sekurlsa|kerberos::|lsadump)\b", re.IGNORECASE), "MAL-004"),
     (re.compile(r"\b(cobalt\s*strike|beacon\.dll|beacon\.exe)\b", re.IGNORECASE), "MAL-005"),
     (re.compile(r"\b(metasploit|meterpreter|reverse_tcp)\b", re.IGNORECASE), "MAL-006"),
@@ -283,7 +289,19 @@ def sanitize_file(file_path: str, file_format: str) -> SanitizerResult:
 
     try:
         if fmt == "csv" or ext == ".csv":
-            df = pd.read_csv(path, nrows=_MAX_ROWS, low_memory=False, dtype=str)
+            try:
+                df = pd.read_csv(path, nrows=_MAX_ROWS, low_memory=False, dtype=str)
+            except Exception:
+                try:
+                    df = pd.read_csv(path, nrows=_MAX_ROWS, engine="python", on_bad_lines="skip", dtype=str)
+                except Exception:
+                    lines = []
+                    with path.open("r", encoding="utf-8", errors="replace") as fh:
+                        for i, line in enumerate(fh):
+                            if i >= _MAX_ROWS:
+                                break
+                            lines.append({"content": line.rstrip("\n")})
+                    df = pd.DataFrame(lines)
             df_clean, total_changes, actions = sanitize_dataframe(df)
 
             out_buffer = io.StringIO()

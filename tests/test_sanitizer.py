@@ -185,7 +185,7 @@ class TestMalwareAndFormatSanitization:
         assert result.error is None
         assert result.changes_count >= 2
         content = result.sanitized_bytes.decode("utf-8")
-        assert "'=cmd|" in content
+        assert "[cmd_neutralized]" in content
         assert "[script_removed]" in content
 
     def test_eicar_csv_file_remediation_rescan(self, tmp_path):

@@ -6,7 +6,7 @@ id,name,email,notes,user_input
 5,Eve,eve@normal.com,clean row - no issues detected,safe value here
 6,Frank,frank@evil.com,javascript:alert(document.cookie),javascript protocol injection
 7,Grace,grace@demo.com,"=HYPERLINK(""http://evil.com"",""Click me"")",hyperlink formula
-8,Hank,hank@example.com,+CONCATENATE(""http://"",""evil.com""),concatenation formula
+8,Hank,hank@example.com,"+CONCATENATE(""http://"",""evil.com"")",concatenation formula
 9,Ivy,ivy@test.com,UNION SELECT username password FROM users,SQL UNION select injection
 10,Jack,jack@demo.com,normal record with clean data,another safe value
 11,Kate,kate@corp.com,"DDE(""cmd"",""/C whoami"","""",8)",DDE command execution

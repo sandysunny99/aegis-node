@@ -243,7 +243,20 @@ def _load_dataframe(path: Path) -> tuple[pd.DataFrame | None, str | None]:
     suffix = path.suffix.lower()
     try:
         if suffix == ".csv":
-            df = pd.read_csv(path, nrows=_MAX_ROWS, low_memory=False, dtype=str)
+            try:
+                df = pd.read_csv(path, nrows=_MAX_ROWS, low_memory=False, dtype=str)
+            except Exception:
+                try:
+                    df = pd.read_csv(path, nrows=_MAX_ROWS, engine="python", on_bad_lines="skip", dtype=str)
+                except Exception:
+                    # Line-by-line fallback
+                    lines = []
+                    with path.open("r", encoding="utf-8", errors="replace") as fh:
+                        for i, line in enumerate(fh):
+                            if i >= _MAX_ROWS:
+                                break
+                            lines.append({"content": line.rstrip("\n")})
+                    df = pd.DataFrame(lines)
 
         elif suffix == ".parquet":
             # Stream row groups to avoid loading entire file into memory
