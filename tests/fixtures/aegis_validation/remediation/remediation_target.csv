@@ -1,0 +1,4 @@
+id,user,balance,formula_col,script_col,research_text
+1,@alice,-10.5,=HYPERLINK("http://evil.com/leak"),<script>alert(1)</script>,"Analyzing WannaCry infection rate"
+2,@bob,100.00,=CMD("calc.exe"),Safe Value,"LockBit ransomware indicators of compromise"
+3,@charlie,+91,=SUM(A1:A10),Safe Value,"Normal reference text"

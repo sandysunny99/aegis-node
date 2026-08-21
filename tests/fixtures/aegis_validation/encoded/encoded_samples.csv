@@ -1,0 +1,7 @@
+id,encoding_type,payload,is_suspicious
+1,base64_safe,SGVsbG8gV29ybGQ=,false
+2,url_safe,https%3A%2F%2Fexample.com%2Fsearch%3Fq%3Dcybersecurity,false
+3,html_safe,&lt;div class=&quot;container&quot;&gt;Hello&lt;/div&gt;,false
+4,hex_safe,48656c6c6f20576f726c64,false
+5,url_sqli,%27%20OR%20%271%27%3D%271,true
+6,html_xss,&lt;script&gt;alert(1)&lt;/script&gt;,true
