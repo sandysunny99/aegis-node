@@ -99,7 +99,7 @@ class Settings(BaseSettings):
     clamav_host: str = "localhost"
     clamav_port: int = 3310
     clamav_mock_mode: bool = False
-    max_upload_size_mb: int = 500
+    max_upload_size_mb: int = 50
     enable_heuristics: bool = True  # Set ENABLE_HEURISTICS=false to disable Stage 0.5
 
     # ─── Database ────────────────────────────────────────────────────────────

@@ -51,6 +51,11 @@ class ScanEngineResult:
     # Content rules (Stage 0 raw scan + Stage 2 content rules)
     content_findings: list[ContentFinding] = field(default_factory=list)
     rows_inspected: int = 0
+    rows_total: int | None = None
+    fields_inspected: int = 0
+    coverage_percentage: float = 100.0
+    coverage_type: str = "ROW_BASED"
+    coverage_status: str = "FULL"
 
     # Heuristic findings (Stage 0.5)
     heuristic_findings: list[ContentFinding] = field(default_factory=list)
@@ -60,7 +65,8 @@ class ScanEngineResult:
     threats_found_count: int = 0
     risk_score: float = 0.0
     scan_duration_ms: int = 0
-    verdict: str = "clean"                 # clean | suspicious | malicious
+    verdict: str = "clean_verified"        # clean_verified | clean_with_limitations | suspicious | malicious | scan_incomplete
+    verification_limitations: list[str] = field(default_factory=list)
 
     # Parse error from content stage
     content_error: str | None = None
@@ -118,45 +124,71 @@ def _determine_verdict(
     content_result: ContentCheckResult,
     heur_findings: list[ContentFinding],
     heur_risk: float,
-) -> tuple[str, float]:
+) -> tuple[str, float, list[str]]:
     """
-    Determine final verdict and composite risk score from all pipeline stages.
+    Determine final verdict, composite risk score, and verification limitations.
 
-    Verdict priority:
-      malicious  — ClamAV infected, OR critical finding from any stage
-      suspicious — high/medium finding from content rules OR significant heuristic risk
-      clean      — no threats detected
+    Explicit Verdict States:
+      - malicious: ClamAV virus detection or critical signature (EICAR, shellcode droppers)
+      - suspicious: Actionable high/medium findings (SQLi, XSS, formula injection) or high heuristic risk
+      - clean_with_limitations: No actionable threats, but verification was incomplete (ClamAV offline/mock, partial rows scanned, metadata-only references)
+      - clean_verified: Full verification completed cleanly (all scanners active and 100% inspected)
+      - scan_incomplete: Fatal parser failure
     """
-    # Content-rule base score (0–10 scale from content_checker)
+    limitations = list(content_result.limitations)
+    all_findings = content_result.findings + heur_findings
+
+    if not clamav_result.available:
+        if "CLAMAV_UNAVAILABLE" not in limitations:
+            limitations.append("CLAMAV_UNAVAILABLE")
+
+    if content_result.coverage_status == "PARTIAL":
+        if "PARTIAL_DATASET_SCAN" not in limitations:
+            limitations.append("PARTIAL_DATASET_SCAN")
+
+    if content_result.error:
+        if "PARSER_LIMITATION" not in limitations:
+            limitations.append("PARSER_LIMITATION")
+
     base_score = content_result.risk_score
-
-    # Add heuristic contribution (heur_risk is 0–1, scale to 0–3 headroom)
     heur_contribution = heur_risk * 3.0
     composite_score = min(base_score + heur_contribution, 10.0)
 
-    # All findings combined for severity checks
-    all_findings = content_result.findings + heur_findings
+    # 1. Fatal parser error without any other findings
+    if content_result.error and not all_findings and not clamav_result.infected:
+        return "scan_incomplete", 0.0, limitations
 
+    # 2. Critical malware detections
     if clamav_result.infected:
-        return "malicious", min(composite_score + 5.0, 10.0)
+        return "malicious", min(composite_score + 5.0, 10.0), limitations
 
     if any(f.severity == "critical" for f in all_findings):
-        return "malicious", min(composite_score, 10.0)
+        return "malicious", min(composite_score, 10.0), limitations
 
-    if any(f.severity in ("high", "medium") for f in all_findings):
-        return "suspicious", min(composite_score, 10.0)
+    # 3. Actionable suspicious findings (SQLi, Script injection, Formula injection, Shellcode)
+    actionable_threats = [f for f in all_findings if f.category != "malware_reference"]
+    if any(f.severity in ("high", "medium") for f in actionable_threats):
+        return "suspicious", min(composite_score, 10.0), limitations
 
-    # Even with no individual critical/high findings, significant heuristic risk
-    # alone warrants a suspicious verdict
     if heur_risk >= 0.4:
-        return "suspicious", round(composite_score, 2)
+        return "suspicious", round(composite_score, 2), limitations
 
-    return "clean", 0.0
+    # 4. Informational malware reference text only (e.g. metadata tables with "WannaCry")
+    if any(f.category == "malware_reference" for f in all_findings):
+        if "MALWARE_REFERENCE_ONLY" not in limitations:
+            limitations.append("MALWARE_REFERENCE_ONLY")
+        return "clean_with_limitations", round(base_score, 2), limitations
+
+    # 5. Clean with limitations vs Clean verified
+    if limitations:
+        return "clean_with_limitations", 0.0, limitations
+
+    return "clean_verified", 0.0, limitations
 
 
 def run_scan(file_path: str, clamav_host: str = _CLAMAV_HOST, clamav_port: int = _CLAMAV_PORT) -> ScanEngineResult:
     """
-    Execute the full scan pipeline against a file.
+    Execute the full multi-stage scan pipeline against a file.
     Always returns a ScanEngineResult regardless of errors.
     """
     start_ms = time.monotonic()
@@ -197,10 +229,17 @@ def run_scan(file_path: str, clamav_host: str = _CLAMAV_HOST, clamav_port: int =
     content: ContentCheckResult = check_file(file_path)
     result.content_findings = content.findings
     result.rows_inspected = content.rows_inspected
+    result.rows_total = content.rows_total
+    result.fields_inspected = content.fields_inspected
+    result.coverage_percentage = content.coverage_percentage
+    result.coverage_type = content.coverage_type
+    result.coverage_status = content.coverage_status
     result.content_error = content.error
 
     # ─── Aggregate ────────────────────────────────────────────────────────────
-    result.verdict, result.risk_score = _determine_verdict(clam, content, heur_findings, heur_risk)
+    result.verdict, result.risk_score, result.verification_limitations = _determine_verdict(
+        clam, content, heur_findings, heur_risk
+    )
     result.threats_found_count = (
         content.threat_count
         + len(heur_findings)
@@ -209,10 +248,10 @@ def run_scan(file_path: str, clamav_host: str = _CLAMAV_HOST, clamav_port: int =
     result.scan_duration_ms = int((time.monotonic() - start_ms) * 1000)
 
     logger.info(
-        "Scan complete — %s | verdict=%s risk=%.1f threats=%d "
+        "Scan complete — %s | verdict=%s risk=%.1f threats=%d coverage=%.1f%% "
         "(heur=%d content=%d clam=%s) duration=%dms",
         path.name, result.verdict, result.risk_score, result.threats_found_count,
-        len(heur_findings), content.threat_count,
+        result.coverage_percentage, len(heur_findings), content.threat_count,
         "infected" if clam.infected else "clean",
         result.scan_duration_ms,
     )

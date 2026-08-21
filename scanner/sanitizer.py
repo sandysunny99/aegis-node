@@ -44,13 +44,41 @@ class SanitizerResult:
     error: str | None = None
 
 
+# Context-aware formula helpers
+_PLAIN_NUMBER_RE = re.compile(r'^\s*[+\-]?\d+(\.\d+)?([eE][+\-]?\d+)?\s*$')
+_PHONE_OR_CODE_RE = re.compile(r'^\s*\+\d{1,4}[-\s\(\)\d]{4,20}\s*$')
+_HANDLE_RE = re.compile(r'^\s*@[A-Za-z0-9_.-]{1,64}\s*$')
+_FORMULA_SYNTAX_RE = re.compile(
+    r'^\s*(=|[+\-@|]\s*([A-Za-z_][A-Za-z0-9_.]*\s*\(|[A-Za-z_][A-Za-z0-9_]*!|cmd\s*\||powershell\s*\||dde\s*\(|[\"\'\(]))',
+    re.IGNORECASE,
+)
+
+
+def _is_safe_literal_not_formula(val: str) -> bool:
+    """Return True if val is a benign literal (numeric, phone code, @handle) rather than a formula."""
+    v = val.strip()
+    if not v:
+        return True
+    if _PLAIN_NUMBER_RE.match(v):
+        return True
+    if _PHONE_OR_CODE_RE.match(v):
+        return True
+    if _HANDLE_RE.match(v):
+        return True
+    return False
+
+
 # ─── Transformation functions per category ───────────────────────────────────
 
 def _remediate_formula_cell(val: str) -> tuple[str, bool, str]:
     """
     Neutralize CSV Formula Injection.
     Prepends a single quote (') and neutralizes executable keywords (DDE, cmd, powershell, HYPERLINK).
+    Preserves safe numeric literals (-10.5, +91) and usernames (@alice).
     """
+    if _is_safe_literal_not_formula(val):
+        return val, False, ""
+
     new_val = val
     # Check DDE/cmd patterns first (FORM-002 critical)
     if re.search(r'DDE\s*\(|cmd\s*\||powershell\s*\|', new_val, re.IGNORECASE):
@@ -67,8 +95,12 @@ def _remediate_formula_cell(val: str) -> tuple[str, bool, str]:
             new_val = "'" + new_val
         return new_val, True, "FORM-003"
 
-    # Standard formula trigger character check (FORM-001)
-    if re.match(r'^\s*[=+\-@|]', new_val):
+    # Context-aware formula trigger check (FORM-001)
+    if _FORMULA_SYNTAX_RE.match(new_val) or (new_val.strip().startswith(('+', '-', '@', '|')) and any(c in new_val for c in '|(;!')):
+        new_val = "'" + new_val
+        return new_val, True, "FORM-001"
+
+    if new_val.strip().startswith('='):
         new_val = "'" + new_val
         return new_val, True, "FORM-001"
 
@@ -151,34 +183,23 @@ def _remediate_sql_cell(
     return new_val, True, rule_id
 
 
-# Malware signature patterns for cell-level neutralization (EICAR, malware tools, etc.)
+# Malware signature patterns for cell-level neutralization (EICAR, offensive malware tools, etc.)
+# Research text metadata mentioning family names (MAL-009) is preserved and NOT wiped.
 _EICAR_STR = "X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
 _MALWARE_PATTERNS = [
     (re.compile(r"X5O!P%@AP\[4\\PZX54\(P\^\)7CC\)7\}|EICAR-STANDARD-ANTIVIRUS-TEST-FILE", re.IGNORECASE), "MAL-001"),
     (re.compile(r"\b(mimikatz|sekurlsa|kerberos::|lsadump)\b", re.IGNORECASE), "MAL-004"),
     (re.compile(r"\b(cobalt\s*strike|beacon\.dll|beacon\.exe)\b", re.IGNORECASE), "MAL-005"),
     (re.compile(r"\b(metasploit|meterpreter|reverse_tcp)\b", re.IGNORECASE), "MAL-006"),
-    (re.compile(r"\b(wannacry|wcry|wncry)\b", re.IGNORECASE), "MAL-007"),
-    (re.compile(r"\b(lockbit|revil|sodinokibi)\b", re.IGNORECASE), "MAL-008"),
-    (
-        re.compile(
-            r'\b(Malware|Malicious|Exploit|Trojan|Ransomware|Spyware|Adware|Rootkit|Backdoor|Worm|Virus|Keylogger|'
-            r'Botnet|RAT|Dropper|Downloader|Infostealer|Cryptominer|Fileless|'
-            r'Mirai|WannaCry|Petya|NotPetya|Emotet|TrickBot|Ryuk|Conti|'
-            r'BlackCat|ALPHV|LockBit|REvil|Sodinokibi|DarkSide|Maze|'
-            r'Stuxnet|Duqu|Flame|Carbanak|APT|TIBS|ZeuS|Conficker|'
-            r'Dridex|Ursnif|Qakbot|IcedID|BazarLoader|Invoke-Mimikatz|Invoke-ReflectivePEInjection)\b',
-            re.IGNORECASE,
-        ),
-        "MAL-009",
-    ),
+    (re.compile(r"\b(Invoke-Mimikatz|Invoke-ReflectivePEInjection)\b", re.IGNORECASE), "MAL-005"),
 ]
 
 
 def _remediate_malware_cell(val: str) -> tuple[str, bool, str]:
     """
-    Neutralize malware signatures/strings (EICAR, malware tool names, etc.)
-    For critical/high malware signatures, replaces the ENTIRE field with [REMOVED].
+    Neutralize active malware signatures/strings (EICAR, offensive malware tool invocations).
+    Replaces actual malicious artifacts with [REMOVED].
+    Preserves legitimate cybersecurity research text (MAL-009).
     """
     for pattern, rule_id in _MALWARE_PATTERNS:
         if pattern.search(val):

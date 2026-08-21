@@ -33,15 +33,21 @@ _SAMPLE_MAX_LEN = 200  # max chars shown in finding sample
 
 _EICAR = b"X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
 
-# ─── Threat Detection Rules ──────────────────────────────────────────────────
-# Each rule: (rule_id, severity, category, description, compiled_regex)
+# Context-aware formula regexes
+_PLAIN_NUMBER_RE = re.compile(r'^\s*[+\-]?\d+(\.\d+)?([eE][+\-]?\d+)?\s*$')
+_PHONE_OR_CODE_RE = re.compile(r'^\s*\+\d{1,4}[-\s\(\)\d]{4,20}\s*$')
+_HANDLE_RE = re.compile(r'^\s*@[A-Za-z0-9_.-]{1,64}\s*$')
+_FORMULA_SYNTAX_RE = re.compile(
+    r'^\s*(=|[+\-@|]\s*([A-Za-z_][A-Za-z0-9_.]*\s*\(|[A-Za-z_][A-Za-z0-9_]*!|cmd\s*\||powershell\s*\||dde\s*\(|[\"\'\(]|\d+[\+\-\*\/\^]))',
+    re.IGNORECASE,
+)
 
 _RULES: list[tuple[str, str, str, str, re.Pattern]] = [
     # ── CSV Formula Injection (OWASP) ──────────────────────────────────────────
     (
         "FORM-001", "high", "formula_injection",
-        "CSV formula injection — cell starts with Excel formula trigger character",
-        re.compile(r'^\s*[=+\-@|]', re.MULTILINE),
+        "CSV formula injection — cell starts with Excel formula syntax or trigger expression",
+        _FORMULA_SYNTAX_RE,
     ),
     (
         "FORM-002", "critical", "formula_injection",
@@ -89,30 +95,30 @@ _RULES: list[tuple[str, str, str, str, re.Pattern]] = [
     # ── EICAR Test String ─────────────────────────────────────────────────────
     (
         "MAL-001", "critical", "malware_signature",
-        "EICAR antivirus test string detected — confirms AV detection pipeline is working",
+        "EICAR antivirus test signature detected — standard test artifact",
         re.compile(r'X5O!P%@AP\[4\\PZX54\(P\^\)7CC\)7\}|EICAR-STANDARD-ANTIVIRUS-TEST-FILE', re.IGNORECASE),
     ),
     # ── Executable / Binary Headers in Text Fields ────────────────────────────
     (
-        "MAL-002", "critical", "malware_signature",
+        "MAL-002", "high", "executable_artifact",
         "Windows PE/MZ executable header detected in field value",
         re.compile(r'\bMZ\x90|\bMZP\x00|\b4d5a90|\b4d5a50', re.IGNORECASE),
     ),
     (
-        "MAL-003", "critical", "malware_signature",
-        "ELF binary header detected in field value (Linux executable)",
+        "MAL-003", "high", "executable_artifact",
+        "ELF binary header detected in field value (Linux executable format)",
         re.compile(r'\x7fELF|7f454c46', re.IGNORECASE),
     ),
     (
-        "MAL-004", "critical", "malware_signature",
+        "MAL-004", "high", "executable_artifact",
         "Base64-encoded Windows PE executable detected (TVoA or TVJQ prefix = MZ header)",
         re.compile(r'\bTVo[Aqw]|\bTVJQ|\bTVpQ', re.IGNORECASE),
     ),
-    # ── PowerShell / Shellcode ────────────────────────────────────────────────
+    # ── PowerShell / Shellcode / Droppers ─────────────────────────────────────
     (
         "MAL-005", "critical", "shellcode",
         "PowerShell encoded command (Base64) detected — common malware dropper technique",
-        re.compile(r'powershell\s.*-[Ee]nc(?:odedCommand)?\s+[A-Za-z0-9+/=]{20,}', re.IGNORECASE),
+        re.compile(r'powershell(?:\.exe)?\s.*-[Ee]nc(?:odedCommand)?\s+[A-Za-z0-9+/=]{20,}', re.IGNORECASE),
     ),
     (
         "MAL-006", "critical", "shellcode",
@@ -130,10 +136,10 @@ _RULES: list[tuple[str, str, str, str, re.Pattern]] = [
         "Auto-execute macro trigger keyword detected (AutoOpen, Document_Open, etc.)",
         re.compile(r'\b(AutoOpen|Document_Open|Workbook_Open|Auto_Open|Shell|CreateObject|WScript\.Shell)\b', re.IGNORECASE),
     ),
-    # ── Known Malware Family Names in Filenames / Fields ─────────────────────
+    # ── Malware Reference / Metadata in Dataset Fields ───────────────────────
     (
-        "MAL-009", "critical", "malware_reference",
-        "Known malware family name or classification detected in field — dataset contains malware analysis data",
+        "MAL-009", "low", "malware_reference",
+        "Known malware family name or classification detected in field — dataset contains malware analysis or reference metadata",
         re.compile(
             r'\b(Malware|Malicious|Exploit|Trojan|Ransomware|Spyware|Adware|Rootkit|Backdoor|Worm|Virus|Keylogger|'
             r'Botnet|RAT|Dropper|Downloader|Infostealer|Cryptominer|Fileless|'
@@ -159,7 +165,7 @@ _RULES: list[tuple[str, str, str, str, re.Pattern]] = [
 
 
 # Severity → numeric weight for risk score calculation
-_SEVERITY_WEIGHT = {"critical": 3.5, "high": 2.0, "medium": 1.0, "low": 0.3}
+_SEVERITY_WEIGHT = {"critical": 3.5, "high": 2.0, "medium": 1.0, "low": 0.2}
 
 
 @dataclass
@@ -176,7 +182,13 @@ class ContentFinding:
 class ContentCheckResult:
     findings: list[ContentFinding] = field(default_factory=list)
     rows_inspected: int = 0
+    rows_total: int | None = None
+    fields_inspected: int = 0
+    coverage_percentage: float = 100.0
+    coverage_type: str = "ROW_BASED"    # ROW_BASED | BYTE_BASED | FILE_BASED | NOT_APPLICABLE
+    coverage_status: str = "FULL"       # FULL | PARTIAL | UNKNOWN
     error: str | None = None
+    limitations: list[str] = field(default_factory=list)
 
     @property
     def threat_count(self) -> int:
@@ -187,6 +199,20 @@ class ContentCheckResult:
         """Returns a capped 0–10 risk score based on finding severities."""
         total = sum(_SEVERITY_WEIGHT.get(f.severity, 0) for f in self.findings)
         return round(min(total, 10.0), 2)
+
+
+def _is_safe_literal_not_formula(val: str) -> bool:
+    """Return True if val is a benign literal (numeric, phone code, @handle) rather than a formula."""
+    v = val.strip()
+    if not v:
+        return True
+    if _PLAIN_NUMBER_RE.match(v):
+        return True
+    if _PHONE_OR_CODE_RE.match(v):
+        return True
+    if _HANDLE_RE.match(v):
+        return True
+    return False
 
 
 def _deobfuscate(value: str) -> str:
@@ -218,7 +244,13 @@ def _check_string_value(value: str, column: str, row_idx: str) -> list[ContentFi
     """Apply deobfuscation then all text rules against a single string cell value."""
     deobfuscated = _deobfuscate(value)
     findings = []
+    is_safe_literal = _is_safe_literal_not_formula(value)
+
     for rule_id, severity, category, description, pattern in _RULES:
+        # Context-aware formula check: skip formula rule if cell is a safe plain numeric literal/handle
+        if rule_id.startswith("FORM-") and is_safe_literal:
+            continue
+
         # Check both original and deobfuscated value for coverage
         match = pattern.search(deobfuscated) or pattern.search(value)
         if match:
@@ -235,14 +267,26 @@ def _check_string_value(value: str, column: str, row_idx: str) -> list[ContentFi
     return findings
 
 
-def _load_dataframe(path: Path) -> tuple[pd.DataFrame | None, str | None]:
+def _load_dataframe(path: Path) -> tuple[pd.DataFrame | None, int | None, str, str | None]:
     """
-    Load dataset into DataFrame. Returns (df, error_msg).
+    Load dataset into DataFrame with accurate row/element totals.
+    Returns (df, rows_total, coverage_type, error_msg).
     Supports CSV, Parquet, JSON, JSONL, XLSX (openpyxl read_only), TXT.
     """
     suffix = path.suffix.lower()
+    rows_total: int | None = None
+    coverage_type = "ROW_BASED"
+
     try:
         if suffix == ".csv":
+            # 1. Quickly count total lines for coverage calculation
+            try:
+                with path.open("rb") as fh:
+                    line_count = sum(1 for _ in fh)
+                rows_total = max(0, line_count - 1) if line_count > 0 else 0
+            except Exception:
+                rows_total = None
+
             try:
                 df = pd.read_csv(path, nrows=_MAX_ROWS, low_memory=False, dtype=str)
             except Exception:
@@ -258,11 +302,14 @@ def _load_dataframe(path: Path) -> tuple[pd.DataFrame | None, str | None]:
                             lines.append({"content": line.rstrip("\n")})
                     df = pd.DataFrame(lines)
 
+            if rows_total is None or rows_total < len(df):
+                rows_total = len(df)
+
         elif suffix == ".parquet":
-            # Stream row groups to avoid loading entire file into memory
             try:
                 import pyarrow.parquet as pq
                 pf = pq.ParquetFile(path)
+                rows_total = pf.metadata.num_rows if pf.metadata else None
                 rows_collected: list[pd.DataFrame] = []
                 rows_read = 0
                 for batch in pf.iter_batches(batch_size=2000):
@@ -274,30 +321,37 @@ def _load_dataframe(path: Path) -> tuple[pd.DataFrame | None, str | None]:
                         break
                 df = pd.concat(rows_collected, ignore_index=True) if rows_collected else pd.DataFrame()
             except ImportError:
-                # Fallback: pandas read with head truncation
                 df = pd.read_parquet(path)
+                rows_total = len(df)
                 df = df.head(_MAX_ROWS).astype(str)
 
         elif suffix == ".json":
             with path.open("r", encoding="utf-8", errors="replace") as fh:
                 raw = json.load(fh)
             if isinstance(raw, list):
+                rows_total = len(raw)
                 df = pd.DataFrame(raw[:_MAX_ROWS]).astype(str)
             elif isinstance(raw, dict):
+                rows_total = 1
                 df = pd.DataFrame([raw]).astype(str)
             else:
-                return None, f"Unsupported JSON root type: {type(raw).__name__}"
+                return None, None, coverage_type, f"Unsupported JSON root type: {type(raw).__name__}"
 
         elif suffix == ".jsonl":
+            try:
+                with path.open("rb") as fh:
+                    rows_total = sum(1 for _ in fh)
+            except Exception:
+                rows_total = None
             df = pd.read_json(io.StringIO(path.read_text("utf-8", errors="replace")),
                               lines=True, nrows=_MAX_ROWS, dtype=str)
+            if rows_total is None or rows_total < len(df):
+                rows_total = len(df)
 
         elif suffix in (".xlsx", ".xls"):
-            # Check file size before loading (openpyxl loads full sheet)
             size_mb = path.stat().st_size / (1024 * 1024)
             if size_mb > _XLSX_MAX_MB:
-                return None, f"Excel file too large ({size_mb:.1f} MB). Max {_XLSX_MAX_MB} MB for XLSX scanning."
-            # Use openpyxl read_only mode for memory efficiency
+                return None, None, coverage_type, f"Excel file too large ({size_mb:.1f} MB). Max {_XLSX_MAX_MB} MB for XLSX scanning."
             try:
                 from openpyxl import load_workbook
                 wb = load_workbook(filename=str(path), read_only=True, data_only=True)
@@ -313,11 +367,18 @@ def _load_dataframe(path: Path) -> tuple[pd.DataFrame | None, str | None]:
                             break
                 wb.close()
                 df = pd.DataFrame(rows, columns=headers[:len(rows[0])] if rows else headers)
+                rows_total = len(df)
             except ImportError:
                 df = pd.read_excel(path, engine="openpyxl", nrows=_MAX_ROWS, dtype=str)
+                rows_total = len(df)
 
         elif suffix == ".txt":
-            # Scan as single-column text file line by line
+            coverage_type = "BYTE_BASED"
+            try:
+                with path.open("rb") as fh:
+                    rows_total = sum(1 for _ in fh)
+            except Exception:
+                rows_total = None
             lines = []
             with path.open("r", encoding="utf-8", errors="replace") as fh:
                 for i, line in enumerate(fh):
@@ -325,13 +386,15 @@ def _load_dataframe(path: Path) -> tuple[pd.DataFrame | None, str | None]:
                         break
                     lines.append({"text": line.rstrip("\n")})
             df = pd.DataFrame(lines)
+            if rows_total is None or rows_total < len(df):
+                rows_total = len(df)
 
         else:
-            return None, f"Unsupported file format: {suffix!r}"
+            return None, None, "NOT_APPLICABLE", f"Unsupported file format: {suffix!r}"
 
-        return df, None
+        return df, rows_total, coverage_type, None
     except Exception as exc:  # noqa: BLE001
-        return None, f"Failed to parse dataset: {exc}"
+        return None, None, coverage_type, f"Failed to parse dataset: {exc}"
 
 
 def raw_bytes_scan(path: Path) -> list[ContentFinding]:
@@ -356,7 +419,7 @@ def raw_bytes_scan(path: Path) -> list[ContentFinding]:
             rule_id="MAL-001",
             severity="critical",
             category="malware_signature",
-            description="EICAR antivirus test string detected in raw file bytes",
+            description="EICAR antivirus test signature detected in raw file bytes",
             location="raw_bytes",
             sample="X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR...",
         ))
@@ -365,9 +428,9 @@ def raw_bytes_scan(path: Path) -> list[ContentFinding]:
     if raw[:2] == b"MZ" or b"MZ\x90\x00" in raw[:4096] or b"MZP\x00" in raw[:4096]:
         findings.append(ContentFinding(
             rule_id="MAL-002",
-            severity="critical",
-            category="malware_signature",
-            description="Windows PE/MZ executable header found in raw file bytes",
+            severity="high",
+            category="executable_artifact",
+            description="Windows PE/MZ executable header found in raw file bytes (executable format)",
             location="raw_bytes:offset=0",
             sample="MZ (PE executable header)",
         ))
@@ -376,9 +439,9 @@ def raw_bytes_scan(path: Path) -> list[ContentFinding]:
     if raw[:4] == b"\x7fELF":
         findings.append(ContentFinding(
             rule_id="MAL-003",
-            severity="critical",
-            category="malware_signature",
-            description="ELF Linux/Unix executable binary detected in raw file bytes",
+            severity="high",
+            category="executable_artifact",
+            description="ELF Linux/Unix executable binary format detected in raw file bytes",
             location="raw_bytes:offset=0",
             sample="\\x7fELF (ELF binary header)",
         ))
@@ -388,8 +451,8 @@ def raw_bytes_scan(path: Path) -> list[ContentFinding]:
     if raw[:2] != b"MZ" and mz_offset != -1:
         findings.append(ContentFinding(
             rule_id="MAL-002",
-            severity="critical",
-            category="malware_signature",
+            severity="high",
+            category="executable_artifact",
             description=f"Embedded Windows PE/MZ executable found at offset {mz_offset} (polyglot file)",
             location=f"raw_bytes:offset={mz_offset}",
             sample=f"MZ header at byte {mz_offset}",
@@ -415,13 +478,13 @@ def raw_bytes_scan(path: Path) -> list[ContentFinding]:
 
 def check_file(file_path: str) -> ContentCheckResult:
     """
-    Entry point: inspect dataset for threat patterns.
+    Entry point: inspect dataset for threat patterns and track coverage.
 
     Pipeline:
       Stage 0 — Raw bytes scan (EICAR, PE/ELF headers, shellcode) — runs FIRST
       Stage 1 — Dataframe content inspection (injection, script, SQL, malware names)
 
-    Returns a ContentCheckResult with findings, row count, and risk score.
+    Returns a ContentCheckResult with findings, row counts, coverage metrics, and risk score.
     """
     path = Path(file_path)
     result = ContentCheckResult()
@@ -436,13 +499,32 @@ def check_file(file_path: str) -> ContentCheckResult:
         )
 
     # ── Stage 1: Dataframe content inspection ─────────────────────────────────
-    df, error = _load_dataframe(path)
+    df, rows_total, coverage_type, error = _load_dataframe(path)
+    result.coverage_type = coverage_type
+    result.rows_total = rows_total
+
     if error:
         result.error = error
+        result.coverage_status = "UNKNOWN"
+        result.limitations.append("PARSER_LIMITATION")
         logger.warning("Content check parse error for %s: %s", file_path, error)
         return result
 
     result.rows_inspected = len(df)
+    result.fields_inspected = len(df) * len(df.columns)
+
+    if rows_total and rows_total > 0:
+        if len(df) < rows_total:
+            result.coverage_percentage = round((len(df) / rows_total) * 100.0, 1)
+            result.coverage_status = "PARTIAL"
+            result.limitations.append("PARTIAL_DATASET_SCAN")
+        else:
+            result.coverage_percentage = 100.0
+            result.coverage_status = "FULL"
+    else:
+        result.coverage_percentage = 100.0
+        result.coverage_status = "FULL"
+
     seen_rules_per_column: set[tuple[str, str]] = set()
 
     # Pre-seed seen set with rules already triggered by raw scan

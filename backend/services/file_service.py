@@ -171,6 +171,71 @@ class FileService:
             "file_path": str(dest_path),
         }
 
+    async def save_upload_stream(
+        self,
+        upload_file,
+        original_filename: str,
+        max_bytes: int = 50 * 1024 * 1024,
+    ) -> dict:
+        """
+        Stream upload chunks directly to disk with incremental SHA-256 calculation
+        and size enforcement. Never holds full file in RAM.
+        """
+        safe_orig = _sanitize_filename(original_filename)
+        ext = Path(safe_orig).suffix.lower()
+        stored_name = f"{uuid.uuid4().hex}{ext}"
+        dest_path = _SAMPLES_DIR / stored_name
+        temp_path = _SAMPLES_DIR / f"{stored_name}.tmp"
+
+        hasher = hashlib.sha256()
+        bytes_written = 0
+        header_bytes = bytearray()
+
+        try:
+            with temp_path.open("wb") as fh:
+                while True:
+                    chunk = await upload_file.read(65536)  # 64 KB streaming chunks
+                    if not chunk:
+                        break
+                    bytes_written += len(chunk)
+                    if bytes_written > max_bytes:
+                        raise ValueError(f"File exceeds maximum allowed size ({max_bytes // (1024 * 1024)} MB).")
+
+                    if len(header_bytes) < 32:
+                        needed = 32 - len(header_bytes)
+                        header_bytes.extend(chunk[:needed])
+
+                    hasher.update(chunk)
+                    fh.write(chunk)
+
+            # Magic bytes validation on captured header bytes
+            if not validate_magic_bytes(bytes(header_bytes), safe_orig):
+                raise ValueError("Executable binary anomaly detected (PE/ELF/Mach-O header blocked).")
+
+            # Atomic finalize
+            temp_path.replace(dest_path)
+        except Exception:
+            if temp_path.exists():
+                try:
+                    temp_path.unlink()
+                except OSError:
+                    pass
+            raise
+
+        sha256 = hasher.hexdigest()
+        mime = _detect_mime(dest_path)
+        fmt = _detect_format(safe_orig)
+
+        return {
+            "original_filename": safe_orig,
+            "stored_filename": stored_name,
+            "file_size_bytes": bytes_written,
+            "sha256_hash": sha256,
+            "mime_type": mime,
+            "file_format": fmt,
+            "file_path": str(dest_path),
+        }
+
     def save_sanitized(self, original_stored_filename: str, content: bytes) -> tuple[str, str, Path]:
         """
         Save sanitized content bytes to data/sanitized/ under a UUID filename.

@@ -57,17 +57,22 @@ class ScanReportRecord(Base):
     clamav_status: Mapped[str] = mapped_column(String(64), nullable=False, default="skipped")
     clamav_virus_name: Mapped[str] = mapped_column(String(256), nullable=True)
 
-    # Content rule stage
+    # Content rule & coverage stage
     threats_found_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     risk_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    verdict: Mapped[str] = mapped_column(String(32), nullable=False, default="clean")
+    verdict: Mapped[str] = mapped_column(String(32), nullable=False, default="clean_verified")
+    rows_inspected: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    rows_total: Mapped[int] = mapped_column(Integer, nullable=True)
+    coverage_percentage: Mapped[float] = mapped_column(Float, nullable=False, default=100.0)
+    coverage_status: Mapped[str] = mapped_column(String(32), nullable=False, default="FULL")
 
     # Timing
     scan_duration_ms: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     scanned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, server_default=func.now())
 
-    # Full findings stored as JSON text
+    # Full findings and limitations stored as JSON text
     findings_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    verification_limitations_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
 
     dataset: Mapped["DatasetRecord"] = relationship("DatasetRecord", back_populates="scan_reports")
 
@@ -76,10 +81,19 @@ class ScanReportRecord(Base):
         """Deserialise findings JSON to Python list."""
         return json.loads(self.findings_json)
 
+    @property
+    def verification_limitations(self) -> list[str]:
+        """Deserialise limitations JSON to Python list."""
+        try:
+            return json.loads(self.verification_limitations_json)
+        except Exception:
+            return []
+
     def __repr__(self) -> str:
         return (
             f"<ScanReportRecord id={self.id} dataset_id={self.dataset_id} "
-            f"verdict={self.verdict!r} risk={self.risk_score:.1f} threats={self.threats_found_count}>"
+            f"verdict={self.verdict!r} risk={self.risk_score:.1f} threats={self.threats_found_count} "
+            f"coverage={self.coverage_percentage:.1f}%>"
         )
 
 

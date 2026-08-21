@@ -13,6 +13,7 @@ _ROOT = _curr.parent.parent if _curr.parent.name == "backend" else _curr.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
+from config import settings  # noqa: E402
 from database import get_db  # noqa: E402
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status  # noqa: E402
 from fastapi.concurrency import run_in_threadpool  # noqa: E402
@@ -59,35 +60,26 @@ async def upload_dataset(
     if not file_service.validate_extension(filename):
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail=f"File type not allowed. Accepted extensions: {sorted(list(file_service.validate_extension.__self__.validate_extension)) if hasattr(file_service, 'allowed_extensions') else 'csv, parquet, json, jsonl, xlsx, txt'}. Got: {Path(filename).suffix!r}",
+            detail=f"File type not allowed. Accepted extensions: {sorted(list(settings.allowed_extensions))}. Got: {Path(filename).suffix!r}",
         )
 
-    # 2. Stream content in 1 MB chunks to prevent OOM
-    buffer = bytearray()
-    while True:
-        chunk = await file.read(_CHUNK_SIZE_BYTES)
-        if not chunk:
-            break
-        buffer.extend(chunk)
-        if len(buffer) > _MAX_UPLOAD_BYTES:
+    # 2. Stream directly to disk with incremental SHA-256 and size enforcement
+    max_bytes = settings.max_upload_size_mb * 1024 * 1024
+    try:
+        meta = await file_service.save_upload_stream(file, filename, max_bytes=max_bytes)
+    except ValueError as exc:
+        msg = str(exc)
+        if "exceeds maximum allowed size" in msg:
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail=f"File too large. Maximum size is {_MAX_UPLOAD_BYTES // (1024*1024)} MB.",
+                detail=msg,
             )
-
-    content = bytes(buffer)
-
-    # 3. Magic byte header verification (reject executable binary anomalies)
-    if not validate_magic_bytes(content, filename):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="File content header (magic bytes) does not match expected format or contains executable binary data.",
+            detail=msg,
         )
 
-    # 4. Save to data/samples/ under UUID filename
-    meta = file_service.save_upload(filename, content)
-
-    # 5. Persist to database
+    # 3. Persist to database
     record = DatasetRecord(
         original_filename=meta["original_filename"],
         stored_filename=meta["stored_filename"],
@@ -176,7 +168,7 @@ async def scan_dataset(
         record.status = "clean"
     db.commit()
 
-    # FINDING-018: Persist scan report including verdict
+    # FINDING-018: Persist scan report including verdict, coverage, and limitations
     report = ScanReportRecord(
         dataset_id=record.id,
         clamav_status=result.clamav_status,
@@ -184,8 +176,13 @@ async def scan_dataset(
         threats_found_count=result.threats_found_count,
         risk_score=result.risk_score,
         verdict=result.verdict,
+        rows_inspected=result.rows_inspected,
+        rows_total=result.rows_total,
+        coverage_percentage=result.coverage_percentage,
+        coverage_status=result.coverage_status,
         scan_duration_ms=result.scan_duration_ms,
         findings_json=json.dumps(result.to_findings_dicts()),
+        verification_limitations_json=json.dumps(result.verification_limitations),
     )
     db.add(report)
     db.commit()
@@ -203,6 +200,11 @@ async def scan_dataset(
         scan_duration_ms=report.scan_duration_ms,
         scanned_at=report.scanned_at,
         verdict=report.verdict,
+        rows_inspected=report.rows_inspected,
+        rows_total=report.rows_total,
+        coverage_percentage=report.coverage_percentage,
+        coverage_status=report.coverage_status,
+        verification_limitations=report.verification_limitations,
         findings=findings,
     )
 
@@ -261,8 +263,8 @@ def get_scan_report(
     # FINDING-018: Use stored verdict from ScanReportRecord if available
     verdict = getattr(report, "verdict", None)
     if not verdict:
-        verdict_map = {"quarantined": "malicious", "suspicious": "suspicious", "clean": "clean"}
-        verdict = verdict_map.get(record.status, "clean")
+        verdict_map = {"quarantined": "malicious", "suspicious": "suspicious", "clean": "clean_verified"}
+        verdict = verdict_map.get(record.status, "clean_verified")
 
     return ScanResultResponse(
         scan_id=report.id,
@@ -274,5 +276,10 @@ def get_scan_report(
         scan_duration_ms=report.scan_duration_ms,
         scanned_at=report.scanned_at,
         verdict=verdict,
+        rows_inspected=getattr(report, "rows_inspected", 0),
+        rows_total=getattr(report, "rows_total", None),
+        coverage_percentage=getattr(report, "coverage_percentage", 100.0),
+        coverage_status=getattr(report, "coverage_status", "FULL"),
+        verification_limitations=report.verification_limitations,
         findings=findings,
     )

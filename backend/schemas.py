@@ -47,7 +47,12 @@ class ScanResultResponse(BaseModel):
     risk_score: float = Field(..., description="Composite risk score 0.0 – 10.0")
     scan_duration_ms: int
     scanned_at: datetime
-    verdict: str = Field(..., description="clean | suspicious | malicious")
+    verdict: str = Field(..., description="clean_verified | clean_with_limitations | suspicious | malicious | scan_incomplete")
+    rows_inspected: int = 0
+    rows_total: int | None = None
+    coverage_percentage: float = 100.0
+    coverage_status: str = "FULL"
+    verification_limitations: list[str] = Field(default_factory=list)
     findings: list[ThreatFinding]
 
 
