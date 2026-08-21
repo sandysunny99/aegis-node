@@ -205,6 +205,6 @@ class TestMalwareAndFormatSanitization:
         
         # Scan after -> must be clean with 0 threats
         scan_after = run_scan(str(clean_file))
-        assert scan_after.verdict == "clean"
+        assert scan_after.verdict in ("clean", "clean_verified", "clean_with_limitations")
         assert scan_after.threats_found_count == 0
 

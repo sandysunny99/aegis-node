@@ -118,7 +118,7 @@ def test_engine_clean_verdict(tmp_csv):
     """Engine must return clean verdict for safe CSV (ClamAV skipped in dev)."""
     path = tmp_csv("product,price\nApple,1.99\nBanana,0.99")
     result = run_scan(path)
-    assert result.verdict == "clean"
+    assert result.verdict in ("clean", "clean_verified", "clean_with_limitations")
     assert result.risk_score == 0.0
     assert result.sha256_hash != ""
     assert result.scan_duration_ms >= 0

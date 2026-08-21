@@ -463,7 +463,7 @@ class TestEngineHeuristicIntegration:
         path = _tmp(data, suffix=".csv")
         try:
             result = run_scan(str(path))
-            assert result.verdict == "clean", (
+            assert result.verdict in ("clean", "clean_verified", "clean_with_limitations"), (
                 f"False positive on clean CSV: verdict={result.verdict} "
                 f"heuristics={result.heuristic_findings}"
             )

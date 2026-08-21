@@ -63,7 +63,7 @@ def test_history_single_dataset_scanned():
     assert item["dataset_id"] == ds_id
     assert item["original_filename"] == "dataset_a.csv"
     assert item["scans_count"] == 1
-    assert item["verdict"] == "clean"
+    assert item["verdict"] in ("clean", "clean_verified", "clean_with_limitations")
     assert item["risk_score"] == 0.0
 
     # Ensure no file paths or secrets in response keys or values

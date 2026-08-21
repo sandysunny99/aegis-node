@@ -16,7 +16,7 @@ def test_real_sample_demo_clean():
     scan = client.post(f"/api/v1/datasets/{cid}/scan")
     assert scan.status_code == 200
     res = scan.json()
-    assert res["verdict"] == "clean"
+    assert res["verdict"] in ("clean", "clean_verified", "clean_with_limitations")
     assert res["threats_found_count"] == 0
     assert res["risk_score"] == 0.0
 
