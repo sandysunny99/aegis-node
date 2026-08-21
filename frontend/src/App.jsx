@@ -313,12 +313,37 @@ function ScanPage({ health }) {
                     Threats Detected: <strong style={{ color: scanResult.threats_found_count > 0 ? 'var(--rose)' : 'var(--emerald)', fontFamily: 'var(--mono)' }}>{scanResult.threats_found_count}</strong>
                   </div>
                   <div>
+                    Coverage: <strong style={{ color: 'var(--cyan)', fontFamily: 'var(--mono)' }}>{scanResult.coverage_percentage ?? 100}%</strong>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-3)', marginLeft: '0.4rem' }}>
+                      ({scanResult.rows_inspected} rows{scanResult.rows_total ? ` / ${scanResult.rows_total}` : ''})
+                    </span>
+                  </div>
+                  <div>
                     ClamAV Status: <strong style={{ color: 'var(--text-1)', fontFamily: 'var(--mono)' }}>{scanResult.clamav_status}</strong>
                     {scanResult.clamav_virus_name && <span style={{ color: 'var(--rose)', marginLeft: '0.4rem' }}>({scanResult.clamav_virus_name})</span>}
                   </div>
                   <div>
                     Pipeline Latency: <strong style={{ color: 'var(--text-1)', fontFamily: 'var(--mono)' }}>{scanResult.scan_duration_ms} ms</strong>
                   </div>
+
+                  {scanResult.verification_limitations && scanResult.verification_limitations.length > 0 && (
+                    <div style={{ marginTop: '0.4rem', display: 'flex', flexWrap: 'wrap', gap: '0.3rem', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--amber)', fontWeight: 600 }}>Limitations:</span>
+                      {scanResult.verification_limitations.map((lim, idx) => (
+                        <span key={idx} style={{
+                          fontSize: '0.68rem',
+                          background: 'rgba(245, 158, 11, 0.12)',
+                          color: 'var(--amber)',
+                          border: '1px solid rgba(245, 158, 11, 0.25)',
+                          padding: '0.1rem 0.35rem',
+                          borderRadius: '4px',
+                          fontFamily: 'var(--mono)',
+                        }}>
+                          {lim}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
