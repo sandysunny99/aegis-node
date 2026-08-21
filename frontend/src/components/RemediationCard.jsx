@@ -101,7 +101,11 @@ export default function RemediationCard({ datasetId, scanResult }) {
               color="var(--cyan)"
             />
             <MetricBox label="Threats Resolved" value={report.resolved_findings_count} color="var(--emerald)" />
-            <MetricBox label="Remaining" value={report.remaining_findings_count} color={report.remaining_findings_count > 0 ? 'var(--rose)' : 'var(--emerald)'} />
+            <MetricBox
+              label="Remaining"
+              value={report.remaining_findings_count}
+              color={report.remediation_status === 'completed' ? (report.remaining_findings_count > 0 ? 'var(--cyan)' : 'var(--emerald)') : 'var(--rose)'}
+            />
             <MetricBox label="Changes Made" value={report.changes_count} color="var(--blue)" />
           </div>
 
@@ -118,7 +122,11 @@ export default function RemediationCard({ datasetId, scanResult }) {
             display: 'flex', alignItems: 'center', gap: '0.625rem',
           }}>
             {report.remediation_status === 'completed' ? '✅' : '⚠️'}
-            Remediation {report.remediation_status === 'completed' ? 'completed — all threats neutralized' : 'partial — some threats may remain'}
+            {report.remediation_status === 'completed'
+              ? (report.remaining_findings_count > 0
+                  ? 'Remediation completed — all actionable threats neutralized (Research metadata preserved)'
+                  : 'Remediation completed — all threats neutralized')
+              : 'Remediation partial — some threats may remain'}
           </div>
 
           {/* Actions taken */}

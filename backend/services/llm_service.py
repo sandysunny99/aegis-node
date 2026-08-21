@@ -355,9 +355,9 @@ def _build_provider_chain(cfg=None) -> list[tuple[str, bool]]:
     cfg = cfg or settings
     _KNOWN = {"gemini", "groq", "xai", "ollama", "none"}
     chain: list[tuple[str, bool]] = []
-    seen: set[str] = set()   # Improvement 8: dedup by provider name
+    seen: set[str] = set()
 
-    primary = cfg.ai_provider.strip().lower()
+    primary = (cfg.ai_provider or "").strip().lower()
     if primary and primary in _KNOWN:
         chain.append((primary, False))
         seen.add(primary)
@@ -566,7 +566,7 @@ def _call_xai(
 
     try:
         from services.ai_providers.xai_provider import call_xai
-        raw_text = call_xai(
+        raw_text, err_msg = call_xai(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             api_key=api_key,
@@ -574,7 +574,10 @@ def _call_xai(
             timeout=settings.xai_timeout_seconds,
         )
         if not raw_text:
-            return _failed_result(model_name, "xAI API returned empty response — check API key validity/quota at console.x.ai")
+            return _failed_result(
+                model_name,
+                err_msg or "xAI API returned empty response — check API key validity/quota at console.x.ai",
+            )
 
         parsed = _validate_and_parse(raw_text)
         if not parsed:

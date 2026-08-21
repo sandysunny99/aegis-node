@@ -70,7 +70,7 @@ router = APIRouter(prefix="/api/v1/datasets", tags=["remediation"])
     status_code=status.HTTP_200_OK,
     summary="Remediate dataset threats, generate sanitized artifact, and execute verification re-scan",
 )
-@limiter.limit("5/minute")
+@limiter.limit("60/minute")
 async def remediate_dataset(
     request: Request,
     dataset_id: int,
@@ -99,7 +99,7 @@ async def remediate_dataset(
     except (FileNotFoundError, ValueError) as err:
         raise HTTPException(status_code=404, detail="Source file unavailable for remediation.") from err
 
-    # FINDING-012: Catch sanitization exceptions, log full traceback, return generic 500 error
+    # Catch sanitization exceptions, log full traceback, return generic 500 error
     try:
         san_result = await run_in_threadpool(sanitize_file, orig_source_path, record.file_format)
     except Exception as exc:
@@ -125,13 +125,28 @@ async def remediate_dataset(
 
     san_risk = rescan_result.risk_score
     remaining_count = rescan_result.threats_found_count
-    resolved_count = max(0, orig_findings_count - remaining_count)
 
-    # Calculate threat reduction percentage
-    if orig_risk > 0:
+    # Check actionable threats vs preserved informational research metadata (MAL-009)
+    remaining_actionable = [
+        f for f in rescan_result.all_findings
+        if f.category != "malware_reference" and f.severity not in ("low", "info")
+    ]
+    orig_actionable = [
+        f for f in (latest_report.findings or [])
+        if f.get("category") != "malware_reference" and f.get("severity") not in ("low", "info")
+    ]
+
+    if len(orig_actionable) > 0:
+        reduction_pct = round(
+            max(0.0, min(100.0, ((len(orig_actionable) - len(remaining_actionable)) / len(orig_actionable)) * 100.0)),
+            1,
+        )
+    elif orig_risk > 0 and orig_risk > san_risk:
         reduction_pct = round(max(0.0, min(100.0, ((orig_risk - san_risk) / orig_risk) * 100.0)), 1)
     else:
-        reduction_pct = 100.0 if remaining_count == 0 else 0.0
+        reduction_pct = 100.0 if len(remaining_actionable) == 0 else 0.0
+
+    resolved_count = max(0, orig_findings_count - len(remaining_actionable))
 
     # ── Compute data integrity preservation score ──────────────────────────
     import os
@@ -139,7 +154,6 @@ async def remediate_dataset(
         sample_df = _read_sample_df(orig_source_path, record.file_format)
         _total_cols = max(len(sample_df.columns), 1)
         _file_bytes = os.path.getsize(orig_source_path)
-        # Improved row estimate (FINDING-020)
         _est_rows = max(_file_bytes // max(_total_cols * 20, 1), 1)
         _total_fields = _est_rows * _total_cols
         integrity_preserved = round(
@@ -151,8 +165,8 @@ async def remediate_dataset(
             100.0 * (1.0 - san_result.changes_count / max(san_result.changes_count + 1000, 1)), 2
         )
 
-    # Determine status: "completed" if 0 remaining threats, else "partial"
-    rem_status = "completed" if remaining_count == 0 else "partial"
+    # Determine status: "completed" if 0 remaining actionable threats, else "partial"
+    rem_status = "completed" if len(remaining_actionable) == 0 else "partial"
 
     # Update dataset status in DB
     record.status = "remediated" if rem_status == "completed" else "partial_remediated"

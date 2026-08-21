@@ -233,8 +233,21 @@ function ScanPage({ health }) {
         <div className="card-title">Dataset File Input</div>
         <UploadZone
           file={phase === 'idle' || phase === 'uploading' ? file : null}
-          onFile={setFile}
-          onClear={() => setFile(null)}
+          onFile={(newFile) => {
+            setFile(newFile);
+            if (phase === 'done' || phase === 'uploaded' || phase === 'error') {
+              setPhase('idle');
+              setUploadResult(null);
+              setScanResult(null);
+              setError('');
+            }
+          }}
+          onClear={() => {
+            setFile(null);
+            if (phase === 'done' || phase === 'uploaded' || phase === 'error') {
+              reset();
+            }
+          }}
           uploadProgress={isUploading ? uploadProgress : null}
         />
 

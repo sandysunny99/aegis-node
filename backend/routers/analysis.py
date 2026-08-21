@@ -33,7 +33,7 @@ router = APIRouter(prefix="/api/v1/datasets", tags=["analysis"])
     response_model=AnalysisResponse,
     summary="Run AI threat analysis on a scanned dataset (triggers external API call)",
 )
-@limiter.limit("5/minute")   # F7: AI calls are expensive — cap at 5/min per IP
+@limiter.limit("60/minute")   # Cap at 60/min per IP
 async def analyse_dataset(
     request: Request,         # Required by slowapi for IP tracking
     dataset_id: int,
