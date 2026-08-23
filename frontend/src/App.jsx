@@ -5,6 +5,7 @@ import FindingsList from './components/FindingsList';
 import RemediationCard from './components/RemediationCard';
 import RiskMeter from './components/RiskMeter';
 import StatusBadge from './components/StatusBadge';
+import TurnstileWidget from './components/TurnstileWidget';
 import UploadZone from './components/UploadZone';
 import HistoryPage from './pages/HistoryPage';
 
@@ -168,21 +169,23 @@ function ScanPage({ health }) {
   const [uploadResult, setUploadResult] = useState(null);
   const [scanResult, setScanResult] = useState(null);
   const [error, setError] = useState('');
+  const [turnstileToken, setTurnstileToken] = useState(null);
 
   const reset = useCallback(() => {
     setFile(null); setPhase('idle');
     setUploadProgress(null);
     setUploadResult(null); setScanResult(null); setError('');
+    setTurnstileToken(null);
   }, []);
 
   const handleUpload = useCallback(async () => {
     if (!file) return;
     setPhase('uploading'); setError(''); setUploadProgress(0);
     try {
-      const r = await uploadDataset(file, (pct) => setUploadProgress(pct));
+      const r = await uploadDataset(file, (pct) => setUploadProgress(pct), turnstileToken);
       setUploadResult(r); setPhase('uploaded'); setUploadProgress(null);
     } catch (e) { setError(e.message); setPhase('error'); setUploadProgress(null); }
-  }, [file]);
+  }, [file, turnstileToken]);
 
   const handleScan = useCallback(async () => {
     if (!uploadResult) return;
@@ -240,6 +243,7 @@ function ScanPage({ health }) {
               setUploadResult(null);
               setScanResult(null);
               setError('');
+              setTurnstileToken(null);
             }
           }}
           onClear={() => {
@@ -262,9 +266,22 @@ function ScanPage({ health }) {
 
         {isError && <div className="error-banner fade-in" style={{ marginTop: '0.875rem' }}>⚠️ {error}</div>}
 
+        {phase === 'idle' && health?.turnstile_enabled && (
+          <TurnstileWidget
+            siteKey={health?.turnstile_site_key}
+            onVerify={setTurnstileToken}
+            onExpire={() => setTurnstileToken(null)}
+          />
+        )}
+
         <div className="btn-row">
           {phase === 'idle' && (
-            <button className="btn btn-primary" disabled={!file} onClick={handleUpload} id="upload-btn">
+            <button
+              className="btn btn-primary"
+              disabled={!file || (health?.turnstile_enabled && !turnstileToken)}
+              onClick={handleUpload}
+              id="upload-btn"
+            >
               ⬆ Upload Dataset
             </button>
           )}

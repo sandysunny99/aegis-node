@@ -92,13 +92,20 @@ services:
       - key: AI_FALLBACK_CHAIN
         value: "xai"
 
-      - key: FALLBACK_GEMINI_API_KEY
+      # ── Cloudflare Workers AI & Turnstile ─────────────────────────────────────
+      - key: CLOUDFLARE_ACCOUNT_ID
         sync: false
 
-      - key: FALLBACK_GROQ_API_KEY
+      - key: CLOUDFLARE_API_TOKEN
         sync: false
 
-      - key: FALLBACK_XAI_API_KEY
+      - key: CLOUDFLARE_TURNSTILE_SITE_KEY
+        sync: false
+
+      - key: CLOUDFLARE_TURNSTILE_SECRET_KEY
+        sync: false
+
+      - key: FALLBACK_CLOUDFLARE_API_TOKEN
         sync: false
 
 

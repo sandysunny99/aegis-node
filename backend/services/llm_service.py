@@ -337,6 +337,9 @@ def _get_provider_key(provider: str, is_fallback: bool = False) -> str:
     if provider == "xai":
         fallback_key = settings.fallback_xai_api_key
         return (fallback_key if is_fallback and fallback_key else settings.xai_api_key)
+    if provider == "cloudflare":
+        fallback_key = settings.fallback_cloudflare_api_token
+        return (fallback_key if is_fallback and fallback_key else settings.cloudflare_api_token)
     return ""   # ollama / none need no key
 
 
@@ -353,7 +356,7 @@ def _build_provider_chain(cfg=None) -> list[tuple[str, bool]]:
              Pass a custom config in tests to avoid patching the module global.
     """
     cfg = cfg or settings
-    _KNOWN = {"gemini", "groq", "xai", "ollama", "none"}
+    _KNOWN = {"gemini", "groq", "xai", "cloudflare", "ollama", "none"}
     chain: list[tuple[str, bool]] = []
     seen: set[str] = set()
 
@@ -475,6 +478,9 @@ def _call_provider(
     if provider_name == "xai":
         api_key = _get_provider_key("xai", is_fallback)
         return _call_xai(system_prompt, user_prompt, api_key=api_key)
+    if provider_name == "cloudflare":
+        api_token = _get_provider_key("cloudflare", is_fallback)
+        return _call_cloudflare(system_prompt, user_prompt, api_token=api_token)
     if provider_name == "ollama":
         return _call_ollama(system_prompt, user_prompt)
     logger.warning("Unknown provider name %r — skipping", provider_name)
@@ -643,6 +649,53 @@ def _call_groq(
             return _unavailable_result(model_name, "Groq API rate limit exceeded — AI temporarily unavailable. Try again in a moment.")
         logger.error("Groq call failed: %s", exc)
         return _failed_result(model_name, "Groq API error")
+
+
+def _call_cloudflare(
+    system_prompt: str,
+    user_prompt: str,
+    *,
+    api_token: str | None = None,
+    account_id: str | None = None,
+) -> LlmAnalysisResult:
+    model_name = settings.cloudflare_ai_model or "@cf/meta/llama-3.1-8b-instruct"
+    api_token = (api_token or settings.cloudflare_api_token or "").strip()
+    account_id = (account_id or settings.cloudflare_account_id or "").strip()
+
+    if not api_token or not account_id:
+        return _unavailable_result(model_name, "CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID not configured")
+
+    try:
+        from services.ai_providers.cloudflare_provider import call_cloudflare
+        raw_text, err_msg = call_cloudflare(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            api_token=api_token,
+            account_id=account_id,
+            model=model_name,
+            timeout=settings.cloudflare_timeout_seconds,
+        )
+        if not raw_text:
+            return _failed_result(
+                model_name,
+                err_msg or "Cloudflare Workers AI returned empty response",
+            )
+
+        parsed = _validate_and_parse(raw_text)
+        if not parsed:
+            return _failed_result(model_name, "Failed to parse Cloudflare Workers AI response as structured JSON")
+
+        logger.info("Cloudflare Workers AI analysis complete — model=%s verdict=%s", model_name, parsed.verdict)
+        return LlmAnalysisResult(
+            status="completed", model_name=f"cloudflare/{model_name}",
+            verdict=parsed.verdict, severity=parsed.severity,
+            confidence=round(parsed.confidence, 2), summary=parsed.summary,
+            evidence=parsed.evidence, recommendations=parsed.recommendations,
+            limitations=parsed.limitations,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Cloudflare call failed: %s", exc)
+        return _failed_result(model_name, f"Cloudflare API error: {exc}")
 
 
 def _call_ollama(system_prompt: str, user_prompt: str) -> LlmAnalysisResult:

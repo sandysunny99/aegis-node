@@ -95,6 +95,17 @@ class Settings(BaseSettings):
     ollama_model: str = "llama3.1"
     ollama_timeout_seconds: int = 60
 
+    # ─── LLM (Cloudflare Workers AI — 100% free daily neuron quota) ───────────
+    cloudflare_account_id: str = ""
+    cloudflare_api_token: str = ""
+    cloudflare_ai_model: str = "@cf/meta/llama-3.1-8b-instruct"
+    cloudflare_timeout_seconds: int = 30
+    fallback_cloudflare_api_token: str = ""
+
+    # ─── Cloudflare Turnstile Bot Protection (Optional) ──────────────────────
+    cloudflare_turnstile_site_key: str = ""
+    cloudflare_turnstile_secret_key: str = ""
+
     # ─── Scanner ─────────────────────────────────────────────────────────────
     clamav_host: str = "localhost"
     clamav_port: int = 3310
@@ -136,6 +147,12 @@ class Settings(BaseSettings):
             self.xai_api_key = _read_secret_file("XAI_API_KEY")
         if not self.groq_api_key:
             self.groq_api_key = _read_secret_file("GROQ_API_KEY")
+        if not self.cloudflare_api_token:
+            self.cloudflare_api_token = _read_secret_file("CLOUDFLARE_API_TOKEN")
+        if not self.cloudflare_account_id:
+            self.cloudflare_account_id = _read_secret_file("CLOUDFLARE_ACCOUNT_ID")
+        if not self.cloudflare_turnstile_secret_key:
+            self.cloudflare_turnstile_secret_key = _read_secret_file("CLOUDFLARE_TURNSTILE_SECRET_KEY")
         if not self.api_key:
             self.api_key = _read_secret_file("API_KEY")
         if not self.fallback_gemini_api_key:
@@ -144,6 +161,8 @@ class Settings(BaseSettings):
             self.fallback_xai_api_key = _read_secret_file("FALLBACK_XAI_API_KEY")
         if not self.fallback_groq_api_key:
             self.fallback_groq_api_key = _read_secret_file("FALLBACK_GROQ_API_KEY")
+        if not self.fallback_cloudflare_api_token:
+            self.fallback_cloudflare_api_token = _read_secret_file("FALLBACK_CLOUDFLARE_API_TOKEN")
 
         if self.app_env.lower() == "production":
             if not self.api_key:

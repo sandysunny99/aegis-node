@@ -44,9 +44,10 @@ async function request(path, options = {}) {
  * Upload a file with progress tracking.
  * @param {File} file - The file to upload.
  * @param {(pct: number) => void} onProgress - Progress callback (0–100).
+ * @param {string|null} turnstileToken - Optional Cloudflare Turnstile token.
  * @returns {Promise<Object>} Upload response
  */
-export function uploadDataset(file, onProgress) {
+export function uploadDataset(file, onProgress, turnstileToken = null) {
   return new Promise((resolve, reject) => {
     const form = new FormData();
     form.append('file', file);
@@ -56,6 +57,7 @@ export function uploadDataset(file, onProgress) {
 
     // Include API key header if configured
     if (API_KEY) xhr.setRequestHeader('X-API-Key', API_KEY);
+    if (turnstileToken) xhr.setRequestHeader('X-Turnstile-Token', turnstileToken);
 
     xhr.upload.addEventListener('progress', (e) => {
       if (e.lengthComputable && onProgress) {

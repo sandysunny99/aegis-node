@@ -29,6 +29,7 @@ from services.file_service import file_service, validate_magic_bytes  # noqa: E4
 from sqlalchemy import update  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 from utils.auth import require_api_key  # noqa: E402
+from utils.turnstile import verify_turnstile_token  # noqa: E402
 
 from scanner.engine import run_scan  # noqa: E402
 
@@ -54,6 +55,15 @@ async def upload_dataset(
     db: Session = Depends(get_db),  # noqa: B008
     _auth: None = Depends(require_api_key),  # noqa: B008  # API key guard (optional in dev)
 ) -> DatasetUploadResponse:
+    # 0. Cloudflare Turnstile Bot Challenge Verification
+    turnstile_token = request.headers.get("x-turnstile-token") or request.headers.get("cf-turnstile-token")
+    client_ip = request.headers.get("cf-connecting-ip") or (request.client.host if request.client else None)
+    if not await verify_turnstile_token(turnstile_token, remote_ip=client_ip):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cloudflare Turnstile bot verification failed. Please complete the security challenge.",
+        )
+
     filename = file.filename or "upload"
 
     # 1. Extension validation

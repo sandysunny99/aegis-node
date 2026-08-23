@@ -44,10 +44,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self'; "
+            "script-src 'self' https://challenges.cloudflare.com; "
+            "frame-src 'self' https://challenges.cloudflare.com; "
             "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data:; "
-            "connect-src 'self'"
+            "connect-src 'self' https://challenges.cloudflare.com"
         )
         return response
 
@@ -114,17 +115,22 @@ async def health(request: Request) -> dict:
         (ai_provider == "gemini" and bool(settings.gemini_api_key.strip()))
         or (ai_provider == "groq" and bool(settings.groq_api_key.strip()))
         or (ai_provider == "xai" and bool(settings.xai_api_key.strip()))
+        or (ai_provider == "cloudflare" and bool(settings.cloudflare_api_token.strip()))
         or (ai_provider == "ollama")
     )
 
+    turnstile_enabled = bool(settings.cloudflare_turnstile_site_key.strip() and settings.cloudflare_turnstile_secret_key.strip())
+
     return {
         "status": "ok",
-        "version": "0.1.0",
+        "version": "1.0.0",
         "clamav_running": clamav_running,
         "clamav_mock": clamav_mock,
-        "clamav_mock_mode": clamav_mock,  # A-019: explicit field for UI banner
+        "clamav_mock_mode": clamav_mock,
         "ai_configured": ai_configured,
         "ai_provider": settings.ai_provider,
+        "turnstile_enabled": turnstile_enabled,
+        "turnstile_site_key": settings.cloudflare_turnstile_site_key if turnstile_enabled else "",
         "max_file_size_mb": settings.max_upload_size_mb,
         "supported_formats": [ext.lstrip(".") for ext in sorted(settings.allowed_extensions)],
     }
