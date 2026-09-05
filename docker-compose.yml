@@ -56,7 +56,7 @@ services:
       - APP_ENV=production
       - MAX_UPLOAD_SIZE_MB=500
       - DATABASE_URL=sqlite:////app/data/aegis_node.db
-      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-*}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-["*"]}
     volumes:
       # Persist uploads and DB across container restarts
       - ./data:/app/data
