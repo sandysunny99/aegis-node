@@ -20,6 +20,11 @@ from urllib.parse import unquote
 
 import pandas as pd
 
+try:
+    from scanner.normalizer import normalize_text
+except ImportError:
+    from normalizer import normalize_text
+
 logger = logging.getLogger(__name__)
 
 # ─── Maximum rows inspected per dataset ─────────────────────────────────────
@@ -161,6 +166,24 @@ _RULES: list[tuple[str, str, str, str, re.Pattern]] = [
         "Hex-encoded shellcode pattern detected (\\x41\\x42 style sequences)",
         re.compile(r'(\\x[0-9a-fA-F]{2}){6,}', re.IGNORECASE),
     ),
+    # ── Prompt Injection / Jailbreaks ─────────────────────────────────────────
+    (
+        "PROMPT-001", "high", "prompt_injection",
+        "Direct instruction override / prompt injection pattern detected",
+        re.compile(
+            r'\b(?:ignore|disregard|forget)\s+(?:all\s+)?(?:prior|previous|earlier)\s+(?:instructions|rules|system\s+prompt|guidelines|constraints)|'
+            r'\b(?:system\s+override|override\s+active\s+filters|jailbreak\s+mode|reset\s+all\s+security\s+parameters|system\s+directive|stop\s+processing)\b',
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "PROMPT-002", "high", "prompt_injection",
+        "Adversarial jailbreak roleplay directive or safety bypass attempt",
+        re.compile(
+            r'\b(?:you\s+are\s+now\s+DAN|act\s+as\s+RootAdmin|bypass\s+all\s+safety\s+filters|reveal\s+the\s+system\s+prompt|output\s+all\s+secret\s+API\s+keys|disregard\s+safety)\b',
+            re.IGNORECASE,
+        ),
+    ),
 ]
 
 
@@ -221,21 +244,16 @@ def _deobfuscate(value: str) -> str:
     Normalises common encoding tricks used to evade regex detection.
     Security: only decodes – never executes any content.
     """
-    # 1. URL decode (handles %3D, %27, etc.)
     try:
-        value = unquote(value)
+        norm, _ = normalize_text(value)
+        value = norm
     except Exception:  # noqa: BLE001
         pass
-    # 2. HTML entity unescape (&lt; → <, &#39; → ', etc.)
-    try:
-        value = html.unescape(value)
-    except Exception:  # noqa: BLE001
-        pass
-    # 3. Strip SQL inline comments /* ... */
+    # Strip SQL inline comments /* ... */
     value = re.sub(r'/\*.*?\*/', '', value, flags=re.DOTALL)
-    # 4. Remove common hex/unicode escape prefixes (evasion tricks)
+    # Remove common hex/unicode escape prefixes (evasion tricks)
     value = value.replace('\\x', '').replace('\\u', '')
-    # 5. Normalize excessive whitespace
+    # Normalize excessive whitespace
     value = ' '.join(value.split())
     return value
 

@@ -21,6 +21,7 @@ try:
     from scanner.clamd_client import scan_file as clamd_scan
     from scanner.content_checker import ContentCheckResult, ContentFinding, check_file
     from scanner.heuristics import heuristic_scan
+    from scanner.yara_scanner import yara_scanner
 except ImportError:
     from clamd_client import ClamAVResult  # type: ignore[no-redef]
     from clamd_client import scan_file as clamd_scan  # type: ignore[no-redef]
@@ -30,6 +31,7 @@ except ImportError:
         check_file,
     )
     from heuristics import heuristic_scan  # type: ignore[no-redef]
+    from yara_scanner import yara_scanner  # type: ignore[no-redef]
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +49,10 @@ class ScanEngineResult:
     clamav_available: bool = False
     clamav_status: str = "skipped"        # clean | infected | skipped | error
     clamav_virus_name: str | None = None
+
+    # YARA (Stage 1.5)
+    yara_available: bool = False
+    yara_findings: list[ContentFinding] = field(default_factory=list)
 
     # Content rules (Stage 0 raw scan + Stage 2 content rules)
     content_findings: list[ContentFinding] = field(default_factory=list)
@@ -84,6 +90,15 @@ class ScanEngineResult:
                 "location": f.location,
                 "sample": f.sample,
             })
+        for f in self.yara_findings:
+            out.append({
+                "rule_id": f.rule_id,
+                "severity": f.severity,
+                "category": f.category,
+                "description": f.description,
+                "location": f.location,
+                "sample": f.sample,
+            })
         for f in self.content_findings:
             out.append({
                 "rule_id": f.rule_id,
@@ -106,8 +121,8 @@ class ScanEngineResult:
 
     @property
     def all_findings(self) -> list[ContentFinding]:
-        """Combined list of heuristic + content findings."""
-        return self.heuristic_findings + self.content_findings
+        """Combined list of heuristic + YARA + content findings."""
+        return self.heuristic_findings + self.yara_findings + self.content_findings
 
 
 def _compute_sha256(path: Path) -> str:
@@ -124,19 +139,21 @@ def _determine_verdict(
     content_result: ContentCheckResult,
     heur_findings: list[ContentFinding],
     heur_risk: float,
+    yara_findings: list[ContentFinding] | None = None,
 ) -> tuple[str, float, list[str]]:
     """
     Determine final verdict, composite risk score, and verification limitations.
 
     Explicit Verdict States:
-      - malicious: ClamAV virus detection or critical signature (EICAR, shellcode droppers)
+      - malicious: ClamAV virus detection or critical signature (EICAR, shellcode droppers, YARA critical)
       - suspicious: Actionable high/medium findings (SQLi, XSS, formula injection) or high heuristic risk
       - clean_with_limitations: No actionable threats, but verification was incomplete (ClamAV offline/mock, partial rows scanned, metadata-only references)
       - clean_verified: Full verification completed cleanly (all scanners active and 100% inspected)
       - scan_incomplete: Fatal parser failure
     """
+    yara_findings = yara_findings or []
     limitations = list(content_result.limitations)
-    all_findings = content_result.findings + heur_findings
+    all_findings = content_result.findings + heur_findings + yara_findings
 
     if not clamav_result.available:
         if "CLAMAV_UNAVAILABLE" not in limitations:
@@ -152,7 +169,8 @@ def _determine_verdict(
 
     base_score = content_result.risk_score
     heur_contribution = heur_risk * 3.0
-    composite_score = min(base_score + heur_contribution, 10.0)
+    yara_contribution = sum(3.0 if f.severity == "critical" else 2.0 for f in yara_findings)
+    composite_score = min(base_score + heur_contribution + yara_contribution, 10.0)
 
     # 1. Fatal parser error without any other findings
     if content_result.error and not all_findings and not clamav_result.infected:
@@ -224,6 +242,27 @@ def run_scan(file_path: str, clamav_host: str = _CLAMAV_HOST, clamav_port: int =
     else:
         result.clamav_status = "clean"
 
+    # ─── Stage 1.5: YARA Pattern Scan ────────────────────────────────────────
+    yara_findings: list[ContentFinding] = []
+    result.yara_available = yara_scanner.is_available
+    if yara_scanner.is_available:
+        logger.info("Stage 1.5: YARA pattern scan for %s", path.name)
+        raw_yara = yara_scanner.scan_file(file_path)
+        for yf in raw_yara:
+            yara_findings.append(
+                ContentFinding(
+                    rule_id=yf.rule_id,
+                    category=yf.category,
+                    severity=yf.severity,
+                    description=yf.description,
+                    location=yf.location,
+                    sample=yf.sample,
+                )
+            )
+        if yara_findings:
+            logger.warning("YARA: %d pattern match(es) for %s", len(yara_findings), path.name)
+    result.yara_findings = yara_findings
+
     # ─── Stage 2: Content Rules ───────────────────────────────────────────────
     logger.info("Stage 2: Content rule inspection for %s", path.name)
     content: ContentCheckResult = check_file(file_path)
@@ -238,20 +277,21 @@ def run_scan(file_path: str, clamav_host: str = _CLAMAV_HOST, clamav_port: int =
 
     # ─── Aggregate ────────────────────────────────────────────────────────────
     result.verdict, result.risk_score, result.verification_limitations = _determine_verdict(
-        clam, content, heur_findings, heur_risk
+        clam, content, heur_findings, heur_risk, yara_findings
     )
     result.threats_found_count = (
         content.threat_count
         + len(heur_findings)
+        + len(yara_findings)
         + (1 if clam.infected else 0)
     )
     result.scan_duration_ms = int((time.monotonic() - start_ms) * 1000)
 
     logger.info(
         "Scan complete — %s | verdict=%s risk=%.1f threats=%d coverage=%.1f%% "
-        "(heur=%d content=%d clam=%s) duration=%dms",
+        "(heur=%d yara=%d content=%d clam=%s) duration=%dms",
         path.name, result.verdict, result.risk_score, result.threats_found_count,
-        result.coverage_percentage, len(heur_findings), content.threat_count,
+        result.coverage_percentage, len(heur_findings), len(yara_findings), content.threat_count,
         "infected" if clam.infected else "clean",
         result.scan_duration_ms,
     )

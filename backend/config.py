@@ -106,12 +106,28 @@ class Settings(BaseSettings):
     cloudflare_turnstile_site_key: str = ""
     cloudflare_turnstile_secret_key: str = ""
 
-    # ─── Scanner ─────────────────────────────────────────────────────────────
+    # ─── Scanner & Multi-Engine Detection ────────────────────────────────────
     clamav_host: str = "localhost"
     clamav_port: int = 3310
     clamav_mock_mode: bool = False
     max_upload_size_mb: int = 50
     enable_heuristics: bool = True  # Set ENABLE_HEURISTICS=false to disable Stage 0.5
+    enable_yara: bool = True        # Set ENABLE_YARA=false to disable Stage 1.5
+    enable_encoding_normalization: bool = True # Multi-encoding deobfuscation
+
+    # ─── Threat Intelligence (External APIs) ──────────────────────────────────
+    # Default OFF for privacy. Opt-in via .env.
+    enable_virustotal: bool = False
+    virustotal_api_key: str = ""
+    virustotal_timeout_seconds: int = 10
+
+    enable_urlhaus: bool = False
+    enable_abuseipdb: bool = False
+    abuseipdb_api_key: str = ""
+    enable_phishtank: bool = False
+    enable_shodan: bool = False
+    enable_hibp: bool = False
+    enable_securitytrails: bool = False
 
     # ─── Database ────────────────────────────────────────────────────────────
     database_url: str = "sqlite:///./aegis_node.db"
@@ -153,6 +169,8 @@ class Settings(BaseSettings):
             self.cloudflare_account_id = _read_secret_file("CLOUDFLARE_ACCOUNT_ID")
         if not self.cloudflare_turnstile_secret_key:
             self.cloudflare_turnstile_secret_key = _read_secret_file("CLOUDFLARE_TURNSTILE_SECRET_KEY")
+        if not self.virustotal_api_key:
+            self.virustotal_api_key = _read_secret_file("VIRUSTOTAL_API_KEY")
         if not self.api_key:
             self.api_key = _read_secret_file("API_KEY")
         if not self.fallback_gemini_api_key:

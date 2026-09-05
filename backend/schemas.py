@@ -25,6 +25,16 @@ class DatasetUploadResponse(BaseModel):
 
 # ─── Scan Findings ────────────────────────────────────────────────────────────
 
+class ThreatIntelResult(BaseModel):
+    provider: str
+    indicator_type: str
+    indicator: str
+    status: str
+    confidence: str | None = None
+    first_seen: str | None = None
+    tags: list[str] = []
+    source: str
+
 class ThreatFinding(BaseModel):
     """A single threat or anomaly detected during scanning."""
     rule_id: str = Field(..., description="Unique identifier for the detection rule")
@@ -54,6 +64,7 @@ class ScanResultResponse(BaseModel):
     coverage_status: str = "FULL"
     verification_limitations: list[str] = Field(default_factory=list)
     findings: list[ThreatFinding]
+    threat_intel: list[ThreatIntelResult] = []
 
 
 # ─── Dataset Status ───────────────────────────────────────────────────────────

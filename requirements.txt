@@ -8,11 +8,12 @@ python-multipart>=0.0.12
 aiofiles>=23.2.0             # Required by FastAPI StaticFiles (serves React build)
 slowapi>=0.1.9             # Rate limiting (per-IP, in-memory)
 
-# ─── Data Processing ──────────────────────────────────────────────────────────
+# ─── Data Processing & Threat Detection ───────────────────────────────────────
 pandas>=2.2.0
 pyarrow>=16.0.0           # Parquet streaming support (iter_batches)
 openpyxl>=3.1.0           # XLSX read/write (read_only mode for memory efficiency)
 python-magic==0.4.27      # Content-based MIME detection (A-017, A-023)
+yara-python>=4.5.0        # Stage 1.5 compiled pattern matcher (BSD-3-Clause)
 
 # ─── Database ────────────────────────────────────────────────────────────────
 sqlalchemy>=2.0.31
