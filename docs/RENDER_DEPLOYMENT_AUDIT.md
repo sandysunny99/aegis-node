@@ -43,7 +43,7 @@ Aegis Node is packaged as a unified multi-stage Docker container serving both th
 | **Database Persistence** | SQLite (`/app/data/aegis_node.db`) | **PASS**: Configured with WAL mode (`PRAGMA journal_mode=WAL`), `PRAGMA synchronous=NORMAL`, and busy timeout. Gracefully falls back to `/tmp/data` if `/app/data` is read-only. |
 | **Secret Management** | Render Environment Variables + Secret Files | **PASS**: Secret keys (`GEMINI_API_KEY`, `XAI_API_KEY`, `GROQ_API_KEY`) can be provided via environment variables or Render Secret Files (`/etc/secrets/*`). |
 | **ClamAV Cloud Semantics** | `CLAMAV_HOST=localhost`, `CLAMAV_PORT=3310` | **TRANSPARENT**: In standard Render deployments where ClamAV daemon is absent, the system explicitly reports `CLEAN_WITH_LIMITATIONS` and `CLAMAV_UNAVAILABLE` rather than false certainty. |
-| **AI Provider Fallback** | Gemini (Primary) $\rightarrow$ xAI Grok (Fallback) | **PASS**: Auto-failover ensures threat analysis continues if one provider experiences quota limits or network timeouts. |
+| **AI Provider Fallback** | Gemini (Primary) $\rightarrow$ Cloudflare Workers AI (Fallback) | **PASS**: Auto-failover ensures threat analysis continues if one provider experiences quota limits or network timeouts. |
 | **Download Security** | Single-use Cryptographic Tokens | **PASS**: Sanitized dataset downloads require single-use UUID tokens expiring in 60 minutes. |
 
 ---

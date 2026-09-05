@@ -36,8 +36,8 @@
                                                ▼
                   ┌─────────────────────────────────────────────────────────┐
                   │             4. MULTI-AI PROVIDER RESILIENCE             │
-                  │   • Google Gemini ➔ Cloudflare Workers AI (Llama 3) ➔   │
-                  │     xAI Grok ➔ Groq Llama 3                             │
+                  │   • Google Gemini ➔ Cloudflare Workers AI (Llama 3)     │
+                  │   • Configurable fallback to Groq, xAI, or Ollama       │
                   │   • Free daily neuron quota on Cloudflare Workers AI    │
                   └────────────────────────────┬────────────────────────────┘
                                                │
