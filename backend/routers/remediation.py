@@ -70,7 +70,7 @@ router = APIRouter(prefix="/api/v1/datasets", tags=["remediation"])
     status_code=status.HTTP_200_OK,
     summary="Remediate dataset threats, generate sanitized artifact, and execute verification re-scan",
 )
-@limiter.limit("60/minute")
+@limiter.limit("10/minute")
 async def remediate_dataset(
     request: Request,
     dataset_id: int,

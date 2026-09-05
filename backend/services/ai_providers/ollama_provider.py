@@ -1,6 +1,6 @@
 """
-Aegis Node — Ollama Local AI Provider.
-Calls a locally running Ollama instance (100% free, no API key needed).
+Aegis Node — Ollama Provider.
+Calls a locally running Ollama instance (self-hosted local inference; no API key required).
 
 Install Ollama: https://ollama.com
 Pull model:     ollama pull llama3.1

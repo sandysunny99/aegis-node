@@ -4,7 +4,7 @@ Runs open models (Llama 3.1 8B Instruct, Mistral) on Cloudflare's serverless edg
 
 API Reference: https://developers.cloudflare.com/workers-ai/
 Authentication: Cloudflare API Token + Account ID
-Free tier: Free daily neuron allocation per account.
+Cloudflare Workers AI Free plan includes 10,000 neurons/day; usage beyond the free allocation requires Workers Paid billing.
 """
 
 import json
@@ -13,7 +13,7 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_MODEL = "@cf/meta/llama-3.1-8b-instruct"
+_DEFAULT_MODEL = "@cf/meta/llama-3.1-8b-instruct-fast"
 
 
 def call_cloudflare(

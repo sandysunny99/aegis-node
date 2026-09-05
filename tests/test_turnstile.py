@@ -8,13 +8,24 @@ from utils.turnstile import verify_turnstile_token
 
 
 @pytest.mark.asyncio
-async def test_turnstile_bypass_when_secret_unset():
-    """When CLOUDFLARE_TURNSTILE_SECRET_KEY is empty, validation passes automatically."""
+async def test_turnstile_bypass_in_dev_when_secret_unset():
+    """When CLOUDFLARE_TURNSTILE_SECRET_KEY is empty AND not in production, validation passes."""
     with patch("utils.turnstile.settings") as mock_settings:
         mock_settings.cloudflare_turnstile_secret_key = ""
+        mock_settings.app_env = "development"
         assert await verify_turnstile_token(None) is True
         assert await verify_turnstile_token("") is True
         assert await verify_turnstile_token("any-token") is True
+
+
+@pytest.mark.asyncio
+async def test_turnstile_denies_in_production_when_secret_unset():
+    """When CLOUDFLARE_TURNSTILE_SECRET_KEY is empty AND in production, validation fails (HTTP 403)."""
+    with patch("utils.turnstile.settings") as mock_settings:
+        mock_settings.cloudflare_turnstile_secret_key = ""
+        mock_settings.app_env = "production"
+        assert await verify_turnstile_token(None) is False
+        assert await verify_turnstile_token("") is False
 
 
 @pytest.mark.asyncio
@@ -55,4 +66,19 @@ async def test_turnstile_failed_verification():
     ):
         mock_settings.cloudflare_turnstile_secret_key = "0x4AAAAAAtest"
         res = await verify_turnstile_token("bad-token")
+        assert res is False
+
+@pytest.mark.asyncio
+async def test_turnstile_already_spent_token_rejected():
+    """Mock already spent token response from Cloudflare."""
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {"success": False, "error-codes": ["timeout-or-duplicate"]}
+
+    with (
+        patch("utils.turnstile.settings") as mock_settings,
+        patch("httpx.AsyncClient.post", new_callable=AsyncMock, return_value=mock_resp),
+    ):
+        mock_settings.cloudflare_turnstile_secret_key = "0x4AAAAAAtest"
+        res = await verify_turnstile_token("spent-token")
         assert res is False

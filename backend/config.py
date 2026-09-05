@@ -69,7 +69,10 @@ class Settings(BaseSettings):
     ai_provider: str = "gemini"
 
     # ─── AI Fallback Chain ────────────────────────────────────────────────────
+    # DEFAULT CHAIN: AI_PROVIDER=gemini → AI_FALLBACK_CHAIN=cloudflare → optional: ollama
+    # OPTIONAL (not in default): groq, xai
     ai_fallback_chain: str = ""
+    ai_optional_providers: str = "groq,ollama,xai"
 
     fallback_gemini_api_key: str = ""
     fallback_groq_api_key: str = ""
@@ -80,7 +83,7 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-2.0-flash"   # Fixed: was gemini-flash-latest (invalid)
     gemini_timeout_seconds: int = 30
 
-    # ─── LLM (Groq Cloud — free tier, ultra-fast Llama 3) ────────────────────
+    # ─── LLM (Groq Cloud — cloud inference; free tier availability is subject to current provider terms)
     groq_api_key: str = ""
     groq_model: str = "llama-3.1-8b-instant"
     groq_timeout_seconds: int = 20
@@ -90,15 +93,15 @@ class Settings(BaseSettings):
     xai_model: str = "grok-2-latest"
     xai_timeout_seconds: int = 30
 
-    # ─── LLM (Ollama — local, 100% free) ─────────────────────────────────────
+    # ─── LLM (Ollama — self-hosted local inference; no API key required) ───────
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.1"
     ollama_timeout_seconds: int = 60
 
-    # ─── LLM (Cloudflare Workers AI — 100% free daily neuron quota) ───────────
+    # ─── LLM (Cloudflare Workers AI Free plan includes 10,000 neurons/day; usage beyond the free allocation requires Workers Paid billing)
     cloudflare_account_id: str = ""
     cloudflare_api_token: str = ""
-    cloudflare_ai_model: str = "@cf/meta/llama-3.1-8b-instruct"
+    cloudflare_ai_model: str = "@cf/meta/llama-3.1-8b-instruct-fast"
     cloudflare_timeout_seconds: int = 30
     fallback_cloudflare_api_token: str = ""
 

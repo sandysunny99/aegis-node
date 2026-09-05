@@ -1,8 +1,8 @@
 # Aegis Node — Cloudflare Multi-Layer Security Architecture
 
 **Document Type**: Architectural Specification & M.Tech Defense Guide  
-**Integration Status**: Fully Implemented & Tested (243/243 Tests Passing)  
-**Free Tier Support**: 100% Free via Cloudflare Workers AI, Cloudflare Turnstile, and Cloudflare Edge Proxy  
+**Integration Status**: Fully Implemented & Tested (257/257 Tests Passing)  
+**Free Tier Support**: Generous free quotas via Cloudflare Workers AI (10,000 neurons/day), Turnstile, and Cloudflare Edge Proxy
 
 ---
 
@@ -11,6 +11,7 @@
 ```
                   ┌─────────────────────────────────────────────────────────┐
                   │              1. CLOUDFLARE EDGE WAF & PROXY             │
+                  │              (DOCUMENTED ONLY — NOT VERIFIED)           │
                   │   • Edge DDoS Shield & TLS 1.3 Termination              │
                   │   • Real Client IP Preservation (CF-Connecting-IP)      │
                   │   • Global CDN Caching & Bot Fight Mode                 │
@@ -53,8 +54,9 @@
 ## 2. Cloudflare Components Implemented
 
 ### Layer 1: Edge Proxy & WAF (Network Layer)
-- **Role**: Sits in front of the Render application (`aegis-node.onrender.com`).
-- **Capabilities**:
+- **Status**: **DOCUMENTED ONLY — NOT VERIFIED** (Requires actual Cloudflare DNS proxying, not verified in current Render deployment)
+- **Role**: Designed to sit in front of the Render application (`aegis-node.onrender.com`) via custom domain.
+- **Capabilities (When Active)**:
   - Automatically mitigates Layer 3/4/7 volumetric DDoS attacks.
   - Terminates TLS with modern TLS 1.3 ciphers.
   - Passes real user IP addresses via the `CF-Connecting-IP` header.
@@ -67,13 +69,13 @@
 - **Zero-Friction Fallback**: When `CLOUDFLARE_TURNSTILE_SECRET_KEY` is not set, Turnstile verification passes automatically (ideal for local testing and CI/CD pipelines).
 
 ### Layer 3: Cloudflare Workers AI (Intelligence Layer)
-- **Role**: Provides a 100% free serverless LLM fallback using `@cf/meta/llama-3.1-8b-instruct`.
+- **Role**: Provides a serverless LLM fallback using `@cf/meta/llama-3.1-8b-instruct-fast`.
 - **Implementation**: [`backend/services/ai_providers/cloudflare_provider.py`](file:///c:/Users/sunny/Downloads/AI%20FULL%20STACK%20PROJECT/Aegis-Node/backend/services/ai_providers/cloudflare_provider.py) & [`backend/services/llm_service.py`](file:///c:/Users/sunny/Downloads/AI%20FULL%20STACK%20PROJECT/Aegis-Node/backend/services/llm_service.py)
-- **Reliability Invariant**: If Gemini or xAI quota/credit limits are reached, Cloudflare Workers AI automatically takes over threat explanation.
+- **Reliability Invariant**: If Gemini or Quota limits are reached, Cloudflare Workers AI automatically takes over threat explanation.
 
 ---
 
-## 3. How to Configure Cloudflare Keys (100% Free)
+## 3. How to Configure Cloudflare Keys
 
 ### A. Turnstile Setup (Anti-Bot):
 1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com/) $\rightarrow$ **Turnstile**.
@@ -102,4 +104,4 @@
    *A*: "Defense-in-depth requires layered controls. Cloudflare operates at the network and application perimeter (DDoS mitigation and Turnstile bot protection), while Aegis Node operates at the data payload level (content scanning, AST/regex parsing, heuristic analysis, and deterministic cell sanitization). Combining them ensures malicious bot floods never reach our compute engine, while legitimate uploaded files are deeply inspected."
 
 2. **Q: How does the system handle an outage of Cloudflare or AI providers?**  
-   *A*: "All Cloudflare components follow the fail-safe graceful degradation principle: if Turnstile keys are unset, it bypasses verification for development; if any AI provider is unreachable, the system executes an automated fallback chain across Gemini, Cloudflare Workers AI, xAI Grok, and Groq, while the deterministic scanner and sanitizer remain 100% authoritative and functional."
+   *A*: "All Cloudflare components follow the fail-safe graceful degradation principle. For AI, if any provider is unreachable or exhausts its quota, the system executes an automated fallback chain (e.g., Gemini → Cloudflare Workers AI), while the deterministic scanner and sanitizer remain 100% authoritative and functional. For Turnstile, missing secrets in production explicitly fail closed (HTTP 403) to prevent misconfiguration bypasses."

@@ -48,7 +48,7 @@ _CHUNK_SIZE_BYTES = 1024 * 1024       # 1 MB chunk size for streaming upload
     status_code=status.HTTP_201_CREATED,
     summary="Upload a dataset file for scanning",
 )
-@limiter.limit("60/minute")    # Prevent storage/bandwidth abuse
+@limiter.limit("10/minute")    # Prevent storage/bandwidth abuse
 async def upload_dataset(
     request: Request,             # Required by slowapi for rate limit tracking
     file: UploadFile = File(..., description="Dataset file — CSV, Parquet, JSON, JSONL, XLSX, TXT"),  # noqa: B008
@@ -61,7 +61,7 @@ async def upload_dataset(
     if not await verify_turnstile_token(turnstile_token, remote_ip=client_ip):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cloudflare Turnstile bot verification failed. Please complete the security challenge.",
+            detail="Bot verification unavailable.",
         )
 
     filename = file.filename or "upload"
@@ -123,7 +123,7 @@ async def upload_dataset(
     response_model=ScanResultResponse,
     summary="Execute multi-stage threat scan on an uploaded dataset",
 )
-@limiter.limit("60/minute")    # Prevent CPU/ClamAV abuse — scans are compute-intensive
+@limiter.limit("20/minute")    # Prevent CPU/ClamAV abuse — scans are compute-intensive
 async def scan_dataset(
     request: Request,
     dataset_id: int,

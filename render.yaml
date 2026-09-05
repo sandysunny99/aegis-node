@@ -86,10 +86,13 @@ services:
         value: "60"
 
       # ── AI Fallback Chain ─────────────────────────────────────────────────────
-      # Auto-failover: Gemini (primary) → xAI Grok (secondary)
-      # If Gemini hits rate limit or errors, xAI is tried automatically.
+      # Auto-failover: Gemini (primary) → Cloudflare Workers AI (secondary)
+      # If Gemini hits rate limit or errors, Cloudflare is tried automatically.
       - key: AI_FALLBACK_CHAIN
-        value: "xai"
+        value: "cloudflare"
+
+      - key: AI_OPTIONAL_PROVIDERS
+        value: "groq,ollama,xai"
 
       # ── Cloudflare Workers AI & Turnstile ─────────────────────────────────────
       - key: CLOUDFLARE_ACCOUNT_ID

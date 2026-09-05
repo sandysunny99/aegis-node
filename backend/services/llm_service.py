@@ -83,7 +83,7 @@ class LlmAnalysisOutput(BaseModel):
 
 @dataclass
 class LlmAnalysisResult:
-    status: str = "completed"  # completed | failed | unavailable
+    status: str = "completed"  # completed | unauthorized | quota_exhausted | timeout | unavailable | invalid_response | failed
     model_name: str = ""
     verdict: str = "inconclusive"
     severity: str = "unknown"
@@ -440,7 +440,7 @@ def analyse(
             continue
 
         # Soft failures: try next provider
-        if result.status in ("failed", "unavailable"):
+        if result.status in ("failed", "unavailable", "unauthorized", "quota_exhausted", "timeout", "invalid_response"):
             last_error = f"{provider_name}: {result.error or result.status}"
             logger.info(
                 "Provider %r returned %r — trying next in chain (reason: %s)",
@@ -658,7 +658,7 @@ def _call_cloudflare(
     api_token: str | None = None,
     account_id: str | None = None,
 ) -> LlmAnalysisResult:
-    model_name = settings.cloudflare_ai_model or "@cf/meta/llama-3.1-8b-instruct"
+    model_name = settings.cloudflare_ai_model or "@cf/meta/llama-3.1-8b-instruct-fast"
     api_token = (api_token or settings.cloudflare_api_token or "").strip()
     account_id = (account_id or settings.cloudflare_account_id or "").strip()
 
@@ -676,14 +676,26 @@ def _call_cloudflare(
             timeout=settings.cloudflare_timeout_seconds,
         )
         if not raw_text:
-            return _failed_result(
-                model_name,
-                err_msg or "Cloudflare Workers AI returned empty response",
-            )
+            err_str = (err_msg or "").lower()
+            status = "failed"
+            if "401" in err_str or "403" in err_str or "authentication failed" in err_str:
+                status = "unauthorized"
+            elif "429" in err_str or "quota" in err_str or "rate limit" in err_str:
+                status = "quota_exhausted"
+            elif "timeout" in err_str:
+                status = "timeout"
+            elif "connection" in err_str:
+                status = "unavailable"
+            
+            res = _failed_result(model_name, err_msg or "Cloudflare Workers AI returned empty response")
+            res.status = status
+            return res
 
         parsed = _validate_and_parse(raw_text)
         if not parsed:
-            return _failed_result(model_name, "Failed to parse Cloudflare Workers AI response as structured JSON")
+            res = _failed_result(model_name, "Failed to parse Cloudflare Workers AI response as structured JSON")
+            res.status = "invalid_response"
+            return res
 
         logger.info("Cloudflare Workers AI analysis complete — model=%s verdict=%s", model_name, parsed.verdict)
         return LlmAnalysisResult(
@@ -695,7 +707,10 @@ def _call_cloudflare(
         )
     except Exception as exc:  # noqa: BLE001
         logger.error("Cloudflare call failed: %s", exc)
-        return _failed_result(model_name, f"Cloudflare API error: {exc}")
+        res = _failed_result(model_name, f"Cloudflare API error: {exc}")
+        if "timeout" in str(exc).lower():
+            res.status = "timeout"
+        return res
 
 
 def _call_ollama(system_prompt: str, user_prompt: str) -> LlmAnalysisResult:

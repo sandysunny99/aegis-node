@@ -24,9 +24,15 @@ async def verify_turnstile_token(token: str | None, remote_ip: str | None = None
         False if Turnstile is configured and token is missing or rejected.
     """
     secret_key = (settings.cloudflare_turnstile_secret_key or "").strip()
+    is_production = (settings.app_env or "").lower() == "production"
 
     # If Turnstile secret key is not configured, gracefully bypass check (open in dev/tests)
+    # BUT explicitly deny in production to prevent misconfiguration bypasses.
     if not secret_key:
+        if is_production:
+            logger.error("SECURITY: CLOUDFLARE_TURNSTILE_SECRET_KEY is unset in production. Denying request.")
+            return False
+        logger.debug("Turnstile secret not configured — bypassing (non-production mode)")
         return True
 
     if not token or not token.strip():
