@@ -21,11 +21,9 @@ services:
     plan: free          # Free tier: 512MB RAM, shared CPU, sleeps after 15min inactivity
     healthCheckPath: /health
 
-    # Persistent storage for uploads and SQLite database (A-007)
-    disk:
-      name: aegis-data
-      mountPath: /app/data
-      sizeGB: 1
+    # NOTE: Render free tier does NOT support persistent disks.
+    # Uploads and SQLite data are stored in /tmp (ephemeral — cleared on redeploy/restart).
+    # To keep data across restarts, upgrade to a paid plan and add a disk section.
 
     envVars:
       # ── AI Provider ───────────────────────────────────────────────────────────
@@ -66,10 +64,11 @@ services:
         value: production
 
       - key: MAX_UPLOAD_SIZE_MB
-        value: "100"      # Lower limit for free tier (512MB RAM)
+        value: "50"
 
+      # Ephemeral SQLite path — data resets on restart (free tier limitation)
       - key: DATABASE_URL
-        value: sqlite:////app/data/aegis_node.db
+        value: sqlite:////tmp/aegis_node.db
 
       - key: ALLOWED_ORIGINS
         value: "*"

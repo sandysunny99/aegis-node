@@ -37,10 +37,12 @@ COPY backend/ .
 # Copy built React app — FastAPI will serve it as static files
 COPY --from=frontend-builder /frontend/dist ./static/
 
-# Runtime data directories
-RUN mkdir -p /app/data/samples /app/data/quarantine /app/data/sanitized /app/data/reports
+# Runtime data directories — use /tmp for Render free tier (ephemeral, no disk required)
+# On paid plans with a disk mounted at /app/data, change DATABASE_URL back to /app/data/aegis_node.db
+RUN mkdir -p /tmp/samples /tmp/quarantine /tmp/sanitized /tmp/reports
 
 # ─── Security: run as non-root user (A-001) ───────────────────────────────────
+# /tmp is world-writable so the non-root user can still write to it
 RUN useradd --no-create-home --shell /bin/false aegis && \
     chown -R aegis:aegis /app
 USER aegis
