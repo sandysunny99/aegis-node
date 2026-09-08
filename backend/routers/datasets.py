@@ -207,103 +207,123 @@ async def scan_dataset(
         logging.getLogger(__name__).warning(f"Threat intel integration failed: {ti_exc}")
         result.verification_limitations.append("THREAT_INTEL_FAILURE")
 
-    # Phase 9.2: URLhaus
+    # Phase 9.4: TI Evidence Normalization + Fusion
+    ti_evidence_list = []
+    providers_checked = ["urlhaus", "abuseipdb"]
     try:
         from services.threat_intelligence.urlhaus import lookup_url
+        from services.threat_intelligence.abuseipdb import lookup_ip
+        from schemas import NormalizedTIEvidence
+        from services.threat_intelligence.fusion import fuse_reports, evaluate_local_verdict_conflict
         import re
         from pathlib import Path
 
-        # Safe URL extraction from raw bytes
-        # Using a simple regex to find all HTTP/HTTPS URLs in the file
         raw_bytes = Path(file_path).read_bytes()
+
+        # 1. URLhaus
         url_pattern = re.compile(rb'https?://[a-zA-Z0-9.-]+(?:/[^\s\"\'<>]*)?', re.IGNORECASE)
         extracted_urls = set()
         for match in url_pattern.finditer(raw_bytes):
             try:
-                url_str = match.group().decode('utf-8')
-                extracted_urls.add(url_str)
+                extracted_urls.add(match.group().decode('utf-8'))
             except Exception:
                 pass
 
-        # Limit the number of URLs to lookup to avoid rate limits / long processing times
-        # URLhaus allows some queries, but we shouldn't spam it. Limit to 5 unique URLs per scan.
         for url in list(extracted_urls)[:5]:
-            urlhaus_intel = await lookup_url(url)
-
-            if urlhaus_intel.status == "unconfigured":
+            uh_intel = await lookup_url(url)
+            if uh_intel.status == "unconfigured":
                 continue
 
-            severity = "low"
-            if urlhaus_intel.status == "malicious":
-                severity = "critical"
-                if result.verdict in ("clean_verified", "clean_with_limitations"):
-                    result.verification_limitations.append("CONFLICT_URLHAUS_MALICIOUS")
-            elif urlhaus_intel.status in ("timeout", "rate_limited", "provider_error"):
-                severity = "low"
-                result.verification_limitations.append(f"URLHAUS_UNAVAILABLE_{urlhaus_intel.status.upper()}")
+            error_status = None
+            if uh_intel.status in ("timeout", "rate_limited", "provider_error", "unauthorized", "forbidden"):
+                error_status = uh_intel.status
+                rep = "unknown"
+                sev = "informational"
+            elif uh_intel.status == "malicious":
+                rep = "malicious"
+                sev = "critical"
+            elif uh_intel.status == "clean" or uh_intel.status == "not_found":
+                rep = "benign"
+                sev = "informational"
+            else:
+                rep = "unknown"
+                sev = "low"
 
-            finding = ContentFinding(
-                rule_id=f"urlhaus_{urlhaus_intel.status}",
-                severity=severity,
-                category="threat_intel",
-                description=f"URLhaus {urlhaus_intel.status.upper()} for URL: {url} - {urlhaus_intel.error_message or 'No errors'}",
-                location="urlhaus",
-                sample=urlhaus_intel.raw_reference or ""
-            )
-            result.content_findings.append(finding)
+            ti_evidence_list.append(NormalizedTIEvidence(
+                provider="urlhaus",
+                indicator_type="url",
+                indicator=url,
+                reputation=rep,
+                confidence=uh_intel.confidence,
+                severity=sev,
+                category=uh_intel.tags[0] if uh_intel.tags else None,
+                reference_url=uh_intel.raw_reference,
+                error_status=error_status
+            ))
 
-    except Exception as urlhaus_exc:
-        import logging
-        logging.getLogger(__name__).warning(f"URLhaus integration failed: {urlhaus_exc}")
-        result.verification_limitations.append("URLHAUS_FAILURE")
-
-    # Phase 9.3: AbuseIPDB
-    try:
-        from services.threat_intelligence.abuseipdb import lookup_ip
-        import re
-        from pathlib import Path
-
-        raw_bytes = Path(file_path).read_bytes()
+        # 2. AbuseIPDB
         ip_pattern = re.compile(rb'\b(?:\d{1,3}\.){3}\d{1,3}\b')
         extracted_ips = set()
         for match in ip_pattern.finditer(raw_bytes):
             try:
-                ip_str = match.group().decode('utf-8')
-                extracted_ips.add(ip_str)
+                extracted_ips.add(match.group().decode('utf-8'))
             except Exception:
                 pass
 
         for ip in list(extracted_ips)[:5]:
-            ip_intel = await lookup_ip(ip)
-
-            if ip_intel.status in ("unconfigured", "invalid_ip"):
+            ab_intel = await lookup_ip(ip)
+            if ab_intel.status in ("unconfigured", "invalid_ip"):
                 continue
 
-            severity = "low"
-            if ip_intel.status == "malicious":
-                severity = "critical"
-                if result.verdict in ("clean_verified", "clean_with_limitations"):
-                    result.verification_limitations.append("CONFLICT_ABUSEIPDB_MALICIOUS")
-            elif ip_intel.status == "suspicious":
-                severity = "high"
-            elif ip_intel.status in ("timeout", "rate_limited", "provider_error"):
-                severity = "low"
-                result.verification_limitations.append(f"ABUSEIPDB_UNAVAILABLE_{ip_intel.status.upper()}")
+            error_status = None
+            if ab_intel.status in ("timeout", "rate_limited", "provider_error", "unauthorized", "forbidden"):
+                error_status = ab_intel.status
+                rep = "unknown"
+                sev = "informational"
+            elif ab_intel.status == "malicious":
+                rep = "malicious"
+                sev = "critical"
+            elif ab_intel.status == "suspicious":
+                rep = "suspicious"
+                sev = "high"
+            elif ab_intel.status == "clean":
+                rep = "benign"
+                sev = "informational"
+            else:
+                rep = "unknown"
+                sev = "low"
 
-            finding = ContentFinding(
-                rule_id=f"abuseipdb_{ip_intel.status}",
-                severity=severity,
-                category="threat_intel",
-                description=f"AbuseIPDB {ip_intel.status.upper()} for IP: {ip} (Confidence: {ip_intel.confidence}) - {ip_intel.error_message or 'No errors'}",
-                location="abuseipdb",
-                sample=ip_intel.raw_reference or ""
-            )
-            result.content_findings.append(finding)
+            ti_evidence_list.append(NormalizedTIEvidence(
+                provider="abuseipdb",
+                indicator_type="ipv4",
+                indicator=ip,
+                reputation=rep,
+                confidence=ab_intel.confidence,
+                severity=sev,
+                category=None,
+                reference_url=ab_intel.raw_reference,
+                error_status=error_status
+            ))
 
-    except Exception as abuseipdb_exc:
+        ti_report = fuse_reports(ti_evidence_list, providers_checked)
+
+        # Apply deterministic fusion conflicts to local scan result
+        conflict = evaluate_local_verdict_conflict(result.verdict, ti_report)
+        if conflict:
+            result.verification_limitations.append(conflict)
+
+        for lim in ti_report.limitations:
+            result.verification_limitations.append(lim)
+
+        # We will attach the ti_report to the db record directly as json later
+        # We store it temporarily on result so we can access it
+        setattr(result, "threat_intel", ti_report)
+
+    except Exception as fusion_exc:
         import logging
-        logging.getLogger(__name__).warning(f"AbuseIPDB integration failed: {abuseipdb_exc}")
-        result.verification_limitations.append("ABUSEIPDB_FAILURE")
+        logging.getLogger(__name__).warning(f"TI Fusion failed: {fusion_exc}")
+        result.verification_limitations.append("THREAT_INTEL_FUSION_FAILURE")
+        setattr(result, "threat_intel", None)
 
     # Update status
     if result.verdict == "malicious":
@@ -314,6 +334,11 @@ async def scan_dataset(
     else:
         record.status = "clean"
     db.commit()
+
+    ti_json_val = '{"status":"disabled","evidence":[],"evidence_strength":"NONE","providers_checked":[],"limitations":[],"conflicts":[]}'
+    ti_report_obj = getattr(result, "threat_intel", None)
+    if ti_report_obj:
+        ti_json_val = ti_report_obj.model_dump_json()
 
     # FINDING-018: Persist scan report including verdict, coverage, and limitations
     report = ScanReportRecord(
@@ -330,12 +355,22 @@ async def scan_dataset(
         scan_duration_ms=result.scan_duration_ms,
         findings_json=json.dumps(result.to_findings_dicts()),
         verification_limitations_json=json.dumps(result.verification_limitations),
+        threat_intel_json=ti_json_val,
     )
     db.add(report)
     db.commit()
     db.refresh(report)
 
     findings = [ThreatFinding(**f) for f in report.findings]
+
+    from schemas import TIFusionReport
+    ti_out = None
+    try:
+        ti_dict = report.threat_intel
+        if ti_dict:
+            ti_out = TIFusionReport(**ti_dict)
+    except Exception:
+        pass
 
     return ScanResultResponse(
         scan_id=report.id,
@@ -353,6 +388,7 @@ async def scan_dataset(
         coverage_status=report.coverage_status,
         verification_limitations=report.verification_limitations,
         findings=findings,
+        threat_intel=ti_out,
     )
 
 
@@ -413,6 +449,15 @@ def get_scan_report(
         verdict_map = {"quarantined": "malicious", "suspicious": "suspicious", "clean": "clean_verified"}
         verdict = verdict_map.get(record.status, "clean_verified")
 
+    from schemas import TIFusionReport
+    ti_out = None
+    try:
+        ti_dict = report.threat_intel
+        if ti_dict:
+            ti_out = TIFusionReport(**ti_dict)
+    except Exception:
+        pass
+
     return ScanResultResponse(
         scan_id=report.id,
         dataset_id=record.id,
@@ -429,4 +474,5 @@ def get_scan_report(
         coverage_status=getattr(report, "coverage_status", "FULL"),
         verification_limitations=report.verification_limitations,
         findings=findings,
+        threat_intel=ti_out,
     )

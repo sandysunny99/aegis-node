@@ -41,11 +41,33 @@ class ThreatIntelResult(BaseModel):
     raw_reference: str | None = None
     error_message: str | None = None
 
+class NormalizedTIEvidence(BaseModel):
+    provider: str
+    indicator_type: str
+    indicator: str
+    reputation: str = Field(..., description="malicious | suspicious | benign | unknown")
+    confidence: str | None = None
+    severity: str = Field(..., description="critical | high | medium | low | informational")
+    category: str | None = None
+    source_timestamp: str | None = None
+    observed_at: datetime | None = None
+    reference_url: str | None = None
+    raw_metadata: dict[str, Any] = Field(default_factory=dict)
+    error_status: str | None = None
+
+class TIFusionReport(BaseModel):
+    status: str = Field(..., description="active | degraded | disabled | error")
+    evidence: list[NormalizedTIEvidence] = []
+    evidence_strength: str = Field(..., description="NONE | SINGLE_PROVIDER | CORROBORATED | CONFLICTED | PROVIDER_UNAVAILABLE")
+    providers_checked: list[str] = []
+    limitations: list[str] = []
+    conflicts: list[str] = []
+
 class ThreatFinding(BaseModel):
     """A single threat or anomaly detected during scanning."""
     rule_id: str = Field(..., description="Unique identifier for the detection rule")
     severity: str = Field(..., description="critical | high | medium | low")
-    category: str = Field(..., description="formula_injection | script_injection | sql_injection | binary_anomaly | clamav")
+    category: str = Field(..., description="formula_injection | script_injection | sql_injection | binary_anomaly | clamav | threat_intel")
     description: str
     location: str = Field(..., description="Column name, byte offset, or 'clamav'")
     sample: str = Field(default="", description="Truncated sample of the offending content (max 200 chars)")
@@ -70,7 +92,7 @@ class ScanResultResponse(BaseModel):
     coverage_status: str = "FULL"
     verification_limitations: list[str] = Field(default_factory=list)
     findings: list[ThreatFinding]
-    threat_intel: list[ThreatIntelResult] = []
+    threat_intel: TIFusionReport | None = None
 
 
 # ─── Dataset Status ───────────────────────────────────────────────────────────

@@ -75,6 +75,7 @@ class ScanReportRecord(Base):
     # Full findings and limitations stored as JSON text
     findings_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
     verification_limitations_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    threat_intel_json: Mapped[str] = mapped_column(Text, nullable=False, default='{"status":"disabled","evidence":[],"evidence_strength":"NONE","providers_checked":[],"limitations":[],"conflicts":[]}')
 
     dataset: Mapped["DatasetRecord"] = relationship("DatasetRecord", back_populates="scan_reports")
 
@@ -90,6 +91,14 @@ class ScanReportRecord(Base):
             return json.loads(self.verification_limitations_json)
         except Exception:
             return []
+
+    @property
+    def threat_intel(self) -> dict:
+        """Deserialise TI JSON to Python dict."""
+        try:
+            return json.loads(self.threat_intel_json)
+        except Exception:
+            return {"status":"error","evidence":[],"evidence_strength":"NONE","providers_checked":[],"limitations":[],"conflicts":[]}
 
     def __repr__(self) -> str:
         return (
