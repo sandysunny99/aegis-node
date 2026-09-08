@@ -134,6 +134,8 @@ def compute_sha256(path: Path) -> str:
     return h.hexdigest()
 
 
+from services.storage import storage_backend, StorageError
+
 class FileService:
     """Encapsulates all file handling operations for dataset uploads & sanitized artifacts."""
 
@@ -144,22 +146,21 @@ class FileService:
 
     def save_upload(self, original_filename: str, content: bytes) -> dict:
         """
-        Save raw file bytes to data/samples/ under a UUID filename.
-
-        Returns a dict with:
-          original_filename, stored_filename, file_size_bytes,
-          sha256_hash, mime_type, file_format, file_path
+        Save raw file bytes to storage backend under a UUID filename.
         """
         safe_orig = _sanitize_filename(original_filename)
         ext = Path(safe_orig).suffix.lower()
-        stored_name = f"{uuid.uuid4().hex}{ext}"
-        dest_path = _SAMPLES_DIR / stored_name
+        scan_id = uuid.uuid4().hex
+        stored_name = f"{scan_id}{ext}"
 
-        dest_path.write_bytes(content)
-
-        sha256 = compute_sha256(dest_path)
-        mime = _detect_mime(dest_path)
+        object_key, sha256 = storage_backend.save_original(scan_id, safe_orig, content)
+        mime = mimetypes.guess_type(safe_orig)[0] or "application/octet-stream"
         fmt = _detect_format(safe_orig)
+
+        # For backward compatibility, we still write to local samples dir
+        # so immediate scanning doesn't need to re-download.
+        dest_path = _SAMPLES_DIR / stored_name
+        dest_path.write_bytes(content)
 
         return {
             "original_filename": safe_orig,
@@ -179,11 +180,12 @@ class FileService:
     ) -> dict:
         """
         Stream upload chunks directly to disk with incremental SHA-256 calculation
-        and size enforcement. Never holds full file in RAM.
+        and size enforcement. Then upload to storage backend.
         """
         safe_orig = _sanitize_filename(original_filename)
         ext = Path(safe_orig).suffix.lower()
-        stored_name = f"{uuid.uuid4().hex}{ext}"
+        scan_id = uuid.uuid4().hex
+        stored_name = f"{scan_id}{ext}"
         dest_path = _SAMPLES_DIR / stored_name
         temp_path = _SAMPLES_DIR / f"{stored_name}.tmp"
 
@@ -212,6 +214,13 @@ class FileService:
             if not validate_magic_bytes(bytes(header_bytes), safe_orig):
                 raise ValueError("Executable binary anomaly detected (PE/ELF/Mach-O header blocked).")
 
+            # Upload to backend
+            try:
+                object_key, backend_sha256 = storage_backend.save_original(scan_id, safe_orig, temp_path.read_bytes())
+            except StorageError as e:
+                logger.error(f"Storage backend failed: {e}")
+                raise ValueError(f"STORAGE_UPLOAD_FAILED: {e}")
+
             # Atomic finalize
             temp_path.replace(dest_path)
         except Exception:
@@ -223,7 +232,7 @@ class FileService:
             raise
 
         sha256 = hasher.hexdigest()
-        mime = _detect_mime(dest_path)
+        mime = mimetypes.guess_type(safe_orig)[0] or "application/octet-stream"
         fmt = _detect_format(safe_orig)
 
         return {
@@ -234,20 +243,37 @@ class FileService:
             "mime_type": mime,
             "file_format": fmt,
             "file_path": str(dest_path),
+            "object_key": object_key,
+            "storage_backend": "R2" if settings.r2_enabled else "local",
         }
 
-    def save_sanitized(self, original_stored_filename: str, content: bytes) -> tuple[str, str, Path]:
+    def save_sanitized(self, original_stored_filename: str, content: bytes) -> dict:
         """
-        Save sanitized content bytes to data/sanitized/ under a UUID filename.
-        Returns (stored_sanitized_filename, sha256_hash, full_dest_path).
+        Save sanitized content bytes to storage backend.
+        Returns a dict with filename and backend metadata.
         """
         ext = Path(original_stored_filename).suffix.lower()
-        sanitized_name = f"{uuid.uuid4().hex}_sanitized{ext}"
+        # scan_id is essentially the base uuid
+        scan_id = Path(original_stored_filename).stem
+        safe_name = f"sanitized{ext}"
+
+        try:
+            object_key, sha256 = storage_backend.save_sanitized(scan_id, safe_name, content)
+        except StorageError as e:
+            logger.error(f"Storage backend failed for sanitized: {e}")
+            raise ValueError(f"STORAGE_UPLOAD_FAILED: {e}")
+
+        sanitized_name = f"{scan_id}_sanitized{ext}"
         dest_path = _SANITIZED_DIR / sanitized_name
 
         dest_path.write_bytes(content)
-        sha256 = compute_sha256(dest_path)
-        return sanitized_name, sha256, dest_path
+        return {
+            "stored_sanitized_filename": sanitized_name,
+            "sha256_hash": sha256,
+            "file_path": str(dest_path),
+            "object_key": object_key,
+            "storage_backend": "R2" if settings.r2_enabled else "local"
+        }
 
     def quarantine(self, stored_filename: str) -> str:
         """Move a file from samples/ to quarantine/. Returns new path."""
@@ -257,46 +283,74 @@ class FileService:
             src.rename(dst)
         return str(dst)
 
-    def get_sample_path(self, stored_filename: str) -> Path:
-        """Return the full path of a stored sample. Enforces directory boundary."""
+    def get_sample_path(self, stored_filename: str, object_key: str | None = None) -> Path:
+        """Return the full path of a stored sample. Restores from storage backend if missing locally."""
         p = (_SAMPLES_DIR / Path(stored_filename).name).resolve()
         if not str(p).startswith(str(_SAMPLES_DIR.resolve())):
             raise ValueError("Path traversal attempt detected")
+
+        # Restore from backend if missing
+        if not p.exists() and object_key:
+            try:
+                content = storage_backend.get_object(object_key)
+                p.write_bytes(content)
+            except Exception as e:
+                logger.error(f"Failed to restore {object_key} from backend: {e}")
+
         return p
 
-    def get_existing_source_path(self, stored_filename: str) -> Path:
+    def get_existing_source_path(self, stored_filename: str, object_key: str | None = None) -> Path:
         """
-        Return the existing file path for stored_filename, checking samples/ first then quarantine/.
-        Enforces directory boundary.
+        Return the existing file path for stored_filename. Restores from backend if needed.
         """
         safe_name = Path(stored_filename).name
-        sample_p = (_SAMPLES_DIR / safe_name).resolve()
-        if sample_p.exists() and str(sample_p).startswith(str(_SAMPLES_DIR.resolve())):
-            return sample_p
 
+        # Check quarantine first
         quarantine_p = (_QUARANTINE_DIR / safe_name).resolve()
         if quarantine_p.exists() and str(quarantine_p).startswith(str(_QUARANTINE_DIR.resolve())):
             return quarantine_p
 
-        raise FileNotFoundError(f"Source file {stored_filename} not found in samples or quarantine.")
+        # Then samples
+        sample_p = (_SAMPLES_DIR / safe_name).resolve()
+        if sample_p.exists() and str(sample_p).startswith(str(_SAMPLES_DIR.resolve())):
+            return sample_p
 
-    def get_sanitized_path(self, stored_sanitized_filename: str) -> Path:
-        """Return the full path of a sanitized sample. Enforces directory boundary."""
+        # Restore from backend
+        if object_key:
+            try:
+                content = storage_backend.get_object(object_key)
+                sample_p.write_bytes(content)
+                return sample_p
+            except Exception as e:
+                logger.error(f"Failed to restore {object_key} from backend: {e}")
+
+        raise FileNotFoundError(f"Source file {stored_filename} not found locally or in backend.")
+
+    def get_sanitized_path(self, stored_sanitized_filename: str, object_key: str | None = None) -> Path:
+        """Return the full path of a sanitized sample. Restores from backend if missing."""
         p = (_SANITIZED_DIR / Path(stored_sanitized_filename).name).resolve()
         if not str(p).startswith(str(_SANITIZED_DIR.resolve())):
             raise ValueError("Path traversal attempt detected")
+
+        if not p.exists() and object_key:
+            try:
+                content = storage_backend.get_object(object_key)
+                p.write_bytes(content)
+            except Exception as e:
+                logger.error(f"Failed to restore {object_key} from backend: {e}")
+
         return p
 
-    def sample_exists(self, stored_filename: str) -> bool:
+    def sample_exists(self, stored_filename: str, object_key: str | None = None) -> bool:
         try:
-            self.get_existing_source_path(stored_filename)
+            self.get_existing_source_path(stored_filename, object_key)
             return True
         except (FileNotFoundError, ValueError):
             return False
 
-    def sanitized_exists(self, stored_sanitized_filename: str) -> bool:
+    def sanitized_exists(self, stored_sanitized_filename: str, object_key: str | None = None) -> bool:
         try:
-            return self.get_sanitized_path(stored_sanitized_filename).exists()
+            return self.get_sanitized_path(stored_sanitized_filename, object_key).exists()
         except ValueError:
             return False
 

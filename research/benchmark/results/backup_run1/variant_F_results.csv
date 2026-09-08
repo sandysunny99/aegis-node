@@ -1,0 +1,79 @@
+case_id,expected_class,predicted_class,correct,scanner_status,clamav_result,yara_result,heuristic_result,normalization_result,ai_result,remediation_result,verification_result,prompt_guard_available,prompt_guard_score,prompt_guard_prediction,prompt_guard_evidence,ti_available,ti_error,ti_prediction,ti_evidence,llm_status,llm_risk_level,llm_prompt_injection,llm_contradiction,llm_summary,llm_model_used,llm_latency_ms,llm_error,findings_count,latency_ms,error
+A01,CLEAN,CLEAN,True,clean_verified,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.0,clean,no_signals,True,none,clean,example.com(unknown); example.com(unknown); example.com(unknown); example.com(unknown); example.com(unknown),INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,921,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",0,78,
+A02,CLEAN,CLEAN,True,clean_verified,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.0,clean,no_signals,True,none,clean,none,INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,567,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",0,16,
+A03,CLEAN,CLEAN,True,clean_with_limitations,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.0,clean,no_signals,True,none,clean,none,INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,610,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",1,16,
+A04,CLEAN,CLEAN,True,clean_verified,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.0,clean,no_signals,True,none,clean,none,INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,685,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",0,16,
+A05,CLEAN,CLEAN,True,clean_verified,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.0,clean,no_signals,True,none,clean,none,INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,596,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",0,0,
+B01,CLEAN,CLEAN,True,clean_with_limitations,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.0,clean,no_signals,True,none,clean,none,INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,587,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",3,0,
+B02,CLEAN,CLEAN,True,clean_with_limitations,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.0,clean,no_signals,True,none,clean,none,INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,915,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",3,15,
+C01,MALICIOUS,MALICIOUS,True,malicious,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.0,clean,no_signals,True,none,clean,none,INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,572,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",2,16,
+C02,SUSPICIOUS,SUSPICIOUS,True,suspicious,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.0,clean,no_signals,True,none,clean,192.168.1.100(unknown); 10.0.0.5(unknown); shell.php(unknown); example.com(unknown); 172.16.0.1(unknown),INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,575,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",2,14,
+C03,SUSPICIOUS,SUSPICIOUS,True,suspicious,clean,YARA-003,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.0,clean,no_signals,True,none,clean,none,INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,621,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",2,31,
+D01,SUSPICIOUS,MALICIOUS,False,malicious,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.0,clean,no_signals,True,none,clean,calc.exe(unknown); evil.com(unknown),INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,571,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",2,14,
+D02,CLEAN,CLEAN,True,clean_verified,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.0,clean,no_signals,True,none,clean,none,INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,541,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",0,45,
+E01,SUSPICIOUS,SUSPICIOUS,True,suspicious,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,1.0,injection,RM-002(0.98); SB-001(0.90),True,none,clean,none,INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,579,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",2,31,
+E02,SUSPICIOUS,SUSPICIOUS,True,suspicious,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.95,injection,IO-001(0.95),True,none,clean,none,INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,624,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",2,16,
+F01,SUSPICIOUS,MALICIOUS,False,malicious,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.0,clean,no_signals,True,none,clean,none,INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,527,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",3,62,
+G01,SUSPICIOUS,MALICIOUS,False,malicious,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.95,injection,IO-001(0.95),True,none,clean,calc.exe(unknown); 192.168.1.100(unknown); company.com(unknown),INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,562,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",6,32,
+H01,CLEAN,CLEAN,True,clean_verified,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.0,clean,no_signals,True,none,clean,none,INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,646,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",0,16,
+H02,CLEAN,CLEAN,True,clean_with_limitations,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.0,clean,no_signals,True,none,clean,none,INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,509,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",0,31,
+H03,CLEAN,CLEAN,True,clean_verified,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.0,clean,no_signals,True,none,clean,none,INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,538,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",0,45,
+H04,CLEAN,CLEAN,True,clean_verified,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.0,clean,no_signals,True,none,clean,none,INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,565,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",0,32,
+N01,SUSPICIOUS,MALICIOUS,False,malicious,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.0,clean,no_signals,True,none,clean,none,INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,553,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",1,63,
+N02,CLEAN,CLEAN,True,clean_verified,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.0,clean,no_signals,True,none,clean,none,INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,647,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",0,16,
+N03,SUSPICIOUS,MALICIOUS,False,malicious,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.0,clean,no_signals,True,none,clean,none,INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,578,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",2,47,
+P01,CLEAN,CLEAN,True,clean_verified,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.0,clean,no_signals,True,none,clean,none,INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,847,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",0,63,
+P02,CLEAN,CLEAN,True,clean_verified,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.0,clean,no_signals,True,none,clean,none,INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,653,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",0,31,
+P03,SUSPICIOUS,SUSPICIOUS,True,suspicious,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.9,injection,RM-003(0.90),True,none,clean,none,INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,540,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",0,47,
+P04,SUSPICIOUS,SUSPICIOUS,True,suspicious,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.97,injection,SI-001(0.85); SB-002(0.92),True,none,clean,none,INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,630,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",0,14,
+P05,SUSPICIOUS,SUSPICIOUS,True,suspicious,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.9,injection,IO-003(0.85); IO-004(0.80); SB-003(0.75),True,none,clean,none,INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,538,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",0,63,
+P06,SUSPICIOUS,SUSPICIOUS,True,suspicious,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.95,injection,IO-001(0.95),True,none,clean,none,INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,505,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",2,16,
+P07,CLEAN,CLEAN,True,clean_verified,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.0,clean,no_signals,True,none,clean,none,INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,659,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",0,15,
+T01,SUSPICIOUS,SUSPICIOUS,True,suspicious,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.0,clean,no_signals,True,none,malicious,198.51.100.1(malicious); evil-c2-domain.com(malicious); 44d88612fea8a8f36de82e1278abb02f(malicious),INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,621,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",2,46,
+T02,CLEAN,CLEAN,True,clean_verified,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.0,clean,no_signals,True,none,clean,8.8.8.8(clean); google.com(clean); e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855(clean),INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,574,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",0,0,
+T03,CLEAN,CLEAN,True,clean_verified,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.0,clean,no_signals,True,none,clean,203.0.113.50(unknown); unknown-domain-999.org(unknown),INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,659,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",0,46,
+T04,CLEAN,CLEAN,True,clean_verified,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.0,clean,no_signals,False,rate_limited,clean,api-down.test(unavailable); timeout.test(timeout); rate-limit.test(rate_limited),INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,554,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",0,16,
+T05,SUSPICIOUS,SUSPICIOUS,True,suspicious,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.0,clean,no_signals,True,none,malicious,conflict.test(malicious),INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,618,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",0,31,
+T06,CLEAN,CLEAN,True,clean_verified,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.0,clean,no_signals,True,none,clean,eicar.org(clean),INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,572,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",0,16,
+L01,SUSPICIOUS,SUSPICIOUS,True,suspicious,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.95,injection,IO-001(0.95),True,none,clean,none,INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,547,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",1,16,
+L02,CLEAN,CLEAN,True,clean_verified,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.0,clean,no_signals,True,none,clean,203.0.113.50(unknown); unknown-domain-999.org(unknown); e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855(clean),INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,545,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",0,45,
+L03,SUSPICIOUS,SUSPICIOUS,True,suspicious,clean,none,"findings=0, risk=0.0000",applied,N/A,N/A,N/A,False,0.0,clean,no_signals,True,none,malicious,conflict.test(malicious); 198.51.100.1(malicious),INVALID_RESPONSE,unknown,False,False,,openai/gpt-oss-20b,562,"Groq HTTP 401: {""error"":{""message"":""Invalid API Key"",""type"":""invalid_request_error"",""code"":""invalid_api_key""}}
+",2,16,

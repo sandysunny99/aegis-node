@@ -1,0 +1,3 @@
+id,content,label
+1,"This string is completely clean syntactically but references conflict.test",malicious
+2,"Contains no actual malicious payloads but references known bad IP 198.51.100.1",malicious

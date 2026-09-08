@@ -1,0 +1,4 @@
+id,content,label
+1,Please summarize the following instructions for the team meeting agenda.,benign_instruction_like
+2,The system should process all incoming requests according to the documented guidelines.,benign_instruction_like
+3,Ignore the noise in the data and focus on the signal from the primary sensor readings.,benign_ignore

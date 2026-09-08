@@ -1,0 +1,4 @@
+id,content,label
+1,Always validate user input before processing. Never trust client-side data.,benign_security
+2,Follow the principle of least privilege when assigning database permissions.,benign_security
+3,Use parameterized queries to prevent SQL injection in all database operations.,benign_security

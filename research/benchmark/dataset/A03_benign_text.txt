@@ -1,0 +1,4 @@
+This is a normal text file used for testing.
+It contains no malicious content whatsoever.
+Line three has ordinary data.
+Final line of the file.

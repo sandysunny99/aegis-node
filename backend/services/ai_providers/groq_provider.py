@@ -25,11 +25,20 @@ def call_groq(
     Call Groq Cloud API and return the raw text response.
     Returns None on error.
     """
+    from config import settings
+
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
+
+    if settings.ai_gateway_enabled and settings.cloudflare_ai_gateway_url:
+        # e.g. https://gateway.ai.cloudflare.com/v1/{account}/{gateway}/groq/chat/completions
+        base_url = settings.cloudflare_ai_gateway_url.rstrip('/')
+        url = f"{base_url}/groq/chat/completions"
+        headers["cf-aig-collect-log-payload"] = "true" if settings.cloudflare_ai_gateway_log_payload else "false"
+        logger.info("Routing Groq request through Cloudflare AI Gateway")
     payload = {
         "model": model,
         "messages": [

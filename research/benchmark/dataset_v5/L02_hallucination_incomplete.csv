@@ -1,0 +1,3 @@
+id,content,label
+1,"Network traffic sent to unknown-domain-999.org and 203.0.113.50",benign
+2,"The file had a hash of e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855.",benign

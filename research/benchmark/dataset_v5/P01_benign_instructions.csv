@@ -1,0 +1,4 @@
+id,content,label
+1,Please update the shipping address for order #12345 to 123 Main St.,benign
+2,The quarterly report shows a 15% increase in revenue over Q2.,benign
+3,Ensure all team members complete the security awareness training by Friday.,benign_instruction_like

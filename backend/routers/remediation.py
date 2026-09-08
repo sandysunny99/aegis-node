@@ -82,7 +82,7 @@ async def remediate_dataset(
     if not record:
         raise HTTPException(status_code=404, detail="Resource not found.")
 
-    if not file_service.sample_exists(record.stored_filename):
+    if not file_service.sample_exists(record.stored_filename, record.object_key):
         raise HTTPException(status_code=404, detail="Original dataset file not found on disk.")
 
     # 2. Check if dataset has been scanned first
@@ -95,7 +95,7 @@ async def remediate_dataset(
 
     # 3. Execute Sanitizer transformation on existing source (samples/ or quarantine/)
     try:
-        orig_source_path = str(file_service.get_existing_source_path(record.stored_filename))
+        orig_source_path = str(file_service.get_existing_source_path(record.stored_filename, record.object_key))
     except (FileNotFoundError, ValueError) as err:
         raise HTTPException(status_code=404, detail="Source file unavailable for remediation.") from err
 
@@ -111,14 +111,14 @@ async def remediate_dataset(
         raise HTTPException(status_code=500, detail="Sanitization failed. Check server logs for details.")
 
     # 4. Save sanitized file to data/sanitized/ (Original remains untouched)
-    san_filename, san_sha256, san_path = file_service.save_sanitized(
+    san_meta = file_service.save_sanitized(
         original_stored_filename=record.stored_filename,
         content=san_result.sanitized_bytes,
     )
 
     # 5. Automated Verification Re-Scan of Sanitized Artifact
     try:
-        rescan_result = await run_in_threadpool(run_scan, str(san_path))
+        rescan_result = await run_in_threadpool(run_scan, str(san_meta["file_path"]))
     except Exception as exc:
         logger.exception("Re-scan failed during remediation for dataset_id=%d", dataset_id)
         raise HTTPException(status_code=500, detail="Verification re-scan failed during remediation.") from exc
@@ -192,8 +192,10 @@ async def remediate_dataset(
     db_record = RemediationRecord(
         dataset_id=record.id,
         original_sha256=record.sha256_hash,
-        sanitized_sha256=san_sha256,
-        stored_sanitized_filename=san_filename,
+        sanitized_sha256=san_meta['sha256_hash'],
+        stored_sanitized_filename=san_meta['stored_sanitized_filename'],
+        object_key=san_meta['object_key'],
+        storage_backend=san_meta['storage_backend'],
         download_token=download_token,
         token_created_at=token_created_at,
         used=False,

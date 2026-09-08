@@ -28,6 +28,8 @@ def call_cloudflare(
     Call Cloudflare Workers AI API and return (raw_text, error_message).
     Endpoint: https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/{model}
     """
+    from config import settings
+
     api_token = (api_token or "").strip()
     account_id = (account_id or "").strip()
 
@@ -42,6 +44,12 @@ def call_cloudflare(
         "Authorization": f"Bearer {api_token}",
         "Content-Type": "application/json",
     }
+
+    if settings.ai_gateway_enabled and settings.cloudflare_ai_gateway_url:
+        base_url = settings.cloudflare_ai_gateway_url.rstrip('/')
+        url = f"{base_url}/workers-ai/{model_name}"
+        headers["cf-aig-collect-log-payload"] = "true" if settings.cloudflare_ai_gateway_log_payload else "false"
+        logger.info("Routing Workers AI request through Cloudflare AI Gateway")
 
     # Format messages payload
     payload = {

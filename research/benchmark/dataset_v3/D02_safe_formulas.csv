@@ -1,0 +1,6 @@
+id,description,formula
+1,Sum function,=SUM(A1:A10)
+2,Average function,=AVERAGE(B1:B10)
+3,Count function,=COUNT(C1:C100)
+4,If function,=IF(A1>10,"Yes","No")
+5,Max function,=MAX(D1:D50)

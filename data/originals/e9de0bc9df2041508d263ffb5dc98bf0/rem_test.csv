@@ -1,0 +1,5 @@
+id,name,email,notes
+1,Alice,alice@example.com,clean row
+2,Bob,' OR '1'='1' --,SQL injection
+3,Charlie,charlie@test.com,=cmd|' /C calc'!A0
+4,Dave,dave@test.com,<script>alert(1)</script>

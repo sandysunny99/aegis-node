@@ -1,0 +1,4 @@
+id,content,label
+1,The attacker infrastructure was traced to 198.51.100.1 which hosted the payload.,malicious
+2,Command and control was established via evil-c2-domain.com over HTTPS.,malicious
+3,The malware binary had an MD5 hash of 44d88612fea8a8f36de82e1278abb02f.,malicious

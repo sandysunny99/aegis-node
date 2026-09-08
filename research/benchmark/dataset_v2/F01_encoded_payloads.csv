@@ -1,0 +1,6 @@
+id,description,value
+1,URL encoded script,%3Cscript%3Ealert(1)%3C%2Fscript%3E
+2,Base64 PE header,TVoAAAAAAAA
+3,URL encoded SQLi,%27%20OR%20%271%27%3D%271
+4,Normal base64,SGVsbG8gV29ybGQ=
+5,HTML encoded script,&lt;script&gt;alert('xss')&lt;/script&gt;

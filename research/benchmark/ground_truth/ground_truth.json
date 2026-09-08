@@ -1,0 +1,382 @@
+[
+  {
+    "case_id": "A01",
+    "file_name": "A01_benign_csv.csv",
+    "format": "csv",
+    "category": "benign",
+    "expected_class": "CLEAN",
+    "expected_properties": {
+      "malware_reference": false,
+      "malware_artifact": false,
+      "formula_injection": false,
+      "prompt_injection": false,
+      "encoded_content": false,
+      "eicar": false
+    },
+    "description": "Standard employee CSV with no threats",
+    "safe_for_execution": false,
+    "source_type": "synthetic",
+    "notes": "Baseline benign dataset"
+  },
+  {
+    "case_id": "A02",
+    "file_name": "A02_benign_json.json",
+    "format": "json",
+    "category": "benign",
+    "expected_class": "CLEAN",
+    "expected_properties": {
+      "malware_reference": false,
+      "malware_artifact": false,
+      "formula_injection": false,
+      "prompt_injection": false,
+      "encoded_content": false,
+      "eicar": false
+    },
+    "description": "Product catalog JSON with no threats",
+    "safe_for_execution": false,
+    "source_type": "synthetic",
+    "notes": "Tests JSON parsing and benign classification"
+  },
+  {
+    "case_id": "A03",
+    "file_name": "A03_benign_text.txt",
+    "format": "txt",
+    "category": "benign",
+    "expected_class": "CLEAN",
+    "expected_properties": {
+      "malware_reference": false,
+      "malware_artifact": false,
+      "formula_injection": false,
+      "prompt_injection": false,
+      "encoded_content": false,
+      "eicar": false
+    },
+    "description": "Plain text file with no threats",
+    "safe_for_execution": false,
+    "source_type": "synthetic",
+    "notes": "Tests TXT parsing"
+  },
+  {
+    "case_id": "A04",
+    "file_name": "A04_benign_numbers.csv",
+    "format": "csv",
+    "category": "benign",
+    "expected_class": "CLEAN",
+    "expected_properties": {
+      "malware_reference": false,
+      "malware_artifact": false,
+      "formula_injection": false,
+      "prompt_injection": false,
+      "encoded_content": false,
+      "eicar": false
+    },
+    "description": "Numeric CSV with +/- values that must NOT trigger formula injection",
+    "safe_for_execution": false,
+    "source_type": "synthetic",
+    "notes": "False positive test: +15.2, -3.1 are numbers, not formulas"
+  },
+  {
+    "case_id": "A05",
+    "file_name": "A05_benign_handles.csv",
+    "format": "csv",
+    "category": "benign",
+    "expected_class": "CLEAN",
+    "expected_properties": {
+      "malware_reference": false,
+      "malware_artifact": false,
+      "formula_injection": false,
+      "prompt_injection": false,
+      "encoded_content": false,
+      "eicar": false
+    },
+    "description": "CSV with @handles that must NOT trigger formula injection",
+    "safe_for_execution": false,
+    "source_type": "synthetic",
+    "notes": "False positive test: @elonmusk is a handle, not a formula"
+  },
+  {
+    "case_id": "B01",
+    "file_name": "B01_malware_reference.csv",
+    "format": "csv",
+    "category": "malware_reference",
+    "expected_class": "CLEAN",
+    "expected_properties": {
+      "malware_reference": true,
+      "malware_artifact": false,
+      "formula_injection": false,
+      "prompt_injection": false,
+      "encoded_content": false,
+      "eicar": false
+    },
+    "description": "Malware family research dataset - references only, not artifacts",
+    "safe_for_execution": false,
+    "source_type": "synthetic",
+    "notes": "System should recognize MALWARE_REFERENCE, not classify as MALICIOUS"
+  },
+  {
+    "case_id": "B02",
+    "file_name": "B02_threat_intel_report.csv",
+    "format": "csv",
+    "category": "malware_reference",
+    "expected_class": "CLEAN",
+    "expected_properties": {
+      "malware_reference": true,
+      "malware_artifact": false,
+      "formula_injection": false,
+      "prompt_injection": false,
+      "encoded_content": false,
+      "eicar": false
+    },
+    "description": "Threat intelligence report references - research metadata",
+    "safe_for_execution": false,
+    "source_type": "synthetic",
+    "notes": "APT/malware names are references, not executable threats"
+  },
+  {
+    "case_id": "C01",
+    "file_name": "C01_eicar_test.txt",
+    "format": "txt",
+    "category": "malicious_payload",
+    "expected_class": "MALICIOUS",
+    "expected_properties": {
+      "malware_reference": false,
+      "malware_artifact": true,
+      "formula_injection": false,
+      "prompt_injection": false,
+      "encoded_content": false,
+      "eicar": true
+    },
+    "description": "EICAR standard antivirus test file",
+    "safe_for_execution": false,
+    "source_type": "synthetic",
+    "notes": "Standard EICAR test signature must be detected as malicious"
+  },
+  {
+    "case_id": "C02",
+    "file_name": "C02_suspicious_urls.csv",
+    "format": "csv",
+    "category": "malicious_payload",
+    "expected_class": "SUSPICIOUS",
+    "expected_properties": {
+      "malware_reference": false,
+      "malware_artifact": false,
+      "formula_injection": false,
+      "prompt_injection": false,
+      "encoded_content": false,
+      "eicar": false
+    },
+    "description": "CSV with suspicious IP:port URLs suggesting C2 infrastructure",
+    "safe_for_execution": false,
+    "source_type": "synthetic",
+    "notes": "URLs with IP:port patterns indicate potential C2 communication"
+  },
+  {
+    "case_id": "C03",
+    "file_name": "C03_shellcode_pattern.csv",
+    "format": "csv",
+    "category": "malicious_payload",
+    "expected_class": "SUSPICIOUS",
+    "expected_properties": {
+      "malware_reference": false,
+      "malware_artifact": false,
+      "formula_injection": false,
+      "prompt_injection": false,
+      "encoded_content": false,
+      "eicar": false
+    },
+    "description": "CSV with hex-encoded shellcode patterns",
+    "safe_for_execution": false,
+    "source_type": "synthetic",
+    "notes": "Hex-encoded payloads indicate potential shellcode"
+  },
+  {
+    "case_id": "D01",
+    "file_name": "D01_formula_injection.csv",
+    "format": "csv",
+    "category": "formula_injection",
+    "expected_class": "SUSPICIOUS",
+    "expected_properties": {
+      "malware_reference": false,
+      "malware_artifact": false,
+      "formula_injection": true,
+      "prompt_injection": false,
+      "encoded_content": false,
+      "eicar": false
+    },
+    "description": "CSV with DDE/CMD formula injection payloads",
+    "safe_for_execution": false,
+    "source_type": "synthetic",
+    "notes": "Contains =CMD, =HYPERLINK with malicious intent, and =SUM (benign)"
+  },
+  {
+    "case_id": "D02",
+    "file_name": "D02_safe_formulas.csv",
+    "format": "csv",
+    "category": "benign",
+    "expected_class": "CLEAN",
+    "expected_properties": {
+      "malware_reference": false,
+      "malware_artifact": false,
+      "formula_injection": false,
+      "prompt_injection": false,
+      "encoded_content": false,
+      "eicar": false
+    },
+    "description": "CSV with legitimate spreadsheet formulas (SUM, AVERAGE, etc.)",
+    "safe_for_execution": false,
+    "source_type": "synthetic",
+    "notes": "Legitimate formulas should ideally not be flagged as injection. System may flag FORM-001 for =SUM etc. If so, that is a known FP characteristic."
+  },
+  {
+    "case_id": "E01",
+    "file_name": "E01_prompt_injection.csv",
+    "format": "csv",
+    "category": "prompt_injection",
+    "expected_class": "SUSPICIOUS",
+    "expected_properties": {
+      "malware_reference": false,
+      "malware_artifact": false,
+      "formula_injection": false,
+      "prompt_injection": true,
+      "encoded_content": false,
+      "eicar": false
+    },
+    "description": "CSV with direct prompt injection attempts",
+    "safe_for_execution": false,
+    "source_type": "synthetic",
+    "notes": "Contains ignore instructions, DAN jailbreak, and system prompt reveal attempts"
+  },
+  {
+    "case_id": "E02",
+    "file_name": "E02_embedded_injection.csv",
+    "format": "csv",
+    "category": "prompt_injection",
+    "expected_class": "SUSPICIOUS",
+    "expected_properties": {
+      "malware_reference": false,
+      "malware_artifact": false,
+      "formula_injection": false,
+      "prompt_injection": true,
+      "encoded_content": false,
+      "eicar": false
+    },
+    "description": "CSV with prompt injection embedded in otherwise normal product reviews",
+    "safe_for_execution": false,
+    "source_type": "synthetic",
+    "notes": "Tests detection of injection embedded within benign-looking context"
+  },
+  {
+    "case_id": "F01",
+    "file_name": "F01_encoded_payloads.csv",
+    "format": "csv",
+    "category": "encoded_content",
+    "expected_class": "SUSPICIOUS",
+    "expected_properties": {
+      "malware_reference": false,
+      "malware_artifact": false,
+      "formula_injection": false,
+      "prompt_injection": false,
+      "encoded_content": true,
+      "eicar": false
+    },
+    "description": "CSV with URL-encoded, Base64-encoded, and HTML-encoded payloads",
+    "safe_for_execution": false,
+    "source_type": "synthetic",
+    "notes": "Tests normalization/deobfuscation before rule matching"
+  },
+  {
+    "case_id": "G01",
+    "file_name": "G01_mixed_content.csv",
+    "format": "csv",
+    "category": "mixed",
+    "expected_class": "SUSPICIOUS",
+    "expected_properties": {
+      "malware_reference": true,
+      "malware_artifact": false,
+      "formula_injection": true,
+      "prompt_injection": true,
+      "encoded_content": true,
+      "eicar": false
+    },
+    "description": "Mixed dataset with clean, reference, formula, injection, and encoded rows",
+    "safe_for_execution": false,
+    "source_type": "synthetic",
+    "notes": "Composite test: system should detect multiple threat types in one file"
+  },
+  {
+    "case_id": "H01",
+    "file_name": "H01_empty.csv",
+    "format": "csv",
+    "category": "edge_case",
+    "expected_class": "CLEAN",
+    "expected_properties": {
+      "malware_reference": false,
+      "malware_artifact": false,
+      "formula_injection": false,
+      "prompt_injection": false,
+      "encoded_content": false,
+      "eicar": false
+    },
+    "description": "Empty file - edge case for parser robustness",
+    "safe_for_execution": false,
+    "source_type": "synthetic",
+    "notes": "System should handle gracefully without crashing. May report parse error."
+  },
+  {
+    "case_id": "H02",
+    "file_name": "H02_malformed.csv",
+    "format": "csv",
+    "category": "edge_case",
+    "expected_class": "CLEAN",
+    "expected_properties": {
+      "malware_reference": false,
+      "malware_artifact": false,
+      "formula_injection": false,
+      "prompt_injection": false,
+      "encoded_content": false,
+      "eicar": false
+    },
+    "description": "Malformed CSV with unclosed quotes and extra columns",
+    "safe_for_execution": false,
+    "source_type": "synthetic",
+    "notes": "Parser robustness test. System should handle gracefully."
+  },
+  {
+    "case_id": "H03",
+    "file_name": "H03_unicode.csv",
+    "format": "csv",
+    "category": "edge_case",
+    "expected_class": "CLEAN",
+    "expected_properties": {
+      "malware_reference": false,
+      "malware_artifact": false,
+      "formula_injection": false,
+      "prompt_injection": false,
+      "encoded_content": false,
+      "eicar": false
+    },
+    "description": "CSV with Unicode, emoji, and international characters",
+    "safe_for_execution": false,
+    "source_type": "synthetic",
+    "notes": "Must not crash or misclassify due to character encoding"
+  },
+  {
+    "case_id": "H04",
+    "file_name": "H04_long_field.csv",
+    "format": "csv",
+    "category": "edge_case",
+    "expected_class": "CLEAN",
+    "expected_properties": {
+      "malware_reference": false,
+      "malware_artifact": false,
+      "formula_injection": false,
+      "prompt_injection": false,
+      "encoded_content": false,
+      "eicar": false
+    },
+    "description": "CSV with a very long field (5000 chars) to test boundary handling",
+    "safe_for_execution": false,
+    "source_type": "synthetic",
+    "notes": "Tests that long fields do not crash the scanner or cause excessive memory usage"
+  }
+]

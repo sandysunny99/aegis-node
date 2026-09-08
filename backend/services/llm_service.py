@@ -513,7 +513,14 @@ def _call_gemini(
             from google import genai
             from google.genai import types
 
-            client = genai.Client(api_key=api_key)
+            client_kwargs = {"api_key": api_key}
+            if settings.ai_gateway_enabled and settings.cloudflare_ai_gateway_url:
+                base_url = settings.cloudflare_ai_gateway_url.rstrip('/')
+                headers = {"cf-aig-collect-log-payload": "true" if settings.cloudflare_ai_gateway_log_payload else "false"}
+                client_kwargs["http_options"] = {"base_url": f"{base_url}/google-ai-studio", "headers": headers}
+                logger.info("Routing Gemini request through Cloudflare AI Gateway")
+
+            client = genai.Client(**client_kwargs)
             config = types.GenerateContentConfig(
                 system_instruction=system_prompt,
                 temperature=0.2,
@@ -686,7 +693,7 @@ def _call_cloudflare(
                 status = "timeout"
             elif "connection" in err_str:
                 status = "unavailable"
-            
+
             res = _failed_result(model_name, err_msg or "Cloudflare Workers AI returned empty response")
             res.status = status
             return res

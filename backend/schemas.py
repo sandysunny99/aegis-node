@@ -34,6 +34,12 @@ class ThreatIntelResult(BaseModel):
     first_seen: str | None = None
     tags: list[str] = []
     source: str
+    malicious_count: int | None = None
+    suspicious_count: int | None = None
+    harmless_count: int | None = None
+    undetected_count: int | None = None
+    raw_reference: str | None = None
+    error_message: str | None = None
 
 class ThreatFinding(BaseModel):
     """A single threat or anomaly detected during scanning."""

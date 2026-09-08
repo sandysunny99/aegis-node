@@ -27,6 +27,8 @@ class DatasetRecord(Base):
     sha256_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     mime_type: Mapped[str] = mapped_column(String(128), nullable=False, default="application/octet-stream")
     file_format: Mapped[str] = mapped_column(String(32), nullable=False, default="unknown")
+    object_key: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    storage_backend: Mapped[str] = mapped_column(String(32), nullable=False, default="local")
     uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, server_default=func.now())
     # status: uploaded | scanning | clean | quarantined | suspicious | remediated | partial_remediated | error
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="uploaded")
@@ -156,6 +158,8 @@ class RemediationRecord(Base):
     original_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     sanitized_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     stored_sanitized_filename: Mapped[str] = mapped_column(String(512), nullable=False)
+    object_key: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    storage_backend: Mapped[str] = mapped_column(String(32), nullable=False, default="local")
 
     # Secure one-time download token — generated on remediation, required for download
     download_token: Mapped[str] = mapped_column(String(64), unique=True, nullable=True, index=True)

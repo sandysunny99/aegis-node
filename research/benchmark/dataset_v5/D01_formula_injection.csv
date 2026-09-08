@@ -1,0 +1,6 @@
+id,name,comment
+1,Test1,=CMD(|'/C calc.exe')
+2,Test2,=HYPERLINK("http://evil.com/steal","Click here")
+3,Test3,+cmd|' /C notepad'!A0
+4,Test4,=SUM(A1:A10)
+5,Test5,Normal comment with no formula

@@ -24,7 +24,7 @@ async def lookup_ip(ip: str) -> ThreatIntelResult:
     if not getattr(settings, 'enable_abuseipdb', False):
         base_res.status = "unconfigured"
         return base_res
-        
+
     api_key = getattr(settings, 'abuseipdb_api_key', "").strip()
     if not api_key:
         base_res.status = "unconfigured"
@@ -45,16 +45,16 @@ async def lookup_ip(ip: str) -> ThreatIntelResult:
             if resp.status_code != 200:
                 base_res.status = "unavailable"
                 return base_res
-                
+
             data = resp.json().get("data", {})
             score = data.get("abuseConfidenceScore", 0)
-            
+
             if score > 0:
                 base_res.status = "suspicious" if score < 80 else "malicious"
                 base_res.confidence = f"score:{score}"
             else:
                 base_res.status = "completed"
-                
+
             return base_res
 
     except Exception as exc:

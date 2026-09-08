@@ -1,0 +1,6 @@
+id,name,description
+1,日本語テスト,This contains Japanese characters
+2,Ñoño,Spanish characters with tildes
+3,Ünïcödé,Mixed diacritical marks
+4,🔒Security,Emoji in field values
+5,Normal ASCII,Plain English text

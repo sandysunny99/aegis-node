@@ -1,0 +1,4 @@
+id,name,value
+1,"Alice,unclosed_quote
+2,Bob,"valid"
+3,Charlie,broken"delimiter

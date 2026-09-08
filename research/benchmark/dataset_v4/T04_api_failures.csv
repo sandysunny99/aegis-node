@@ -1,0 +1,5 @@
+id,content,label
+1,Simulate lookup failure via api-down.test.,error
+2,Simulate API timeout via timeout.test.,error
+3,Simulate rate limit via rate-limit.test.,error
+4,Simulate malformed data via malformed...test.,error

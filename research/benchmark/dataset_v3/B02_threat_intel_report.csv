@@ -1,0 +1,6 @@
+report_id,title,threat_actor,malware_used,target_sector
+RPT-001,Operation CloudHopper,APT10,PlugX Trojan,Technology
+RPT-002,FIN7 Campaign Analysis,FIN7,Carbanak Backdoor,Financial
+RPT-003,Lazarus Group Update,Lazarus,DarkSide Ransomware,Cryptocurrency
+RPT-004,Turla Infrastructure,Turla,Rootkit Snake,Government
+RPT-005,Conti Leak Analysis,Conti Team,Conti Ransomware,Healthcare

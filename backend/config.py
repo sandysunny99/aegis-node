@@ -132,7 +132,32 @@ class Settings(BaseSettings):
     enable_hibp: bool = False
     enable_securitytrails: bool = False
 
-    # ─── Database ────────────────────────────────────────────────────────────
+    # 🪣 Cloudflare R2 Artifact Storage (Phase 8B)
+    r2_enabled: bool = False
+    r2_account_id: str = ""
+    r2_bucket: str = ""
+    r2_access_key_id: str = ""
+    r2_secret_access_key: str = ""
+    r2_endpoint_url: str = ""
+    r2_region: str = "auto"
+
+    # ☁️ Cloudflare AI Gateway (Phase 8A)
+    ai_gateway_enabled: bool = False
+    cloudflare_account_id: str = ""
+    cloudflare_ai_gateway_id: str = ""
+    cloudflare_ai_gateway_url: str = ""
+    cloudflare_ai_gateway_log_payload: bool = False
+
+    # 🛡️ Threat Intelligence (Phase 9)
+    enable_virustotal: bool = True
+    virustotal_api_key: str | None = None
+    virustotal_timeout_seconds: float = 5.0
+
+    enable_urlhaus: bool = True
+    urlhaus_auth_key: str | None = None
+    urlhaus_timeout_seconds: float = 5.0
+
+    # 💾 Database
     database_url: str = "sqlite:///./aegis_node.db"
 
     def is_trusted_proxy(self, host: str) -> bool:
@@ -174,6 +199,8 @@ class Settings(BaseSettings):
             self.cloudflare_turnstile_secret_key = _read_secret_file("CLOUDFLARE_TURNSTILE_SECRET_KEY")
         if not self.virustotal_api_key:
             self.virustotal_api_key = _read_secret_file("VIRUSTOTAL_API_KEY")
+        if not self.urlhaus_auth_key:
+            self.urlhaus_auth_key = _read_secret_file("URLHAUS_AUTH_KEY")
         if not self.api_key:
             self.api_key = _read_secret_file("API_KEY")
         if not self.fallback_gemini_api_key:
