@@ -125,8 +125,10 @@ class Settings(BaseSettings):
     virustotal_timeout_seconds: int = 10
 
     enable_urlhaus: bool = False
-    enable_abuseipdb: bool = False
-    abuseipdb_api_key: str = ""
+    enable_abuseipdb: bool = True
+    abuseipdb_api_key: str | None = None
+    abuseipdb_timeout_seconds: float = 5.0
+
     enable_phishtank: bool = False
     enable_shodan: bool = False
     enable_hibp: bool = False
@@ -201,6 +203,8 @@ class Settings(BaseSettings):
             self.virustotal_api_key = _read_secret_file("VIRUSTOTAL_API_KEY")
         if not self.urlhaus_auth_key:
             self.urlhaus_auth_key = _read_secret_file("URLHAUS_AUTH_KEY")
+        if not self.abuseipdb_api_key:
+            self.abuseipdb_api_key = _read_secret_file("ABUSEIPDB_API_KEY")
         if not self.api_key:
             self.api_key = _read_secret_file("API_KEY")
         if not self.fallback_gemini_api_key:

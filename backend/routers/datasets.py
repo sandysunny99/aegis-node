@@ -257,6 +257,54 @@ async def scan_dataset(
         logging.getLogger(__name__).warning(f"URLhaus integration failed: {urlhaus_exc}")
         result.verification_limitations.append("URLHAUS_FAILURE")
 
+    # Phase 9.3: AbuseIPDB
+    try:
+        from services.threat_intelligence.abuseipdb import lookup_ip
+        import re
+        from pathlib import Path
+
+        raw_bytes = Path(file_path).read_bytes()
+        ip_pattern = re.compile(rb'\b(?:\d{1,3}\.){3}\d{1,3}\b')
+        extracted_ips = set()
+        for match in ip_pattern.finditer(raw_bytes):
+            try:
+                ip_str = match.group().decode('utf-8')
+                extracted_ips.add(ip_str)
+            except Exception:
+                pass
+
+        for ip in list(extracted_ips)[:5]:
+            ip_intel = await lookup_ip(ip)
+
+            if ip_intel.status in ("unconfigured", "invalid_ip"):
+                continue
+
+            severity = "low"
+            if ip_intel.status == "malicious":
+                severity = "critical"
+                if result.verdict in ("clean_verified", "clean_with_limitations"):
+                    result.verification_limitations.append("CONFLICT_ABUSEIPDB_MALICIOUS")
+            elif ip_intel.status == "suspicious":
+                severity = "high"
+            elif ip_intel.status in ("timeout", "rate_limited", "provider_error"):
+                severity = "low"
+                result.verification_limitations.append(f"ABUSEIPDB_UNAVAILABLE_{ip_intel.status.upper()}")
+
+            finding = ContentFinding(
+                rule_id=f"abuseipdb_{ip_intel.status}",
+                severity=severity,
+                category="threat_intel",
+                description=f"AbuseIPDB {ip_intel.status.upper()} for IP: {ip} (Confidence: {ip_intel.confidence}) - {ip_intel.error_message or 'No errors'}",
+                location="abuseipdb",
+                sample=ip_intel.raw_reference or ""
+            )
+            result.content_findings.append(finding)
+
+    except Exception as abuseipdb_exc:
+        import logging
+        logging.getLogger(__name__).warning(f"AbuseIPDB integration failed: {abuseipdb_exc}")
+        result.verification_limitations.append("ABUSEIPDB_FAILURE")
+
     # Update status
     if result.verdict == "malicious":
         record.status = "quarantined"
