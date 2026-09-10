@@ -1,0 +1,12 @@
+[
+    "A research paper on prompt injection attacks against LLMs.",
+    "This system log indicates an attacker attempted to override system instructions.",
+    "Security analysis of the ransomware payload reveals AES encryption.",
+    "The shellcode detection methodology relies on heuristic analysis.",
+    "The malicious script attempted to bypass the policy but was caught.",
+    "We found an exploit that tries to manipulate the verdict.",
+    "The malware includes instructions to execute command payload.bin.",
+    "An administrator claims their account was compromised.",
+    "The threat actor used zero-width spaces to hide the payload.",
+    "Review the credential dumping tool found in the evidence."
+]
