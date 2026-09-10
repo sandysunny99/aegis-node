@@ -6,7 +6,7 @@ import sys
 _ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(_ROOT / "backend"))
 
-from services.llm_service import _validate_and_parse
+from services.guardrails import evaluate_input_guardrail
 
 def load_fixtures(name):
     path = Path(__file__).parent / "fixtures" / "guardrails" / f"{name}.json"
@@ -20,46 +20,49 @@ def run_benchmark():
     detected_attacks = 0
     missed_attacks = 0
     latencies = []
+    
+    allow_count = 0
+    restrict_count = 0
+    block_count = 0
 
     # Test benign (False Positives)
-    # We simulate a parsed output where the summary contains the payload
     for payload in benign:
         start_time = time.time()
-        test_json = json.dumps({
-            "verdict": "clean", "severity": "low", "confidence": 0.5,
-            "summary": payload, "evidence": [], "recommendations": [], "limitations": []
-        })
-        res = _validate_and_parse(test_json)
+        status, score, signals = evaluate_input_guardrail(payload)
         latencies.append(time.time() - start_time)
-        if res is None:
-            # Valid benign text was rejected
+        if status in ("RESTRICT", "BLOCK"):
             false_positives += 1
-            print(f"False Positive on: {payload}")
+            print(f"[FP] Status: {status}, Score: {score}, Signals: {signals} -> {payload}")
+        
+        if status == "ALLOW": allow_count += 1
+        elif status == "RESTRICT": restrict_count += 1
+        elif status == "BLOCK": block_count += 1
 
     # Test adversarial (True Positives / Misses)
     for payload in adversarial:
         start_time = time.time()
-        test_json = json.dumps({
-            "verdict": "clean", "severity": "low", "confidence": 0.5,
-            "summary": payload, "evidence": [], "recommendations": [], "limitations": []
-        })
-        res = _validate_and_parse(test_json)
+        status, score, signals = evaluate_input_guardrail(payload)
         latencies.append(time.time() - start_time)
-        if res is None:
+        if status in ("RESTRICT", "BLOCK"):
             detected_attacks += 1
         else:
             missed_attacks += 1
-            print(f"Missed Attack on: {payload}")
+            print(f"[MISS] Status: {status}, Score: {score}, Signals: {signals} -> {payload}")
+
+        if status == "ALLOW": allow_count += 1
+        elif status == "RESTRICT": restrict_count += 1
+        elif status == "BLOCK": block_count += 1
 
     avg_latency = sum(latencies) / len(latencies) * 1000 if latencies else 0
 
     print("--- Guardrail Benchmark ---")
     print(f"Benign content evaluated: {len(benign)}")
-    print(f"False positives (incorrectly blocked): {false_positives} / {len(benign)}")
+    print(f"False positives (incorrectly restricted/blocked): {false_positives} / {len(benign)} ({false_positives/len(benign)*100:.1f}%)")
     print(f"Adversarial content evaluated: {len(adversarial)}")
-    print(f"Attacks detected (rejected): {detected_attacks} / {len(adversarial)}")
-    print(f"Attacks missed (passed): {missed_attacks} / {len(adversarial)}")
+    print(f"Attacks detected (restricted/blocked): {detected_attacks} / {len(adversarial)} ({detected_attacks/len(adversarial)*100:.1f}%)")
+    print(f"Attacks missed (passed as ALLOW): {missed_attacks} / {len(adversarial)}")
     print(f"Average latency overhead: {avg_latency:.2f} ms")
+    print(f"ALLOW: {allow_count}, RESTRICT: {restrict_count}, BLOCK: {block_count}")
 
 if __name__ == "__main__":
     run_benchmark()

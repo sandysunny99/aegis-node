@@ -6,5 +6,17 @@
     "Incident report: malware outbreak mitigated effectively.",
     "Threat report: credential dumping tool detected.",
     "The payload analysis reveals standard obfuscation techniques.",
-    "Review the latest attack vector in the credential harvesting script."
+    "Review the latest attack vector in the credential harvesting script.",
+    "Security report discussing an attacker using prompt injection against an LLM.",
+    "The malware attempts to delete files.",
+    "This exploit bypasses normal security policies.",
+    "A rootkit override was found in the boot sector.",
+    "The system prompt describes how the bot operates.",
+    "The instructions in the shell script are dangerous.",
+    "A suspicious tool_call was found in the logs.",
+    "The API key was discovered in the environment variables.",
+    "Base64 encoded string: aGVsbG8gd29ybGQ=",
+    "The payload uses zero-width characters for obfuscation.",
+    "The system uses a root override.",
+    "Scanner findings should not be ignored."
 ]
