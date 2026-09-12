@@ -5,6 +5,7 @@ import FindingsList from './components/FindingsList';
 import RemediationCard from './components/RemediationCard';
 import RiskMeter from './components/RiskMeter';
 import StatusBadge from './components/StatusBadge';
+import ThreatIntelligence from './components/ThreatIntelligence';
 import TurnstileWidget from './components/TurnstileWidget';
 import UploadZone from './components/UploadZone';
 import HistoryPage from './pages/HistoryPage';
@@ -332,9 +333,14 @@ function ScanPage({ health }) {
             }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>
-                    Overall Verdict
-                  </span>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>
+                      SECURITY VERDICT
+                    </span>
+                    <span style={{ fontSize: '0.65rem', color: 'var(--cyan)', marginTop: '2px' }}>
+                      Source: Deterministic Scanner
+                    </span>
+                  </div>
                   <StatusBadge verdict={scanResult.verdict} />
                 </div>
 
@@ -388,6 +394,9 @@ function ScanPage({ health }) {
 
           {/* AI Context Panel */}
           <AiSummary datasetId={scanResult.dataset_id} />
+
+          {/* Threat Intelligence Panel */}
+          <ThreatIntelligence tiReport={scanResult.threat_intel} />
 
           {/* Remediation & Sanitize Card */}
           <RemediationCard datasetId={scanResult.dataset_id} scanResult={scanResult} />

@@ -1,5 +1,5 @@
 """
-Aegis Node — LLM Analysis Router.
+Aegis Node - LLM Analysis Router.
 POST /api/v1/datasets/{dataset_id}/analyse
 GET  /api/v1/datasets/{dataset_id}/analysis
 """
@@ -38,7 +38,7 @@ async def analyse_dataset(
     request: Request,         # Required by slowapi for IP tracking
     dataset_id: int,
     db: Session = Depends(get_db),  # noqa: B008
-    _auth: None = Depends(require_api_key),  # noqa: B008  # Guard — triggers paid AI calls
+    _auth: None = Depends(require_api_key),  # noqa: B008  # Guard - triggers paid AI calls
 ) -> AnalysisResponse:
     record: DatasetRecord | None = db.get(DatasetRecord, dataset_id)
     if not record:
@@ -54,7 +54,7 @@ async def analyse_dataset(
     latest_report = sorted(record.scan_reports, key=lambda r: r.scanned_at)[-1]
     findings = latest_report.findings
 
-    # F1: Run blocking LLM network call in threadpool — keeps event loop free
+    # F1: Run blocking LLM network call in threadpool - keeps event loop free
     result = await run_in_threadpool(
         functools.partial(
             analyse,
@@ -83,6 +83,12 @@ async def analyse_dataset(
         prompt_tokens=result.prompt_tokens,
         completion_tokens=result.completion_tokens,
         error_message=result.error,
+        guardrail_status=result.guardrail_status,
+        guardrail_score=result.guardrail_score,
+        guardrail_signals_json=json.dumps(result.guardrail_signals),
+        llm_invoked=result.llm_invoked,
+        llm_bypassed=result.llm_bypassed,
+        llm_context_mode=result.llm_context_mode,
     )
     db.add(db_record)
     db.commit()
@@ -90,7 +96,7 @@ async def analyse_dataset(
 
     return AnalysisResponse(
         analysis_id=db_record.id,
-        dataset_id=db_record.dataset_id,
+        dataset_id=record.id,
         model_name=db_record.model_name,
         status=db_record.status,
         verdict=db_record.verdict,
@@ -103,7 +109,13 @@ async def analyse_dataset(
         prompt_tokens=db_record.prompt_tokens,
         completion_tokens=db_record.completion_tokens,
         created_at=db_record.created_at,
-        error=result.error,
+        error=db_record.error_message,
+        guardrail_status=db_record.guardrail_status,
+        guardrail_score=db_record.guardrail_score,
+        guardrail_signals=db_record.guardrail_signals,
+        llm_invoked=db_record.llm_invoked,
+        llm_bypassed=db_record.llm_bypassed,
+        llm_context_mode=db_record.llm_context_mode,
     )
 
 
@@ -144,4 +156,10 @@ def get_analysis(
         completion_tokens=latest.completion_tokens,
         created_at=latest.created_at,
         error=latest.error_message,
+        guardrail_status=latest.guardrail_status,
+        guardrail_score=latest.guardrail_score,
+        guardrail_signals=latest.guardrail_signals,
+        llm_invoked=latest.llm_invoked,
+        llm_bypassed=latest.llm_bypassed,
+        llm_context_mode=latest.llm_context_mode,
     )

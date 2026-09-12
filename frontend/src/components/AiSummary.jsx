@@ -42,17 +42,17 @@ export default function AiSummary({ datasetId }) {
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '1rem 1.25rem',
-        borderBottom: state === 'done' || state === 'unavailable' ? '1px solid var(--border)' : 'none',
+        borderBottom: (state === 'done' || state === 'unavailable' || state === 'idle') ? '1px solid var(--border)' : 'none',
         flexWrap: 'wrap', gap: '0.75rem',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-          <span style={{ fontSize: '1.25rem' }}>🤖</span>
+          <span style={{ fontSize: '1.25rem' }}>🛡️</span>
           <div>
             <div style={{ fontWeight: 700, color: 'var(--text-1)', fontSize: '0.9rem' }}>
-              AI Threat Context & Explainability
+              AI SECURITY & ANALYSIS
             </div>
             <div style={{ fontSize: '0.75rem', color: 'var(--text-3)' }}>
-              Contextual reasoning powered by LLM (advisory only).
+              LLM Analysis protected by native Guardrails.
             </div>
           </div>
         </div>
@@ -65,7 +65,7 @@ export default function AiSummary({ datasetId }) {
           )}
           {state === 'loading' && (
             <button className="btn btn-ghost" disabled style={{ padding: '0.45rem 1rem', fontSize: '0.82rem' }}>
-              <span className="spinner" /> Reasoning…
+              <span className="spinner" /> Reasoning...
             </button>
           )}
           {(state === 'done' || state === 'unavailable') && (
@@ -81,11 +81,54 @@ export default function AiSummary({ datasetId }) {
                 padding: '0.25rem 0.5rem',
               }}
             >
-              {isExpanded ? 'Collapse ▲' : 'Expand ▼'}
+              {isExpanded ? 'Collapse 🔼' : 'Expand 🔽'}
             </button>
           )}
         </div>
       </div>
+
+      {/* Observability State Always Visible if not loading */}
+      {state !== 'loading' && isExpanded && (
+        <div style={{
+          padding: '1rem 1.25rem',
+          background: 'var(--bg-2)',
+          borderBottom: state === 'done' ? '1px solid var(--border)' : 'none',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.5rem',
+          fontFamily: 'var(--mono)',
+          fontSize: '0.75rem',
+        }}>
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <div style={{ color: 'var(--text-3)' }}>Guardrail:</div>
+            <div style={{ color: result?.guardrail_status === 'BLOCK' ? 'var(--rose)' : result?.guardrail_status === 'RESTRICT' ? 'var(--amber)' : result?.guardrail_status === 'ALLOW' ? 'var(--emerald)' : 'var(--text-1)' }}>
+              {result?.guardrail_status || 'N/A'}
+            </div>
+          </div>
+          {result?.guardrail_signals?.length > 0 && (
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <div style={{ color: 'var(--text-3)' }}>Signals:</div>
+              <div style={{ color: 'var(--amber)' }}>
+                {result.guardrail_signals.join(', ')}
+              </div>
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <div style={{ color: 'var(--text-3)' }}>LLM State:</div>
+            <div style={{ color: 'var(--cyan)' }}>
+              {state === 'idle' ? 'NOT INVOKED' : result?.llm_bypassed ? 'BYPASSED DUE TO BLOCK' : result?.llm_invoked ? 'INVOKED' : 'INVOCATION FAILED'}
+            </div>
+          </div>
+          {(result?.llm_context_mode && result.llm_context_mode !== 'UNKNOWN') && (
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <div style={{ color: 'var(--text-3)' }}>Context:</div>
+              <div style={{ color: 'var(--text-2)' }}>
+                {result.llm_context_mode === 'RESTRICTED' ? 'BOUNDED UNTRUSTED EVIDENCE (REDACTED)' : result.llm_context_mode === 'FULL' ? 'BOUNDED UNTRUSTED EVIDENCE (FULL)' : 'NONE'}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Unavailable state */}
       {state === 'unavailable' && isExpanded && (
