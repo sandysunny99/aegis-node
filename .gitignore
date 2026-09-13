@@ -61,3 +61,7 @@ docker-volumes/
 .vscode/settings.json
 .DS_Store
 Thumbs.db
+data/originals/*
+!data/originals/.gitkeep
+data/originals/*
+!data/originals/.gitkeep

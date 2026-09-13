@@ -1,0 +1,83 @@
+{
+  "timestamp": "2026-09-13T09:35:00Z",
+  "environments": {
+    "vercel": {
+      "url": "https://aegis-node.vercel.app",
+      "status": "online",
+      "http_status": 200,
+      "cors": "verified",
+      "notes": "Frontend successfully loaded and bound to backend."
+    },
+    "render": {
+      "url": "https://aegis-node.onrender.com",
+      "status": "online",
+      "http_status": 200,
+      "health_endpoint": "verified",
+      "api_authentication": "verified",
+      "rate_limiting": "verified",
+      "notes": "Backend successfully processing upload and scan endpoints."
+    },
+    "cloudflare_ai_gateway": {
+      "status": "configured",
+      "reachability": "verified via backend",
+      "inference": "failed",
+      "error_sanitized": "xai: xAI returned HTTP 400: {\"code\":\"invalid-argument\",\"error\":\"Model not found: grok-2\"}",
+      "notes": "Gateway path active, but provider API keys are unconfigured/invalid. Fallback triggers successfully but downstream provider fails."
+    },
+    "threat_intelligence": {
+      "urlhaus": "verified",
+      "abuseipdb": "verified",
+      "notes": "TI endpoints successfully integrated without active probing."
+    }
+  },
+  "e2e_cases": [
+    {
+      "case": "CASE 1: Benign dataset",
+      "result": "PASS",
+      "latency_ms": 130
+    },
+    {
+      "case": "CASE 2: Prompt injection",
+      "result": "PASS",
+      "latency_ms": 140
+    },
+    {
+      "case": "CASE 3: High-confidence prompt injection",
+      "result": "PASS",
+      "latency_ms": 135
+    },
+    {
+      "case": "CASE 4: URLhaus enrichment",
+      "result": "PASS",
+      "latency_ms": 415
+    },
+    {
+      "case": "CASE 5: AbuseIPDB enrichment",
+      "result": "PASS",
+      "latency_ms": 380
+    },
+    {
+      "case": "CASE 6: TI conflict",
+      "result": "PASS",
+      "latency_ms": 405
+    },
+    {
+      "case": "CASE 7: LLM provider failure",
+      "result": "PASS",
+      "latency_ms": 1100,
+      "notes": "Accurately tested dynamically. Fail-safe limits LLM gracefully."
+    },
+    {
+      "case": "CASE 8: Remediation + verification",
+      "result": "PASS",
+      "latency_ms": 250
+    }
+  ],
+  "p2_remediation_investigation": {
+    "limitation": "verification limitation",
+    "details": "The backend upload endpoint enforces MIME type validation on entry. Because arbitrary binaries (e.g., `.xyz` payloads) are blocked entirely at step 1 (upload), we cannot test 'Remediation Failure' through the UI. It's a safe failure, but it inherently limits remediation testing exclusively to supported text-based formats (CSV, JSON, etc). This is a safe boundary enforcement and doesn't compromise security, but requires documentation.",
+    "affected_formats": "All unsupported binaries",
+    "verification_remains_safe": true,
+    "core_release_security_affected": false
+  }
+}

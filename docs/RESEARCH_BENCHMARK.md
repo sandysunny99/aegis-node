@@ -8,7 +8,7 @@
 ## 1. Research Hypothesis & Novelty Framing
 
 ### Academic Framing:
-> *"Can a hybrid architecture combining multi-layer deterministic pattern matching, recursive multi-encoding normalization, external cryptographic reputation enrichment, and evidence-grounded LLM contextual reasoning achieve near-zero false positives on benign security research text while maintaining 100% precision on actionable dataset injection threats?"*
+> *"Can a hybrid architecture combining multi-layer deterministic pattern matching, recursive multi-encoding normalization, external cryptographic reputation enrichment, and evidence-grounded LLM contextual reasoning achieve high precision on actionable dataset injection threats?"*
 
 ---
 

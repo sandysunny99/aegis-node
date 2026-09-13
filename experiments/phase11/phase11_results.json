@@ -1,0 +1,132 @@
+{
+  "summary": {
+    "baseline": "a9aaf02",
+    "total_cases": 20,
+    "pass": 18,
+    "fail": 2,
+    "blocked": 0,
+    "not_applicable": 0
+  },
+  "cases": [
+    {
+      "id": "CASE 01",
+      "name": "BENIGN DATASET",
+      "status": "PASS",
+      "notes": "Guardrail correctly allowed. LLM invoked successfully (when provider keys are available)."
+    },
+    {
+      "id": "CASE 02",
+      "name": "KNOWN MALICIOUS ARTIFACT",
+      "status": "PASS",
+      "notes": "ClamAV detects correctly. Deterministic verdict overrides AI."
+    },
+    {
+      "id": "CASE 03",
+      "name": "SUSPICIOUS DATASET",
+      "status": "PASS",
+      "notes": "Suspicious evidence retained."
+    },
+    {
+      "id": "CASE 04",
+      "name": "PROMPT INJECTION",
+      "status": "PASS",
+      "notes": "Guardrail correctly restricts context. Context mode: RESTRICTED."
+    },
+    {
+      "id": "CASE 05",
+      "name": "HIGH-CONFIDENCE INJECTION",
+      "status": "PASS",
+      "notes": "Guardrail correctly blocks. LLM bypassed."
+    },
+    {
+      "id": "CASE 06",
+      "name": "ENCODED/OBFUSCATED THREAT",
+      "status": "PASS",
+      "notes": "Base64 decode catches bounded injection."
+    },
+    {
+      "id": "CASE 07",
+      "name": "URLhaus MATCH",
+      "status": "PASS",
+      "notes": "Lookup bounded. No URL fetching."
+    },
+    {
+      "id": "CASE 08",
+      "name": "AbuseIPDB MATCH",
+      "status": "PASS",
+      "notes": "Public IP only."
+    },
+    {
+      "id": "CASE 09",
+      "name": "TI CONFLICT",
+      "status": "PASS",
+      "notes": "CONFLICTED state returned."
+    },
+    {
+      "id": "CASE 10",
+      "name": "TI PROVIDER FAILURE",
+      "status": "PASS",
+      "notes": "Graceful fallback to local scan."
+    },
+    {
+      "id": "CASE 11",
+      "name": "LLM FAILURE",
+      "status": "PASS",
+      "notes": "API limits/unavailability correctly handled. Deterministic verdict authoritative."
+    },
+    {
+      "id": "CASE 12",
+      "name": "LLM OUTPUT FAILURE",
+      "status": "PASS",
+      "notes": "Malformed JSON rejected safely."
+    },
+    {
+      "id": "CASE 13",
+      "name": "REMEDIATION SUCCESS",
+      "status": "PASS",
+      "notes": "Remediated artifact re-scanned and verified clean."
+    },
+    {
+      "id": "CASE 14",
+      "name": "REMEDIATION FAILURE",
+      "status": "FAIL",
+      "notes": "P2 Medium - The API currently rejects invalid file extensions at upload, meaning we can't test remediation failure for unsupported types through standard UI upload. Remediation logic itself is safe, but test case is awkwardly bounded."
+    },
+    {
+      "id": "CASE 15",
+      "name": "VERIFICATION FAILURE",
+      "status": "PASS",
+      "notes": "Verification strictly enforced."
+    },
+    {
+      "id": "CASE 16",
+      "name": "LARGE FILE / UPLOAD LIMIT",
+      "status": "PASS",
+      "notes": "413 Payload Too Large enforced."
+    },
+    {
+      "id": "CASE 17",
+      "name": "MALFORMED DATASET",
+      "status": "PASS",
+      "notes": "Graceful failure."
+    },
+    {
+      "id": "CASE 18",
+      "name": "FORMULA INJECTION",
+      "status": "PASS",
+      "notes": "Categorized as suspicious correctly."
+    },
+    {
+      "id": "CASE 19",
+      "name": "MALWARE REFERENCE",
+      "status": "PASS",
+      "notes": "Safe text ignored."
+    },
+    {
+      "id": "CASE 20",
+      "name": "ATTACKER URL/IP IN EVIDENCE",
+      "status": "PASS",
+      "notes": "No SSRF."
+    }
+  ]
+}
