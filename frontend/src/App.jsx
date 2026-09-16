@@ -312,98 +312,45 @@ function ScanPage({ health }) {
         </div>
       </div>
 
+      
       {/* Scan Results */}
       {isDone && scanResult && (
-        <div className="card fade-in">
-          <div className="card-title">Multi-Stage Inspection Report</div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem', marginBottom: '1.5rem', alignItems: 'stretch' }}>
-            {/* Risk Gauge Card */}
-            <RiskMeter score={scanResult.risk_score} verdict={scanResult.verdict} />
-
-            {/* Overview Summary */}
-            <div style={{
-              background: 'var(--bg-3)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--r-md)',
-              padding: '1.25rem',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-            }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>
-                      SECURITY VERDICT
-                    </span>
-                    <span style={{ fontSize: '0.65rem', color: 'var(--cyan)', marginTop: '2px' }}>
-                      Source: Deterministic Scanner
-                    </span>
-                  </div>
-                  <StatusBadge verdict={scanResult.verdict} />
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.82rem', color: 'var(--text-2)' }}>
-                  <div>
-                    Threats Detected: <strong style={{ color: scanResult.threats_found_count > 0 ? 'var(--rose)' : 'var(--emerald)', fontFamily: 'var(--mono)' }}>{scanResult.threats_found_count}</strong>
-                  </div>
-                  <div>
-                    Coverage: <strong style={{ color: 'var(--cyan)', fontFamily: 'var(--mono)' }}>{scanResult.coverage_percentage ?? 100}%</strong>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-3)', marginLeft: '0.4rem' }}>
-                      ({scanResult.rows_inspected} rows{scanResult.rows_total ? ` / ${scanResult.rows_total}` : ''})
-                    </span>
-                  </div>
-                  <div>
-                    ClamAV Status: <strong style={{ color: 'var(--text-1)', fontFamily: 'var(--mono)' }}>{scanResult.clamav_status}</strong>
-                    {scanResult.clamav_virus_name && <span style={{ color: 'var(--rose)', marginLeft: '0.4rem' }}>({scanResult.clamav_virus_name})</span>}
-                  </div>
-                  <div>
-                    Pipeline Latency: <strong style={{ color: 'var(--text-1)', fontFamily: 'var(--mono)' }}>{scanResult.scan_duration_ms} ms</strong>
-                  </div>
-
-                  {scanResult.verification_limitations && scanResult.verification_limitations.length > 0 && (
-                    <div style={{ marginTop: '0.4rem', display: 'flex', flexWrap: 'wrap', gap: '0.3rem', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.7rem', color: 'var(--amber)', fontWeight: 600 }}>Limitations:</span>
-                      {scanResult.verification_limitations.map((lim, idx) => (
-                        <span key={idx} style={{
-                          fontSize: '0.68rem',
-                          background: 'rgba(245, 158, 11, 0.12)',
-                          color: 'var(--amber)',
-                          border: '1px solid rgba(245, 158, 11, 0.25)',
-                          padding: '0.1rem 0.35rem',
-                          borderRadius: '4px',
-                          fontFamily: 'var(--mono)',
-                        }}>
-                          {lim}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-3)', fontFamily: 'var(--mono)', marginTop: '0.75rem', borderTop: '1px solid var(--border)', paddingTop: '0.5rem' }}>
-                Dataset ID: #{scanResult.dataset_id}
-              </div>
-            </div>
+        <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div style={{ fontSize: '1.1rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span>📄</span> Multi-Stage Security Report: {scanResult.dataset_id}
           </div>
 
-          {/* Grouped findings */}
-          <FindingsList findings={scanResult.findings} />
+          {/* COMPACT RESULT HEADER */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', background: 'var(--bg-1)', padding: '1rem', borderRadius: 'var(--r-md)', border: '1px solid var(--border)', fontFamily: 'var(--mono)', fontSize: '0.8rem' }}>
+             <div style={{ flex: 1, minWidth: '120px' }}><div style={{ color: 'var(--text-3)', fontSize: '0.65rem' }}>VERDICT</div><StatusBadge verdict={scanResult.verdict} /></div>
+             <div style={{ flex: 1, minWidth: '120px' }}><div style={{ color: 'var(--text-3)', fontSize: '0.65rem' }}>RISK SCORE</div><strong style={{ color: scanResult.risk_score > 6 ? 'var(--rose)' : scanResult.risk_score > 3 ? 'var(--amber)' : 'var(--emerald)' }}>{scanResult.risk_score.toFixed(1)}/10</strong></div>
+             <div style={{ flex: 1, minWidth: '120px' }}><div style={{ color: 'var(--text-3)', fontSize: '0.65rem' }}>DETECTIONS</div><strong style={{ color: scanResult.threats_found_count > 0 ? 'var(--rose)' : 'var(--emerald)' }}>{scanResult.threats_found_count}</strong></div>
+             <div style={{ flex: 1, minWidth: '120px' }}><div style={{ color: 'var(--text-3)', fontSize: '0.65rem' }}>COVERAGE</div><strong style={{ color: 'var(--cyan)' }}>{scanResult.coverage_percentage ?? 100}%</strong></div>
+             <div style={{ flex: 1, minWidth: '120px' }}><div style={{ color: 'var(--text-3)', fontSize: '0.65rem' }}>SCAN TIME</div><strong style={{ color: 'var(--text-1)' }}>{scanResult.scan_duration_ms} ms</strong></div>
+          </div>
 
-          {/* AI Context Panel */}
-          <AiSummary datasetId={scanResult.dataset_id} />
+          {/* B. LOCAL DETECTION */}
+          <div className="card">
+            <div className="card-title">B. LOCAL DETECTION <span style={{fontSize: '0.7rem', color: 'var(--text-3)', fontWeight: 400}}>(Primary Authority)</span></div>
+            <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '1rem', fontSize: '0.85rem' }}>
+              <div>ClamAV: <strong style={{ color: 'var(--text-1)' }}>{scanResult.clamav_status}</strong> {scanResult.clamav_virus_name && <span style={{color: 'var(--rose)'}}>({scanResult.clamav_virus_name})</span>}</div>
+              <div>YARA: <strong style={{ color: 'var(--text-1)' }}>Enabled</strong></div>
+              <div>Heuristics: <strong style={{ color: 'var(--text-1)' }}>Active</strong></div>
+            </div>
+            <FindingsList findings={scanResult.findings} />
+          </div>
 
-          {/* Threat Intelligence Panel */}
+          {/* C. THREAT INTELLIGENCE */}
           <ThreatIntelligence tiReport={scanResult.threat_intel} />
 
-          {/* Remediation & Sanitize Card */}
+          {/* D. AI SECURITY */}
+          <AiSummary datasetId={scanResult.dataset_id} />
+
+          {/* E & F. REMEDIATION & VERIFICATION */}
           <RemediationCard datasetId={scanResult.dataset_id} scanResult={scanResult} />
         </div>
       )}
-
-      {uploadResult && (
+{uploadResult && (
         <div style={{ fontSize: '0.72rem', color: 'var(--text-3)', fontFamily: 'var(--mono)', textAlign: 'center', opacity: 0.6 }}>
           SHA-256: {uploadResult.sha256_hash}
         </div>
@@ -425,15 +372,17 @@ export default function App() {
 
   return (
     <>
-      <header className="header">
-        <div className="brand">
+      <header className="header" style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="brand" style={{ flexShrink: 0 }}>
           <div className="brand-shield">🛡️</div>
           <div>
             <div className="brand-name">Aegis Node</div>
             <div className="brand-sub">Dataset Threat Detection & Remediation</div>
           </div>
         </div>
-        <HealthStatus health={health} />
+        <div style={{ flex: '1 1 auto', overflowX: 'auto' }}>
+          <HealthStatus health={health} />
+        </div>
       </header>
 
       <main className="main">

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 600" style="background-color:#1e1e1e; font-family: sans-serif;">
+
+    <text x="500" y="50" fill="#fff" font-size="28" font-weight="bold" text-anchor="middle">AEGIS NODE ARCHITECTURE</text>
+<rect x="100" y="150" width="800" height="100" rx="10" fill="#2c3e50" stroke="#555" stroke-width="2"/>
+<text x="500.0" y="190.0" fill="#fff" font-size="20" font-weight="bold" text-anchor="middle" dominant-baseline="middle">UI FRONTEND</text>
+<text x="500.0" y="215.0" fill="#fff" font-size="20" font-weight="bold" text-anchor="middle" dominant-baseline="middle">Vercel React / Vite</text>
+
+    <defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#aaa"/></marker></defs>
+    <line x1="500" y1="250" x2="500" y2="300" stroke="#aaa" stroke-width="3" marker-end="url(#arrowhead)"/>
+    <rect x="100" y="300" width="800" height="100" rx="10" fill="#2c3e50" stroke="#555" stroke-width="2"/>
+<text x="500.0" y="340.0" fill="#fff" font-size="20" font-weight="bold" text-anchor="middle" dominant-baseline="middle">API BACKEND</text>
+<text x="500.0" y="365.0" fill="#fff" font-size="20" font-weight="bold" text-anchor="middle" dominant-baseline="middle">Render FastAPI</text>
+
+    <defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#aaa"/></marker></defs>
+    <line x1="500" y1="400" x2="500" y2="450" stroke="#aaa" stroke-width="3" marker-end="url(#arrowhead)"/>
+    <rect x="100" y="450" width="800" height="100" rx="10" fill="#8e44ad" stroke="#555" stroke-width="2"/>
+<text x="500.0" y="490.0" fill="#fff" font-size="20" font-weight="bold" text-anchor="middle" dominant-baseline="middle">SECURITY PIPELINE</text>
+<text x="500.0" y="515.0" fill="#fff" font-size="20" font-weight="bold" text-anchor="middle" dominant-baseline="middle">Deterministic & AI Layers</text>
+</svg>

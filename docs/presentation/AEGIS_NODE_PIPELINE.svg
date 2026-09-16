@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 600" style="background-color:#1e1e1e; font-family: sans-serif;">
+
+    <text x="500" y="50" fill="#fff" font-size="28" font-weight="bold" text-anchor="middle">END-TO-END SECURITY PIPELINE</text>
+<rect x="50" y="100" width="150" height="60" rx="10" fill="#2c3e50" stroke="#555" stroke-width="2"/>
+<text x="125.0" y="130.0" fill="#fff" font-size="16" font-weight="bold" text-anchor="middle" dominant-baseline="middle">Upload</text>
+
+    <defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#aaa"/></marker></defs>
+    <line x1="200" y1="130" x2="250" y2="130" stroke="#aaa" stroke-width="3" marker-end="url(#arrowhead)"/>
+    <rect x="250" y="100" width="150" height="60" rx="10" fill="#2c3e50" stroke="#555" stroke-width="2"/>
+<text x="325.0" y="130.0" fill="#fff" font-size="16" font-weight="bold" text-anchor="middle" dominant-baseline="middle">Validation</text>
+
+    <defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#aaa"/></marker></defs>
+    <line x1="400" y1="130" x2="450" y2="130" stroke="#aaa" stroke-width="3" marker-end="url(#arrowhead)"/>
+    <rect x="450" y="100" width="150" height="60" rx="10" fill="#2c3e50" stroke="#555" stroke-width="2"/>
+<text x="525.0" y="130.0" fill="#fff" font-size="16" font-weight="bold" text-anchor="middle" dominant-baseline="middle">SHA-256</text>
+
+    <defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#aaa"/></marker></defs>
+    <line x1="600" y1="130" x2="650" y2="130" stroke="#aaa" stroke-width="3" marker-end="url(#arrowhead)"/>
+    <rect x="650" y="100" width="300" height="60" rx="10" fill="#27ae60" stroke="#555" stroke-width="2"/>
+<text x="800.0" y="130.0" fill="#fff" font-size="16" font-weight="bold" text-anchor="middle" dominant-baseline="middle">ClamAV + YARA + Heuristics</text>
+
+    <defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#aaa"/></marker></defs>
+    <line x1="800" y1="160" x2="800" y2="200" stroke="#aaa" stroke-width="3" marker-end="url(#arrowhead)"/>
+    <rect x="650" y="200" width="300" height="60" rx="10" fill="#27ae60" stroke="#555" stroke-width="2"/>
+<text x="800.0" y="230.0" fill="#fff" font-size="16" font-weight="bold" text-anchor="middle" dominant-baseline="middle">Normalization</text>
+
+    <defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#aaa"/></marker></defs>
+    <line x1="650" y1="230" x2="600" y2="230" stroke="#aaa" stroke-width="3" marker-end="url(#arrowhead)"/>
+    <rect x="450" y="200" width="150" height="60" rx="10" fill="#2980b9" stroke="#555" stroke-width="2"/>
+<text x="525.0" y="230.0" fill="#fff" font-size="16" font-weight="bold" text-anchor="middle" dominant-baseline="middle">Threat Intel</text>
+
+    <defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#aaa"/></marker></defs>
+    <line x1="450" y1="230" x2="400" y2="230" stroke="#aaa" stroke-width="3" marker-end="url(#arrowhead)"/>
+    <rect x="250" y="200" width="150" height="60" rx="10" fill="#2980b9" stroke="#555" stroke-width="2"/>
+<text x="325.0" y="230.0" fill="#fff" font-size="16" font-weight="bold" text-anchor="middle" dominant-baseline="middle">TI Fusion</text>
+
+    <defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#aaa"/></marker></defs>
+    <line x1="250" y1="230" x2="200" y2="230" stroke="#aaa" stroke-width="3" marker-end="url(#arrowhead)"/>
+    <rect x="50" y="200" width="150" height="60" rx="10" fill="#8e44ad" stroke="#555" stroke-width="2"/>
+<text x="125.0" y="230.0" fill="#fff" font-size="16" font-weight="bold" text-anchor="middle" dominant-baseline="middle">AI Guardrail</text>
+
+    <defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#aaa"/></marker></defs>
+    <line x1="125" y1="260" x2="125" y2="300" stroke="#aaa" stroke-width="3" marker-end="url(#arrowhead)"/>
+    <rect x="50" y="300" width="150" height="60" rx="10" fill="#8e44ad" stroke="#555" stroke-width="2"/>
+<text x="125.0" y="330.0" fill="#fff" font-size="16" font-weight="bold" text-anchor="middle" dominant-baseline="middle">LLM Analysis</text>
+
+    <defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#aaa"/></marker></defs>
+    <line x1="200" y1="330" x2="250" y2="330" stroke="#aaa" stroke-width="3" marker-end="url(#arrowhead)"/>
+    <rect x="250" y="300" width="150" height="60" rx="10" fill="#d35400" stroke="#555" stroke-width="2"/>
+<text x="325.0" y="330.0" fill="#fff" font-size="16" font-weight="bold" text-anchor="middle" dominant-baseline="middle">Remediation</text>
+
+    <defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#aaa"/></marker></defs>
+    <line x1="400" y1="330" x2="450" y2="330" stroke="#aaa" stroke-width="3" marker-end="url(#arrowhead)"/>
+    <rect x="450" y="300" width="150" height="60" rx="10" fill="#d35400" stroke="#555" stroke-width="2"/>
+<text x="525.0" y="330.0" fill="#fff" font-size="16" font-weight="bold" text-anchor="middle" dominant-baseline="middle">Re-Scan</text>
+
+    <defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#aaa"/></marker></defs>
+    <line x1="600" y1="330" x2="650" y2="330" stroke="#aaa" stroke-width="3" marker-end="url(#arrowhead)"/>
+    <rect x="650" y="300" width="150" height="60" rx="10" fill="#d35400" stroke="#555" stroke-width="2"/>
+<text x="725.0" y="330.0" fill="#fff" font-size="16" font-weight="bold" text-anchor="middle" dominant-baseline="middle">Verification</text>
+<rect x="40" y="80" width="920" height="300" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="10,10"/><text x="500" y="420" fill="#fff" font-size="20">The system does not trust any single layer.</text><rect x="250" y="480" width="20" height="20" fill="#27ae60"/><text x="280" y="495" fill="#fff" font-size="16">Deterministic</text><rect x="450" y="480" width="20" height="20" fill="#2980b9"/><text x="480" y="495" fill="#fff" font-size="16">External TI</text><rect x="650" y="480" width="20" height="20" fill="#8e44ad"/><text x="680" y="495" fill="#fff" font-size="16">AI Controls</text></svg>

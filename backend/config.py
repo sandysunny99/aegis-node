@@ -66,7 +66,7 @@ class Settings(BaseSettings):
 
     # ─── AI Provider ─────────────────────────────────────────────────────────
     # Primary AI provider: gemini | groq | xai | ollama | none
-    ai_provider: str = "gemini"
+    ai_provider: str = "groq"
 
     # ─── AI Fallback Chain ────────────────────────────────────────────────────
     # DEFAULT CHAIN: AI_PROVIDER=gemini → AI_FALLBACK_CHAIN=cloudflare → optional: ollama

@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 600" style="background-color:#1e1e1e; font-family: sans-serif;">
+
+    <text x="500" y="50" fill="#fff" font-size="28" font-weight="bold" text-anchor="middle">TI EVIDENCE FUSION</text>
+<rect x="400" y="100" width="200" height="60" rx="10" fill="#2c3e50" stroke="#555" stroke-width="2"/>
+<text x="500.0" y="130.0" fill="#fff" font-size="20" font-weight="bold" text-anchor="middle" dominant-baseline="middle">Dataset Indicators</text>
+
+    <defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#aaa"/></marker></defs>
+    <line x1="450" y1="160" x2="300" y2="220" stroke="#aaa" stroke-width="3" marker-end="url(#arrowhead)"/>
+    
+    <defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#aaa"/></marker></defs>
+    <line x1="550" y1="160" x2="700" y2="220" stroke="#aaa" stroke-width="3" marker-end="url(#arrowhead)"/>
+    <rect x="200" y="220" width="200" height="60" rx="10" fill="#2980b9" stroke="#555" stroke-width="2"/>
+<text x="300.0" y="240.0" fill="#fff" font-size="20" font-weight="bold" text-anchor="middle" dominant-baseline="middle">URLhaus</text>
+<text x="300.0" y="265.0" fill="#fff" font-size="20" font-weight="bold" text-anchor="middle" dominant-baseline="middle">Lookup-only</text>
+<rect x="600" y="220" width="200" height="60" rx="10" fill="#2980b9" stroke="#555" stroke-width="2"/>
+<text x="700.0" y="240.0" fill="#fff" font-size="20" font-weight="bold" text-anchor="middle" dominant-baseline="middle">AbuseIPDB</text>
+<text x="700.0" y="265.0" fill="#fff" font-size="20" font-weight="bold" text-anchor="middle" dominant-baseline="middle">Lookup-only</text>
+
+    <defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#aaa"/></marker></defs>
+    <line x1="300" y1="280" x2="450" y2="340" stroke="#aaa" stroke-width="3" marker-end="url(#arrowhead)"/>
+    
+    <defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#aaa"/></marker></defs>
+    <line x1="700" y1="280" x2="550" y2="340" stroke="#aaa" stroke-width="3" marker-end="url(#arrowhead)"/>
+    <rect x="400" y="340" width="200" height="80" rx="10" fill="#d35400" stroke="#555" stroke-width="2"/>
+<text x="500.0" y="380.0" fill="#fff" font-size="20" font-weight="bold" text-anchor="middle" dominant-baseline="middle">TI Fusion Engine</text>
+
+    <defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#aaa"/></marker></defs>
+    <line x1="500" y1="420" x2="500" y2="480" stroke="#aaa" stroke-width="3" marker-end="url(#arrowhead)"/>
+    <rect x="300" y="480" width="400" height="80" rx="10" fill="#c0392b" stroke="#555" stroke-width="2"/>
+<text x="500.0" y="510.0" fill="#fff" font-size="20" font-weight="bold" text-anchor="middle" dominant-baseline="middle">Corroborated / Conflicted</text>
+<text x="500.0" y="535.0" fill="#fff" font-size="20" font-weight="bold" text-anchor="middle" dominant-baseline="middle">External reputation does NOT override local verdict</text>
+</svg>
