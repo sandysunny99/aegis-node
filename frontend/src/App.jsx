@@ -331,7 +331,7 @@ function ScanPage({ health }) {
 
           {/* B. LOCAL DETECTION */}
           <div className="card">
-            <div className="card-title">B. LOCAL DETECTION <span style={{fontSize: '0.7rem', color: 'var(--text-3)', fontWeight: 400}}>(Primary Authority)</span></div>
+            <div className="card-title">LOCAL DETECTION <span style={{fontSize: '0.7rem', color: 'var(--text-3)', fontWeight: 400}}>(Primary Authority)</span></div>
             <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '1rem', fontSize: '0.85rem' }}>
               <div>ClamAV: <strong style={{ color: 'var(--text-1)' }}>{scanResult.clamav_status}</strong> {scanResult.clamav_virus_name && <span style={{color: 'var(--rose)'}}>({scanResult.clamav_virus_name})</span>}</div>
               <div>YARA: <strong style={{ color: 'var(--text-1)' }}>Enabled</strong></div>

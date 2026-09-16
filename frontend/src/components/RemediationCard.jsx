@@ -60,11 +60,11 @@ export default function RemediationCard({ datasetId, scanResult }) {
         marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem',
       }}>
         <div>
-          <div style={{ fontWeight: 600, color: 'var(--text-1)', marginBottom: '0.25rem' }}>
-            🛠️ Risk-Based Remediation
-          </div>
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-3)' }}>
-            Neutralizes threats in-place while preserving dataset schema and structure.
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div className="card-title" style={{ marginBottom: '0.2rem' }}>REMEDIATION & VERIFICATION</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-3)' }}>Neutralizes threats in-place while preserving dataset schema and structure.</div>
+            </div>
           </div>
         </div>
         {state === 'idle' && (

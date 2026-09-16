@@ -31,7 +31,7 @@ export default function AiSummary({ datasetId }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <div className="card-title" style={{ marginBottom: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{ color: 'var(--blue)' }}>🛡️</span> D. AI SECURITY & ANALYSIS
+            <span style={{ color: 'var(--blue)' }}>🛡️</span> AI SECURITY & ANALYSIS
           </div>
           <div style={{ fontSize: '0.7rem', color: 'var(--text-3)' }}>LLM Analysis protected by native Guardrails.</div>
         </div>

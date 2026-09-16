@@ -9,7 +9,7 @@ export default function ThreatIntelligence({ tiReport }) {
     <div className="card">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <div className="card-title" style={{ marginBottom: '0.2rem' }}>C. THREAT INTELLIGENCE</div>
+          <div className="card-title" style={{ marginBottom: '0.2rem' }}>THREAT INTELLIGENCE</div>
           <div style={{ fontSize: '0.7rem', color: 'var(--text-3)' }}>External Enrichment (Non-Authoritative)</div>
         </div>
         <button className="btn btn-ghost" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => setCollapsed(!collapsed)}>
