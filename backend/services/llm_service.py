@@ -546,16 +546,10 @@ def _call_provider(
             res = _unavailable_result(provider_name, err_msg)
             res.status = "unavailable"
             
-            # If there's a retry_after, we enforce the bounded delay here 
-            # before falling back, OR we just log it and fallback immediately? 
-            # The prompt says: "bounded retry/fallback decision -> next configured provider"
-            # It also says: "Retry-After must inform the existing bounded mechanism rather than replacing it."
-            # and "Do not automatically sleep inside the parser."
-            # We will sleep in the orchestrator if a delay is prescribed.
+            # Note: We do NOT sleep here. Aegis cascades to a different fallback provider,
+            # so we transition immediately without blocking the HTTP request thread.
             if classification.retry_after_seconds:
-                import time
-                logger.info(f"Respecting Retry-After bounded delay of {classification.retry_after_seconds}s before next step.")
-                time.sleep(classification.retry_after_seconds)
+                logger.info(f"Provider requested Retry-After delay of {classification.retry_after_seconds}s. Falling back to next provider immediately.")
                 
             return res
         else:

@@ -33,3 +33,8 @@ The A-F research baseline remains completely frozen. The datasets, scoring algor
 
 ## Conclusion
 The selective adaptation of error-classification and Retry-After parsing concepts was successfully implemented in Python. The frozen baseline `fdad586` architectural authority remains identical.
+
+
+## Corrective Update: Non-Blocking Fallback
+
+Retry-After is parsed and bounded as provider metadata, but is not used as a synchronous sleep in the FastAPI request path. The fallback transitions immediately, maintaining the existing bounded attempt/time limits.

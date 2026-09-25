@@ -328,3 +328,25 @@ class TestAnalyseFallbackChain:
 
         assert result.status == "completed"
         assert mock_call.call_count == 2
+def test_fallback_does_not_sleep_on_retry_after(monkeypatch):
+    import httpx
+    import time
+    from unittest.mock import MagicMock
+    from services.llm_service import _call_provider
+
+    class MockResponse:
+        status_code = 429
+        headers = {'retry-after': '60'}
+
+    def mock_gemini(*args, **kwargs):
+        raise httpx.HTTPStatusError('429 Too Many Requests', request=MagicMock(), response=MockResponse())
+
+    monkeypatch.setattr('services.llm_service._call_gemini', mock_gemini)
+
+    sleep_mock = MagicMock()
+    monkeypatch.setattr(time, 'sleep', sleep_mock)
+
+    res = _call_provider('gemini', {}, 'csv', 'some prompt')
+
+    assert res.status == 'unavailable'
+    sleep_mock.assert_not_called()

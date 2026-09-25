@@ -49,3 +49,15 @@ Selective adaptation of error-classification and Retry-After parsing concepts fr
 
 ## 8. Remaining Limitations
 - Aegis Node remains stateless. If a provider throws a 429 Rate Limit, we sleep for the `Retry-After` duration during that specific request, but subsequent simultaneous API requests will still hit the provider until they independently fail and wait. (This is intentional to avoid needing Redis/state).
+
+
+## Update: Non-Blocking Retry-After
+
+Retry-After is parsed and bounded as provider metadata, but is not used as a synchronous sleep in the FastAPI request path.
+
+The fallback model is now strictly:
+1. retryable failure
+2. classify
+3. record Retry-After
+4. immediate fallback
+5. bounded existing attempt/time policy
