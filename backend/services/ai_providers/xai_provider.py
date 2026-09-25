@@ -45,8 +45,8 @@ def call_xai(
     last_error_msg: str | None = None
 
     with httpx.Client(timeout=timeout) as client:
+        last_exc = None
         for m in models_to_try:
-            # Try with and without json_object response format
             payload = {
                 "model": m,
                 "messages": [
@@ -70,21 +70,15 @@ def call_xai(
                 return text, None
             except httpx.HTTPStatusError as e:
                 status_code = e.response.status_code
-                err_body = e.response.text[:250]
-                last_error_msg = f"xAI returned HTTP {status_code}: {err_body}"
-                logger.warning(
-                    "xAI API HTTP error with model %s: status=%s body=%s",
-                    m,
-                    status_code,
-                    err_body,
-                )
-                if status_code in (401, 403):
-                    last_error_msg = f"xAI authentication error (HTTP {status_code}) — check XAI_API_KEY validity at console.x.ai"
-                    break
-                if status_code == 429:
-                    last_error_msg = f"xAI rate limit / quota exceeded (HTTP 429) — check credits at console.x.ai"
+                last_exc = e
+                logger.warning("xAI API HTTP error with model %s: status=%s", m, status_code)
+                if status_code in (401, 403, 429):
+                    raise last_exc
             except Exception as e:  # noqa: BLE001
-                last_error_msg = f"xAI connection error: {e}"
+                last_exc = e
                 logger.warning("xAI API call error with model %s: %s", m, e)
 
-    return None, last_error_msg
+        if last_exc:
+            raise last_exc
+
+    return None, "xAI models exhausted"

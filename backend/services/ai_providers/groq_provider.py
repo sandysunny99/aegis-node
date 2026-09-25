@@ -50,18 +50,11 @@ def call_groq(
         "response_format": {"type": "json_object"},
     }
 
-    try:
-        with httpx.Client(timeout=timeout) as client:
-            resp = client.post(url, headers=headers, json=payload)
-            resp.raise_for_status()
-            data = resp.json()
-            text = data["choices"][0]["message"]["content"]
-            logger.info("Groq API call successful — model=%s tokens=%s",
-                        model, data.get("usage", {}).get("total_tokens", "?"))
-            return text
-    except httpx.HTTPStatusError as e:
-        logger.error("Groq API HTTP error: %s %s", e.response.status_code, e.response.text[:200])
-        return None
-    except Exception as e:  # noqa: BLE001
-        logger.error("Groq API call failed: %s", e)
-        return None
+    with httpx.Client(timeout=timeout) as client:
+        resp = client.post(url, headers=headers, json=payload)
+        resp.raise_for_status()
+        data = resp.json()
+        text = data["choices"][0]["message"]["content"]
+        logger.info("Groq API call successful — model=%s tokens=%s",
+                    model, data.get("usage", {}).get("total_tokens", "?"))
+        return text

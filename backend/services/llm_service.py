@@ -513,22 +513,56 @@ def _call_provider(
     """
     Dispatch a single provider call. Returns LlmAnalysisResult (never raises).
     """
-    if provider_name == "gemini":
-        api_key = _get_provider_key("gemini", is_fallback)
-        return _call_gemini(system_prompt, user_prompt, api_key=api_key)
-    if provider_name == "groq":
-        api_key = _get_provider_key("groq", is_fallback)
-        return _call_groq(system_prompt, user_prompt, api_key=api_key)
-    if provider_name == "xai":
-        api_key = _get_provider_key("xai", is_fallback)
-        return _call_xai(system_prompt, user_prompt, api_key=api_key)
-    if provider_name == "cloudflare":
-        api_token = _get_provider_key("cloudflare", is_fallback)
-        return _call_cloudflare(system_prompt, user_prompt, api_token=api_token)
-    if provider_name == "ollama":
-        return _call_ollama(system_prompt, user_prompt)
-    logger.warning("Unknown provider name %r — skipping", provider_name)
-    return _unavailable_result(provider_name, f"Unknown provider: {provider_name!r}")
+    from services.llm_error_classifier import classify_error
+    try:
+        if provider_name == "gemini":
+            api_key = _get_provider_key("gemini", is_fallback)
+            return _call_gemini(system_prompt, user_prompt, api_key=api_key)
+        if provider_name == "groq":
+            api_key = _get_provider_key("groq", is_fallback)
+            return _call_groq(system_prompt, user_prompt, api_key=api_key)
+        if provider_name == "xai":
+            api_key = _get_provider_key("xai", is_fallback)
+            return _call_xai(system_prompt, user_prompt, api_key=api_key)
+        if provider_name == "cloudflare":
+            api_token = _get_provider_key("cloudflare", is_fallback)
+            return _call_cloudflare(system_prompt, user_prompt, api_token=api_token)
+        if provider_name == "ollama":
+            return _call_ollama(system_prompt, user_prompt)
+            
+        logger.warning("Unknown provider name %r — skipping", provider_name)
+        return _unavailable_result(provider_name, f"Unknown provider: {provider_name!r}")
+        
+    except Exception as exc:
+        classification = classify_error(exc, provider=provider_name)
+        
+        err_msg = f"Provider {provider_name} {classification.category.value}"
+        if classification.retry_after_seconds is not None:
+            err_msg += f" (Retry-After: {classification.retry_after_seconds}s)"
+            
+        if classification.fallback_eligible:
+            logger.info("Soft error eligible for fallback: %s", err_msg)
+            # Use 'unavailable' to trigger the loop's soft failure fallback
+            res = _unavailable_result(provider_name, err_msg)
+            res.status = "unavailable"
+            
+            # If there's a retry_after, we enforce the bounded delay here 
+            # before falling back, OR we just log it and fallback immediately? 
+            # The prompt says: "bounded retry/fallback decision -> next configured provider"
+            # It also says: "Retry-After must inform the existing bounded mechanism rather than replacing it."
+            # and "Do not automatically sleep inside the parser."
+            # We will sleep in the orchestrator if a delay is prescribed.
+            if classification.retry_after_seconds:
+                import time
+                logger.info(f"Respecting Retry-After bounded delay of {classification.retry_after_seconds}s before next step.")
+                time.sleep(classification.retry_after_seconds)
+                
+            return res
+        else:
+            logger.error("Hard error halting fallback: %s", err_msg)
+            res = _failed_result(provider_name, err_msg)
+            res.status = "hard_failed" # Not in soft-failure list, will halt loop
+            return res
 
 
 # ─── Provider Implementations ─────────────────────────────────────────────────
@@ -599,14 +633,15 @@ def _call_gemini(
             )
         except Exception as exc:  # noqa: BLE001
             last_error = exc
+            logger.warning("Gemini model %s failed: %s", current_model, exc)
+            # Bubble up rate limit exceptions immediately
             exc_str = str(exc).lower()
             if "429" in exc_str or "quota" in exc_str or "resource_exhausted" in exc_str:
-                logger.warning("Gemini rate limit hit: %s", exc)
-                return _unavailable_result(current_model, "Gemini API quota/rate limit reached — trying next provider.")
-            logger.warning("Gemini model %s failed: %s", current_model, exc)
+                raise exc
 
-    logger.error("Gemini call failed on all models: %s", last_error)
-    return _failed_result(model_name, f"Gemini API error: {last_error}")
+    if last_error:
+        raise last_error
+    return _failed_result(model_name, "Gemini models exhausted")
 
 
 def _call_xai(
@@ -621,40 +656,33 @@ def _call_xai(
     if not api_key:
         return _unavailable_result(model_name, "XAI_API_KEY not configured")
 
-    try:
-        from services.ai_providers.xai_provider import call_xai
-        raw_text, err_msg = call_xai(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            api_key=api_key,
-            model=model_name,
-            timeout=settings.xai_timeout_seconds,
+    from services.ai_providers.xai_provider import call_xai
+    raw_text, err_msg = call_xai(
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        api_key=api_key,
+        model=model_name,
+        timeout=settings.xai_timeout_seconds,
+    )
+    if not raw_text:
+        return _failed_result(
+            model_name,
+            err_msg or "xAI API returned empty response — check API key validity/quota at console.x.ai",
         )
-        if not raw_text:
-            return _failed_result(
-                model_name,
-                err_msg or "xAI API returned empty response — check API key validity/quota at console.x.ai",
-            )
 
-        parsed = _validate_and_parse(raw_text)
-        if not parsed:
-            return _failed_result(model_name, "Failed to parse xAI/Grok response as structured JSON")
+    parsed = _validate_and_parse(raw_text)
+    if not parsed:
+        return _failed_result(model_name, "Failed to parse xAI/Grok response as structured JSON")
 
-        logger.info("xAI Grok analysis complete — model=%s verdict=%s", model_name, parsed.verdict)
-        return LlmAnalysisResult(
-            status="completed", model_name=f"xai/{model_name}",
-            verdict=parsed.verdict, severity=parsed.severity,
-            confidence=round(parsed.confidence, 2), summary=parsed.summary,
-            evidence=parsed.evidence, recommendations=parsed.recommendations,
-            limitations=parsed.limitations,
-        )
-    except Exception as exc:  # noqa: BLE001
-        exc_str = str(exc).lower()
-        if "429" in exc_str or "quota" in exc_str or "rate" in exc_str:
-            logger.warning("xAI rate limit hit: %s", exc)
-            return _unavailable_result(model_name, "xAI API rate limit exceeded — trying next provider.")
-        logger.error("xAI call failed: %s", exc)
-        return _failed_result(model_name, f"xAI API error: {exc}")
+    logger.info("xAI Grok analysis complete — model=%s verdict=%s", model_name, parsed.verdict)
+    return LlmAnalysisResult(
+        status="completed", model_name=f"xai/{model_name}",
+        verdict=parsed.verdict, severity=parsed.severity,
+        confidence=round(parsed.confidence, 2), summary=parsed.summary,
+        evidence=parsed.evidence, recommendations=parsed.recommendations,
+        limitations=parsed.limitations,
+    )
+
 
 
 def _call_groq(
@@ -669,37 +697,29 @@ def _call_groq(
     if not api_key:
         return _unavailable_result(model_name, "GROQ_API_KEY not configured")
 
-    try:
-        from services.ai_providers.groq_provider import call_groq
-        raw_text = call_groq(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            api_key=api_key,
-            model=model_name,
-            timeout=settings.groq_timeout_seconds,
-        )
-        if not raw_text:
-            return _failed_result(model_name, "Groq API returned empty response")
+    from services.ai_providers.groq_provider import call_groq
+    raw_text = call_groq(
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        api_key=api_key,
+        model=model_name,
+        timeout=settings.groq_timeout_seconds,
+    )
+    if not raw_text:
+        return _failed_result(model_name, "Groq API returned empty response")
 
-        parsed = _validate_and_parse(raw_text)
-        if not parsed:
-            return _failed_result(model_name, "Failed to parse Groq response as structured JSON")
+    parsed = _validate_and_parse(raw_text)
+    if not parsed:
+        return _failed_result(model_name, "Failed to parse Groq response as structured JSON")
 
-        logger.info("Groq analysis complete — model=%s verdict=%s", model_name, parsed.verdict)
-        return LlmAnalysisResult(
-            status="completed", model_name=f"groq/{model_name}",
-            verdict=parsed.verdict, severity=parsed.severity,
-            confidence=round(parsed.confidence, 2), summary=parsed.summary,
-            evidence=parsed.evidence, recommendations=parsed.recommendations,
-            limitations=parsed.limitations,
-        )
-    except Exception as exc:  # noqa: BLE001
-        exc_str = str(exc).lower()
-        if "429" in exc_str or "quota" in exc_str or "rate" in exc_str:
-            logger.warning("Groq rate limit hit: %s", exc)
-            return _unavailable_result(model_name, "Groq API rate limit exceeded — AI temporarily unavailable. Try again in a moment.")
-        logger.error("Groq call failed: %s", exc)
-        return _failed_result(model_name, "Groq API error")
+    logger.info("Groq analysis complete — model=%s verdict=%s", model_name, parsed.verdict)
+    return LlmAnalysisResult(
+        status="completed", model_name=f"groq/{model_name}",
+        verdict=parsed.verdict, severity=parsed.severity,
+        confidence=round(parsed.confidence, 2), summary=parsed.summary,
+        evidence=parsed.evidence, recommendations=parsed.recommendations,
+        limitations=parsed.limitations,
+    )
 
 
 def _call_cloudflare(
@@ -716,88 +736,73 @@ def _call_cloudflare(
     if not api_token or not account_id:
         return _unavailable_result(model_name, "CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID not configured")
 
-    try:
-        from services.ai_providers.cloudflare_provider import call_cloudflare
-        raw_text, err_msg = call_cloudflare(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            api_token=api_token,
-            account_id=account_id,
-            model=model_name,
-            timeout=settings.cloudflare_timeout_seconds,
-        )
-        if not raw_text:
-            err_str = (err_msg or "").lower()
-            status = "failed"
-            if "401" in err_str or "403" in err_str or "authentication failed" in err_str:
-                status = "unauthorized"
-            elif "429" in err_str or "quota" in err_str or "rate limit" in err_str:
-                status = "quota_exhausted"
-            elif "timeout" in err_str:
-                status = "timeout"
-            elif "connection" in err_str:
-                status = "unavailable"
+    from services.ai_providers.cloudflare_provider import call_cloudflare
+    raw_text, err_msg = call_cloudflare(
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        api_token=api_token,
+        account_id=account_id,
+        model=model_name,
+        timeout=settings.cloudflare_timeout_seconds,
+    )
+    if not raw_text:
+        err_str = (err_msg or "").lower()
+        status = "failed"
+        if "401" in err_str or "403" in err_str or "authentication failed" in err_str:
+            status = "unauthorized"
+        elif "429" in err_str or "quota" in err_str or "rate limit" in err_str:
+            status = "quota_exhausted"
+        elif "timeout" in err_str:
+            status = "timeout"
+        elif "connection" in err_str:
+            status = "unavailable"
 
-            res = _failed_result(model_name, err_msg or "Cloudflare Workers AI returned empty response")
-            res.status = status
-            return res
-
-        parsed = _validate_and_parse(raw_text)
-        if not parsed:
-            res = _failed_result(model_name, "Failed to parse Cloudflare Workers AI response as structured JSON")
-            res.status = "invalid_response"
-            return res
-
-        logger.info("Cloudflare Workers AI analysis complete — model=%s verdict=%s", model_name, parsed.verdict)
-        return LlmAnalysisResult(
-            status="completed", model_name=f"cloudflare/{model_name}",
-            verdict=parsed.verdict, severity=parsed.severity,
-            confidence=round(parsed.confidence, 2), summary=parsed.summary,
-            evidence=parsed.evidence, recommendations=parsed.recommendations,
-            limitations=parsed.limitations,
-        )
-    except Exception as exc:  # noqa: BLE001
-        logger.error("Cloudflare call failed: %s", exc)
-        res = _failed_result(model_name, f"Cloudflare API error: {exc}")
-        if "timeout" in str(exc).lower():
-            res.status = "timeout"
+        res = _failed_result(model_name, err_msg or "Cloudflare Workers AI returned empty response")
+        res.status = status
         return res
+
+    parsed = _validate_and_parse(raw_text)
+    if not parsed:
+        res = _failed_result(model_name, "Failed to parse Cloudflare Workers AI response as structured JSON")
+        res.status = "invalid_response"
+        return res
+
+    logger.info("Cloudflare Workers AI analysis complete — model=%s verdict=%s", model_name, parsed.verdict)
+    return LlmAnalysisResult(
+        status="completed", model_name=f"cloudflare/{model_name}",
+        verdict=parsed.verdict, severity=parsed.severity,
+        confidence=round(parsed.confidence, 2), summary=parsed.summary,
+        evidence=parsed.evidence, recommendations=parsed.recommendations,
+        limitations=parsed.limitations,
+    )
+
 
 
 def _call_ollama(system_prompt: str, user_prompt: str) -> LlmAnalysisResult:
     model_name = settings.ollama_model or "llama3.1"
     base_url = settings.ollama_base_url or "http://localhost:11434"
 
-    try:
-        from services.ai_providers.ollama_provider import call_ollama
-        raw_text = call_ollama(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            base_url=base_url,
-            model=model_name,
-            timeout=settings.ollama_timeout_seconds,
-        )
-        if not raw_text:
-            return _unavailable_result(f"ollama/{model_name}", "Ollama not reachable or returned empty response")
+    from services.ai_providers.ollama_provider import call_ollama
+    raw_text = call_ollama(
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        base_url=base_url,
+        model=model_name,
+        timeout=settings.ollama_timeout_seconds,
+    )
+    if not raw_text:
+        return _unavailable_result(f"ollama/{model_name}", "Ollama not reachable or returned empty response")
 
-        parsed = _validate_and_parse(raw_text)
-        if not parsed:
-            return _failed_result(f"ollama/{model_name}", "Failed to parse Ollama response as structured JSON")
+    parsed = _validate_and_parse(raw_text)
+    if not parsed:
+        return _failed_result(f"ollama/{model_name}", "Failed to parse Ollama response as structured JSON")
 
-        logger.info("Ollama analysis complete — model=%s verdict=%s", model_name, parsed.verdict)
-        return LlmAnalysisResult(
-            status="completed", model_name=f"ollama/{model_name}",
-            verdict=parsed.verdict, severity=parsed.severity,
-            confidence=round(parsed.confidence, 2), summary=parsed.summary,
-            evidence=parsed.evidence, recommendations=parsed.recommendations,
-            limitations=parsed.limitations,
-        )
-    except Exception as exc:  # noqa: BLE001
-        exc_str = str(exc).lower()
-        if "429" in exc_str or "quota" in exc_str or "rate" in exc_str:
-            logger.warning("Ollama rate limit hit: %s", exc)
-            return _unavailable_result(f"ollama/{model_name}", "Ollama rate limit exceeded — AI temporarily unavailable.")
-        if "connect" in exc_str or "refused" in exc_str or "timeout" in exc_str:
-            return _unavailable_result(f"ollama/{model_name}", "Ollama not reachable — is it running on the configured host?")
-        logger.error("Ollama call failed: %s", exc)
-        return _failed_result(f"ollama/{model_name}", "Ollama API error")
+    logger.info("Ollama analysis complete — model=%s verdict=%s", model_name, parsed.verdict)
+    return LlmAnalysisResult(
+        status="completed", model_name=f"ollama/{model_name}",
+        verdict=parsed.verdict, severity=parsed.severity,
+        confidence=round(parsed.confidence, 2), summary=parsed.summary,
+        evidence=parsed.evidence, recommendations=parsed.recommendations,
+        limitations=parsed.limitations,
+    )
+

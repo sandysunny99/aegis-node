@@ -61,43 +61,20 @@ def call_cloudflare(
         "max_tokens": 1024,
     }
 
-    try:
-        with httpx.Client(timeout=timeout) as client:
-            resp = client.post(url, headers=headers, json=payload)
-            resp.raise_for_status()
-            data = resp.json()
+    with httpx.Client(timeout=timeout) as client:
+        resp = client.post(url, headers=headers, json=payload)
+        resp.raise_for_status()
+        data = resp.json()
 
-            # Cloudflare Workers AI returns {"result": {"response": "..."}, "success": true}
-            if data.get("success"):
-                result = data.get("result", {})
-                raw_text = result.get("response") or ""
-                logger.info(
-                    "Cloudflare Workers AI call successful — model=%s",
-                    model_name,
-                )
-                return raw_text, None
+        if data.get("success"):
+            result = data.get("result", {})
+            raw_text = result.get("response") or ""
+            logger.info(
+                "Cloudflare Workers AI call successful — model=%s",
+                model_name,
+            )
+            return raw_text, None
 
-            errors = data.get("errors", [])
-            err_msg = json.dumps(errors) if errors else "Cloudflare Workers AI returned success=false"
-            return None, f"Cloudflare Workers AI error: {err_msg}"
-
-    except httpx.HTTPStatusError as e:
-        status_code = e.response.status_code
-        err_body = e.response.text[:250]
-        if status_code in (401, 403):
-            err_msg = f"Cloudflare API authentication failed (HTTP {status_code}) — check CLOUDFLARE_API_TOKEN"
-        elif status_code == 429:
-            err_msg = f"Cloudflare Workers AI rate limit / neuron quota reached (HTTP 429)"
-        else:
-            err_msg = f"Cloudflare Workers AI returned HTTP {status_code}: {err_body}"
-
-        logger.warning(
-            "Cloudflare Workers AI HTTP error: status=%s body=%s",
-            status_code,
-            err_body,
-        )
-        return None, err_msg
-
-    except Exception as e:  # noqa: BLE001
-        logger.warning("Cloudflare Workers AI connection error: %s", e)
-        return None, f"Cloudflare connection error: {e}"
+        errors = data.get("errors", [])
+        err_msg = json.dumps(errors) if errors else "Cloudflare Workers AI returned success=false"
+        return None, f"Cloudflare Workers AI error: {err_msg}"

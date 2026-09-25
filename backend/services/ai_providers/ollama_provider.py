@@ -27,12 +27,8 @@ def call_ollama(
     Returns None on error or if Ollama is not running.
     """
     # First check if Ollama is reachable
-    try:
-        with httpx.Client(timeout=5) as check_client:
-            check_client.get(f"{base_url}/api/tags")
-    except Exception:
-        logger.warning("Ollama is not reachable at %s — skipping local AI.", base_url)
-        return None
+    with httpx.Client(timeout=5) as check_client:
+        check_client.get(f"{base_url}/api/tags")
 
     url = f"{base_url}/api/chat"
     payload = {
@@ -49,17 +45,10 @@ def call_ollama(
         },
     }
 
-    try:
-        with httpx.Client(timeout=timeout) as client:
-            resp = client.post(url, json=payload)
-            resp.raise_for_status()
-            data = resp.json()
-            text = data.get("message", {}).get("content", "")
-            logger.info("Ollama call successful — model=%s", model)
-            return text
-    except httpx.HTTPStatusError as e:
-        logger.error("Ollama HTTP error: %s %s", e.response.status_code, e.response.text[:200])
-        return None
-    except Exception as e:  # noqa: BLE001
-        logger.error("Ollama call failed: %s", e)
-        return None
+    with httpx.Client(timeout=timeout) as client:
+        resp = client.post(url, json=payload)
+        resp.raise_for_status()
+        data = resp.json()
+        text = data.get("message", {}).get("content", "")
+        logger.info("Ollama call successful — model=%s", model)
+        return text
