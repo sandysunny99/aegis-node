@@ -111,13 +111,25 @@ async def health(request: Request) -> dict:
 
     # AI availability check
     ai_provider = settings.ai_provider.strip().lower()
-    ai_configured = (
-        (ai_provider == "gemini" and bool(settings.gemini_api_key.strip()))
-        or (ai_provider == "groq" and bool(settings.groq_api_key.strip()))
-        or (ai_provider == "xai" and bool(settings.xai_api_key.strip()))
-        or (ai_provider == "cloudflare" and bool(settings.cloudflare_api_token.strip()))
-        or (ai_provider == "ollama")
-    )
+    
+    def _is_configured(provider):
+        p = provider.strip().lower()
+        if p == "gemini": return bool(settings.gemini_api_key.strip())
+        if p == "groq": return bool(settings.groq_api_key.strip())
+        if p == "xai": return bool(settings.xai_api_key.strip())
+        if p == "cloudflare": return bool(settings.cloudflare_api_token.strip())
+        if p == "nvidia": return bool(settings.nvidia_api_key.strip())
+        if p == "huggingface": return bool(settings.hf_token.strip())
+        if p == "freellmapi": return bool(settings.freellmapi_enabled) and bool(settings.freellmapi_api_key.strip())
+        if p == "ollama": return True
+        return False
+
+    ai_configured = _is_configured(ai_provider)
+    
+    ai_fallback_chain = [
+        p.strip().lower() for p in (settings.ai_fallback_chain or "").split(",") 
+        if p.strip()
+    ]
 
     turnstile_enabled = bool(settings.cloudflare_turnstile_site_key.strip() and settings.cloudflare_turnstile_secret_key.strip())
 
@@ -128,7 +140,8 @@ async def health(request: Request) -> dict:
         "clamav_mock": clamav_mock,
         "clamav_mock_mode": clamav_mock,
         "ai_configured": ai_configured,
-        "ai_provider": settings.ai_provider,
+        "ai_provider": ai_provider,
+        "ai_fallback_chain": ai_fallback_chain,
         "turnstile_enabled": turnstile_enabled,
         "turnstile_site_key": settings.cloudflare_turnstile_site_key if turnstile_enabled else "",
         "max_file_size_mb": settings.max_upload_size_mb,

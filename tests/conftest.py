@@ -14,44 +14,26 @@ import pytest
 
 
 # ---------------------------------------------------------------------------
-# Rate-limit reset
+# Disable Rate Limits
 # ---------------------------------------------------------------------------
-# All integration test files share one Python process and (in most cases)
-# the same `main.app` instance.  SlowAPI's InMemoryStrategy accumulates
-# counts across tests, so the 10/min upload limit is exhausted by the time
-# later test files run.  We reset every limiter instance we can find before
-# each test so each test starts with a clean slate.
+# SlowAPI rate limits carry over between tests in a single pytest run and
+# can easily exhaust limits (e.g. 10/min upload limits) when tests are
+# executed rapidly. We globally disable rate limiting for tests.
 
-def _reset_all_limiters():
-    """Reset SlowAPI limiter(s) reachable via any known import path."""
-    for mod_name in ("main", "backend.main"):
-        try:
-            import importlib
-            mod = sys.modules.get(mod_name) or importlib.import_module(mod_name)
-            lim = getattr(mod, "limiter", None)
-            if lim is not None:
-                # SlowAPI Limiter exposes reset() which clears InMemoryStrategy
-                lim.reset()
-        except Exception:  # noqa: BLE001
-            pass
-
-    # Also clear any Limiter instances created in router modules
-    for mod_name in list(sys.modules.keys()):
-        if "analysis" in mod_name or "datasets" in mod_name:
-            try:
-                mod = sys.modules[mod_name]
-                lim = getattr(mod, "limiter", None)
-                if lim is not None and hasattr(lim, "reset"):
-                    lim.reset()
-            except Exception:  # noqa: BLE001
-                pass
-
-
-@pytest.fixture(autouse=True)
-def reset_rate_limits():
-    _reset_all_limiters()
-    yield
-    _reset_all_limiters()
+@pytest.fixture(autouse=True, scope="session")
+def disable_rate_limits():
+    """Globally disable the SlowAPI limiter during test execution."""
+    # Attempt to import limiter directly
+    try:
+        from backend.limiter import limiter
+        limiter.enabled = False
+    except ImportError:
+        pass
+    try:
+        from limiter import limiter
+        limiter.enabled = False
+    except ImportError:
+        pass
 
 
 # ---------------------------------------------------------------------------

@@ -349,6 +349,14 @@ def _get_provider_key(provider: str, is_fallback: bool = False) -> str:
     if provider == "cloudflare":
         fallback_key = settings.fallback_cloudflare_api_token
         return (fallback_key if is_fallback and fallback_key else settings.cloudflare_api_token)
+    if provider == "nvidia":
+        fallback_key = settings.fallback_nvidia_api_key
+        return (fallback_key if is_fallback and fallback_key else settings.nvidia_api_key)
+    if provider == "huggingface":
+        fallback_key = settings.fallback_hf_token
+        return (fallback_key if is_fallback and fallback_key else settings.hf_token)
+    if provider == "freellmapi":
+        return settings.freellmapi_api_key
     return ""   # ollama / none need no key
 
 
@@ -365,7 +373,7 @@ def _build_provider_chain(cfg=None) -> list[tuple[str, bool]]:
              Pass a custom config in tests to avoid patching the module global.
     """
     cfg = cfg or settings
-    _KNOWN = {"gemini", "groq", "xai", "cloudflare", "ollama", "none"}
+    _KNOWN = {"gemini", "groq", "xai", "cloudflare", "ollama", "none", "nvidia", "huggingface", "freellmapi"}
     chain: list[tuple[str, bool]] = []
     seen: set[str] = set()
 
@@ -514,6 +522,10 @@ def _call_provider(
     Dispatch a single provider call. Returns LlmAnalysisResult (never raises).
     """
     from services.llm_error_classifier import classify_error
+    from services.ai_providers.nvidia_provider import call_nvidia
+    from services.ai_providers.huggingface_provider import call_huggingface
+    from services.ai_providers.freellmapi_provider import call_freellmapi
+
     try:
         if provider_name == "gemini":
             api_key = _get_provider_key("gemini", is_fallback)
@@ -527,6 +539,17 @@ def _call_provider(
         if provider_name == "cloudflare":
             api_token = _get_provider_key("cloudflare", is_fallback)
             return _call_cloudflare(system_prompt, user_prompt, api_token=api_token)
+        if provider_name == "nvidia":
+            api_key = _get_provider_key("nvidia", is_fallback)
+            return _call_nvidia(system_prompt, user_prompt, api_key=api_key)
+        if provider_name == "huggingface":
+            api_key = _get_provider_key("huggingface", is_fallback)
+            return _call_huggingface(system_prompt, user_prompt, api_key=api_key)
+        if provider_name == "freellmapi":
+            if not settings.freellmapi_enabled:
+                return _unavailable_result("freellmapi", "FreeLLMAPI is disabled in configuration.")
+            api_key = _get_provider_key("freellmapi", is_fallback)
+            return _call_freellmapi(system_prompt, user_prompt, api_key=api_key)
         if provider_name == "ollama":
             return _call_ollama(system_prompt, user_prompt)
             
@@ -534,7 +557,7 @@ def _call_provider(
         return _unavailable_result(provider_name, f"Unknown provider: {provider_name!r}")
         
     except Exception as exc:
-        classification = classify_error(exc, provider=provider_name)
+        import traceback; traceback.print_exc(); classification = classify_error(exc, provider=provider_name)
         
         err_msg = f"Provider {provider_name} {classification.category.value}"
         if classification.retry_after_seconds is not None:
@@ -800,3 +823,42 @@ def _call_ollama(system_prompt: str, user_prompt: str) -> LlmAnalysisResult:
         limitations=parsed.limitations,
     )
 
+
+def _call_nvidia(system_prompt: str, user_prompt: str, *, api_key: str | None = None) -> LlmAnalysisResult:
+    model_name = settings.nvidia_model or "meta/llama-3.1-8b-instruct"
+    if not api_key:
+        return _unavailable_result(model_name, "NVIDIA_API_KEY not configured")
+    from services.ai_providers.nvidia_provider import call_nvidia
+    raw_text, err_msg = call_nvidia(system_prompt, user_prompt, api_key=api_key, model=model_name, timeout=settings.nvidia_timeout_seconds)
+    if not raw_text:
+        return _failed_result(model_name, err_msg or "NVIDIA API returned empty response")
+    parsed = _validate_and_parse(raw_text)
+    if not parsed:
+        return _failed_result(model_name, "Failed to parse NVIDIA response as structured JSON")
+    return LlmAnalysisResult(status="completed", model_name=f"nvidia/{model_name}", verdict=parsed.verdict, severity=parsed.severity, confidence=round(parsed.confidence, 2), summary=parsed.summary, evidence=parsed.evidence, recommendations=parsed.recommendations, limitations=parsed.limitations)
+
+def _call_huggingface(system_prompt: str, user_prompt: str, *, api_key: str | None = None) -> LlmAnalysisResult:
+    model_name = settings.hf_model or "meta-llama/Meta-Llama-3.1-8B-Instruct"
+    if not api_key:
+        return _unavailable_result(model_name, "HF_TOKEN not configured")
+    from services.ai_providers.huggingface_provider import call_huggingface
+    raw_text, err_msg = call_huggingface(system_prompt, user_prompt, api_key=api_key, model=model_name, timeout=settings.hf_timeout_seconds)
+    if not raw_text:
+        return _failed_result(model_name, err_msg or "Hugging Face API returned empty response")
+    parsed = _validate_and_parse(raw_text)
+    if not parsed:
+        return _failed_result(model_name, "Failed to parse Hugging Face response as structured JSON")
+    return LlmAnalysisResult(status="completed", model_name=f"huggingface/{model_name}", verdict=parsed.verdict, severity=parsed.severity, confidence=round(parsed.confidence, 2), summary=parsed.summary, evidence=parsed.evidence, recommendations=parsed.recommendations, limitations=parsed.limitations)
+
+def _call_freellmapi(system_prompt: str, user_prompt: str, *, api_key: str | None = None) -> LlmAnalysisResult:
+    model_name = settings.freellmapi_model or "auto"
+    if not api_key:
+        return _unavailable_result(model_name, "FREELLMAPI_API_KEY not configured")
+    from services.ai_providers.freellmapi_provider import call_freellmapi
+    raw_text, err_msg = call_freellmapi(system_prompt, user_prompt, api_key=api_key, model=model_name, timeout=settings.freellmapi_timeout_seconds)
+    if not raw_text:
+        return _failed_result(model_name, err_msg or "FreeLLMAPI returned empty response")
+    parsed = _validate_and_parse(raw_text)
+    if not parsed:
+        return _failed_result(model_name, "Failed to parse FreeLLMAPI response as structured JSON")
+    return LlmAnalysisResult(status="completed", model_name=f"freellmapi/{model_name}", verdict=parsed.verdict, severity=parsed.severity, confidence=round(parsed.confidence, 2), summary=parsed.summary, evidence=parsed.evidence, recommendations=parsed.recommendations, limitations=parsed.limitations)

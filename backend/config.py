@@ -85,8 +85,28 @@ class Settings(BaseSettings):
 
     # ─── LLM (Groq Cloud — cloud inference; free tier availability is subject to current provider terms)
     groq_api_key: str = ""
-    groq_model: str = "llama-3.1-8b-instant"
+    groq_model: str = "openai/gpt-oss-20b"
     groq_timeout_seconds: int = 20
+
+
+    # ─── LLM (NVIDIA NIM) ─────────────────────────────────────────────────────
+    nvidia_api_key: str = ""
+    nvidia_model: str = "openai/gpt-oss-20b"
+    nvidia_timeout_seconds: int = 30
+    fallback_nvidia_api_key: str = ""
+
+    # ─── LLM (Hugging Face) ───────────────────────────────────────────────────
+    hf_token: str = ""
+    hf_model: str = "Qwen/Qwen2.5-7B-Instruct"
+    hf_timeout_seconds: int = 30
+    fallback_hf_token: str = ""
+
+    # ─── LLM (FreeLLMAPI - Terminal Gateway) ──────────────────────────────────
+    freellmapi_enabled: bool = False
+    freellmapi_base_url: str = "http://localhost:3001/v1"
+    freellmapi_api_key: str = ""
+    freellmapi_model: str = "auto"
+    freellmapi_timeout_seconds: int = 30
 
     # ─── LLM (xAI / Grok — OpenAI-compatible API) ────────────────────────────
     xai_api_key: str = ""
@@ -191,6 +211,16 @@ class Settings(BaseSettings):
             self.gemini_api_key = _read_secret_file("GEMINI_API_KEY")
         if not self.xai_api_key:
             self.xai_api_key = _read_secret_file("XAI_API_KEY")
+        if not self.nvidia_api_key:
+            self.nvidia_api_key = _read_secret_file("NVIDIA_API_KEY")
+        if not self.hf_token:
+            self.hf_token = _read_secret_file("HF_TOKEN")
+        if not self.freellmapi_api_key:
+            self.freellmapi_api_key = _read_secret_file("FREELLMAPI_API_KEY")
+        if not self.fallback_nvidia_api_key:
+            self.fallback_nvidia_api_key = _read_secret_file("FALLBACK_NVIDIA_API_KEY")
+        if not self.fallback_hf_token:
+            self.fallback_hf_token = _read_secret_file("FALLBACK_HF_TOKEN")
         if not self.groq_api_key:
             self.groq_api_key = _read_secret_file("GROQ_API_KEY")
         if not self.cloudflare_api_token:

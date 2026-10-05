@@ -69,6 +69,8 @@ def call_cloudflare(
         if data.get("success"):
             result = data.get("result", {})
             raw_text = result.get("response") or ""
+            if not isinstance(raw_text, str):
+                raw_text = json.dumps(raw_text)
             logger.info(
                 "Cloudflare Workers AI call successful — model=%s",
                 model_name,

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { getAnalysis } from '../api';
 
@@ -26,6 +25,26 @@ export default function AiSummary({ datasetId }) {
 
   const a = data.analysis;
   
+  // Format model name output
+  let displayProvider = "Unknown";
+  let displayModel = "Unknown";
+  let fallbackUsed = null;
+
+  if (a.model_name) {
+    if (a.model_name === "chain_exhausted") {
+       displayProvider = "Chain Exhausted";
+       displayModel = "None";
+    } else if (a.model_name.includes('/')) {
+       const parts = a.model_name.split('/');
+       displayProvider = parts[0];
+       displayModel = parts.slice(1).join('/');
+    } else {
+       // Legacy or groq fallback
+       displayProvider = a.model_name.includes('gemini') ? 'gemini' : a.model_name.includes('llama') ? 'groq' : 'unknown';
+       displayModel = a.model_name;
+    }
+  }
+
   return (
     <div className="card">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -42,6 +61,13 @@ export default function AiSummary({ datasetId }) {
 
       {!collapsed && (
         <div style={{ marginTop: '1.5rem' }}>
+          
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', background: 'var(--bg-1)', padding: '1rem', borderRadius: 'var(--r-md)', border: '1px solid var(--border)', fontFamily: 'var(--mono)', fontSize: '0.8rem', marginBottom: '1.5rem' }}>
+             <div style={{ flex: 1, minWidth: '120px' }}><div style={{ color: 'var(--text-3)', fontSize: '0.65rem' }}>AI PROVIDER</div><strong style={{ color: 'var(--cyan)', textTransform: 'capitalize' }}>{displayProvider}</strong></div>
+             <div style={{ flex: 1, minWidth: '120px' }}><div style={{ color: 'var(--text-3)', fontSize: '0.65rem' }}>MODEL</div><strong style={{ color: 'var(--text-1)' }}>{displayModel}</strong></div>
+             <div style={{ flex: 1, minWidth: '120px' }}><div style={{ color: 'var(--text-3)', fontSize: '0.65rem' }}>AI STATUS</div><strong style={{ color: a.status === 'completed' ? 'var(--emerald)' : 'var(--amber)' }}>{a.status}</strong></div>
+          </div>
+
           {a.guardrail_action && (
             <div style={{ background: 'var(--bg-1)', padding: '1rem', borderRadius: 'var(--r-sm)', border: '1px solid var(--border)', marginBottom: '1.5rem', fontFamily: 'var(--mono)', fontSize: '0.75rem', display: 'grid', gap: '0.5rem' }}>
               <div style={{ display: 'flex' }}><span style={{ width: '100px', color: 'var(--text-3)' }}>Guardrail:</span> <strong style={{ color: a.guardrail_action === 'BLOCK' ? 'var(--rose)' : a.guardrail_action === 'RESTRICT' ? 'var(--amber)' : 'var(--emerald)' }}>{a.guardrail_action}</strong></div>
@@ -51,7 +77,7 @@ export default function AiSummary({ datasetId }) {
           )}
 
           <div style={{ fontSize: '0.85rem', lineHeight: '1.5', color: 'var(--text-1)', whiteSpace: 'pre-wrap', background: 'var(--bg-2)', padding: '1.25rem', borderRadius: 'var(--r-sm)', border: '1px solid var(--border)' }}>
-            {a.narrative_explanation || 'No narrative provided.'}
+            {a.narrative_explanation || a.summary || 'No narrative provided.'}
           </div>
 
           <div style={{ marginTop: '1.5rem', fontSize: '0.7rem', color: 'var(--text-3)', borderTop: '1px solid var(--border)', paddingTop: '0.75rem', display: 'flex', gap: '2rem' }}>
