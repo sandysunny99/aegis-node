@@ -7,7 +7,7 @@ def call_huggingface(
     model: str,
     timeout: int,
 ) -> tuple[str | None, str | None]:
-    url = "https://router.huggingface.co/hf-inference/v1/chat/completions"
+    url = "https://router.huggingface.co/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",

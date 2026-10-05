@@ -97,7 +97,7 @@ class Settings(BaseSettings):
 
     # ─── LLM (Hugging Face) ───────────────────────────────────────────────────
     hf_token: str = ""
-    hf_model: str = "Qwen/Qwen2.5-7B-Instruct"
+    hf_model: str = "Qwen/Qwen2.5-Coder-7B-Instruct"
     hf_timeout_seconds: int = 30
     fallback_hf_token: str = ""
 
