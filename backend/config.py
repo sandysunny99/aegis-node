@@ -5,7 +5,7 @@ Loaded once at startup via pydantic-settings.
 
 import ipaddress
 import logging
-from pydantic import model_validator
+from pydantic import model_validator, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from pathlib import Path
@@ -165,7 +165,6 @@ class Settings(BaseSettings):
 
     # ☁️ Cloudflare AI Gateway (Phase 8A)
     ai_gateway_enabled: bool = False
-    cloudflare_account_id: str = ""
     cloudflare_ai_gateway_id: str = ""
     cloudflare_ai_gateway_url: str = ""
     cloudflare_ai_gateway_log_payload: bool = False
@@ -181,6 +180,40 @@ class Settings(BaseSettings):
 
     # 💾 Database
     database_url: str = "sqlite:///./aegis_node.db"
+
+    
+    @field_validator("trusted_proxies", mode="before")
+    @classmethod
+    def parse_trusted_proxies(cls, v) -> list[str]:
+        if isinstance(v, list):
+            res = v
+        elif isinstance(v, str):
+            try:
+                import json
+                parsed = json.loads(v)
+                if isinstance(parsed, list):
+                    res = parsed
+                else:
+                    res = [v]
+            except json.JSONDecodeError:
+                res = [x.strip() for x in v.split(",") if x.strip()]
+        else:
+            raise ValueError("trusted_proxies must be a list or a comma-separated string")
+        
+        valid_proxies = []
+        import ipaddress
+        for proxy in res:
+            if proxy == "*":
+                raise ValueError("Wildcard '*' is intentionally NOT supported for trusted_proxies")
+            try:
+                if "/" in proxy:
+                    ipaddress.ip_network(proxy, strict=False)
+                else:
+                    ipaddress.ip_address(proxy)
+                valid_proxies.append(proxy)
+            except ValueError:
+                raise ValueError(f"Invalid IP or CIDR network: {proxy}")
+        return valid_proxies
 
     def is_trusted_proxy(self, host: str) -> bool:
         """

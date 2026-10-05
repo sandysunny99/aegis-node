@@ -30,7 +30,7 @@ services:
       # Set to: gemini | groq | xai | ollama | none
       # If none/key missing, app still works — AI panel shows setup instructions.
       - key: AI_PROVIDER
-        value: gemini
+        value: groq
 
       # Add your real key in the Render dashboard (Environment tab)
       - key: GEMINI_API_KEY
@@ -38,6 +38,21 @@ services:
 
       - key: GROQ_API_KEY
         sync: false
+      - key: NVIDIA_API_KEY
+        sync: false
+
+      - key: HF_TOKEN
+        sync: false
+
+      - key: FREELLMAPI_ENABLED
+        value: "false"
+
+      - key: FREELLMAPI_API_KEY
+        sync: false
+
+      - key: FREELLMAPI_BASE_URL
+        value: "http://localhost:3001/v1"
+
 
       # xAI / Grok — secondary AI provider (auto-failover from Gemini)
       # Key format: xai-...
@@ -74,7 +89,7 @@ services:
         value: "[\"https://aegis-node.vercel.app\"]"
 
       - key: TRUSTED_PROXIES
-        value: "10.0.0.0/8,127.0.0.1"
+        value: "[\"10.0.0.0/8\",\"127.0.0.1\"]"
 
       # ── Auth & Token ──────────────────────────────────────────────────────────
       # Set API_KEY in Render dashboard to enable write-endpoint protection.
@@ -86,13 +101,12 @@ services:
         value: "60"
 
       # ── AI Fallback Chain ─────────────────────────────────────────────────────
-      # Auto-failover: Gemini (primary) → Cloudflare Workers AI (secondary)
-      # If Gemini hits rate limit or errors, Cloudflare is tried automatically.
+      # Auto-failover: Groq (primary) -> NVIDIA -> Cloudflare -> Hugging Face -> FreeLLMAPI
       - key: AI_FALLBACK_CHAIN
-        value: "cloudflare"
+        value: "nvidia,cloudflare,huggingface,freellmapi"
 
       - key: AI_OPTIONAL_PROVIDERS
-        value: "groq,ollama,xai"
+        value: ""
 
       # ── Cloudflare Workers AI & Turnstile ─────────────────────────────────────
       - key: CLOUDFLARE_ACCOUNT_ID
