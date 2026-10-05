@@ -7,7 +7,7 @@
 #   2. Go to https://dashboard.render.com/select-repo
 #   3. Connect the aegis-node repository
 #   4. Render detects this render.yaml automatically
-#   5. Set GEMINI_API_KEY (or GROQ_API_KEY) in the environment variables section
+#   5. Set GROQ_API_KEY in the environment variables section
 #   6. Click "Apply" — deployment takes ~5 minutes
 
 services:
@@ -27,7 +27,7 @@ services:
 
     envVars:
       # ── AI Provider ───────────────────────────────────────────────────────────
-      # Set to: gemini | groq | xai | ollama | none
+      # Set to: groq | nvidia | cloudflare | huggingface | xai | ollama | none
       # If none/key missing, app still works — AI panel shows setup instructions.
       - key: AI_PROVIDER
         value: groq
@@ -68,7 +68,7 @@ services:
         value: "3310"
 
       - key: CLAMAV_MOCK_MODE
-        value: "${CLAMAV_MOCK_MODE:-false}"
+        value: "false"
 
       # ── Heuristic Scanning ────────────────────────────────────────────────────
       - key: ENABLE_HEURISTICS
