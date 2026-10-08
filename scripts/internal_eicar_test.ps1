@@ -23,14 +23,14 @@ try:
     print(f"\nUploaded successfully! Dataset ID: {dataset_id}")
     
     print("\n>>> TRIGGERING ANALYSIS (THIS RUNS CLAMAV)...")
-    analyse_resp = httpx.post(f"http://localhost:8000/api/v1/datasets/{dataset_id}/analyse", timeout=60.0)
+    scan_resp = httpx.post(f"http://localhost:8000/api/v1/datasets/{dataset_id}/scan", timeout=60.0)
     
-    print(f"\nHTTP Status: {analyse_resp.status_code}")
-    analyse_data = analyse_resp.json()
+    print(f"\nHTTP Status: {scan_resp.status_code}")
+    scan_data = scan_resp.json()
     print('\nAPI Response:')
-    print(json.dumps(analyse_data, indent=2))
+    print(json.dumps(scan_data, indent=2))
     
-    if analyse_data.get('scan_result', {}).get('clamav_status') == 'infected':
+    if scan_data.get('clamav_status') == 'infected':
         print('\nSUCCESS! Real ClamAV correctly detected the EICAR file through Aegis!')
     else:
         print('\nFAILED! ClamAV did not detect the file as infected.')
