@@ -60,13 +60,11 @@ services:
         sync: false       # Set manually in Render dashboard
 
       # ── ClamAV REST API ───────────────────────────────────────────────────────
-      - key: CLAMAV_API_HOST
+      - key: CLAMAV_API_URL
         fromService:
           type: pserv
           name: aegis-clamav-rest
-          property: host
-      - key: CLAMAV_API_PORT
-        value: "3000"
+          property: hostport
 
       - key: CLAMAV_MOCK_MODE
         value: "false"
@@ -132,10 +130,13 @@ services:
     runtime: image
     image:
       url: docker.io/benzino77/clamav-rest-api:latest
-    plan: free
+    plan: standard
     envVars:
       - key: CLAMD_IP
-        value: "clamav-daemon"
+        fromService:
+          type: pserv
+          name: clamav-daemon
+          property: host
       - key: CLAMD_PORT
         value: "3310"
       - key: APP_PORT
@@ -149,4 +150,4 @@ services:
     runtime: image
     image:
       url: docker.io/clamav/clamav:stable
-    plan: free
+    plan: standard

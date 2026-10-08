@@ -47,8 +47,7 @@ services:
       - "8000:8000"
     environment:
       # ClamAV — connect via the REST wrapper
-      - CLAMAV_API_HOST=clamav-rest
-      - CLAMAV_API_PORT=3000
+      - CLAMAV_API_URL=http://clamav-rest:3000
       - CLAMAV_MOCK_MODE=${CLAMAV_MOCK_MODE:-false}
       # AI Provider
       - AI_PROVIDER=${AI_PROVIDER:-groq}

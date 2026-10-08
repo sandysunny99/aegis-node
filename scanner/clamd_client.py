@@ -33,12 +33,11 @@ def _get_api_url() -> str:
         try:
             import importlib
             _cfg = importlib.import_module(_mod)
-            if getattr(_cfg, "settings", None) and hasattr(_cfg.settings, "clamav_api_host"):
-                host = _cfg.settings.clamav_api_host
-                port = getattr(_cfg.settings, "clamav_api_port", 3000)
-                if not host.startswith("http"):
-                    host = f"http://{host}"
-                return f"{host}:{port}"
+            if getattr(_cfg, "settings", None) and hasattr(_cfg.settings, "clamav_api_url"):
+                url = _cfg.settings.clamav_api_url
+                if url and not url.startswith("http"):
+                    url = f"http://{url}"
+                return url
             break
         except Exception:
             continue
