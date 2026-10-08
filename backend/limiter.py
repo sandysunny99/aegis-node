@@ -29,3 +29,4 @@ def _get_client_ip(request: Request) -> str:
 # Singleton shared Limiter instance used across main.py and all API routers
 limiter = Limiter(key_func=_get_client_ip, default_limits=["200/hour"])
 
+

@@ -23,3 +23,4 @@ rule Embedded_PE_Executable {
     condition:
         ($mz_raw at 0 and $pe_sig) or $mz_hex or $mz_hex_spaced
 }
+

@@ -917,3 +917,4 @@ def _call_freellmapi(system_prompt: str, user_prompt: str, *, api_key: str | Non
     if not parsed:
         return _failed_result(model_name, "Failed to parse FreeLLMAPI response as structured JSON")
     return LlmAnalysisResult(status="completed", model_name=f"freellmapi/{model_name}", verdict=parsed.verdict, severity=parsed.severity, confidence=round(parsed.confidence, 2), summary=parsed.summary, evidence=parsed.evidence, recommendations=parsed.recommendations, limitations=parsed.limitations)
+

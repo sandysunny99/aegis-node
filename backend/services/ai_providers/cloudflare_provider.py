@@ -80,3 +80,4 @@ def call_cloudflare(
         errors = data.get("errors", [])
         err_msg = json.dumps(errors) if errors else "Cloudflare Workers AI returned success=false"
         return None, f"Cloudflare Workers AI error: {err_msg}"
+

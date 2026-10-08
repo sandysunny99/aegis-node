@@ -23,3 +23,4 @@ rule Webshell_Dynamic_Eval {
     condition:
         any of them
 }
+

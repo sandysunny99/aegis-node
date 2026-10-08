@@ -25,3 +25,4 @@ rule Shellcode_NOP_Sled {
     condition:
         ($nop_raw or $nop_hex) or ($nop_raw and ($prolog_32 or $prolog_64))
 }
+

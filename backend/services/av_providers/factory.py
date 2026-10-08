@@ -1,5 +1,5 @@
 import logging
-from backend.config import settings
+from config import settings
 from .base import AntivirusProvider, AVScanResult
 from .clamav import ClamAVRestProvider
 from .metadefender import MetaDefenderProvider
@@ -51,3 +51,4 @@ def get_av_provider() -> AntivirusProvider:
     else:
         logger.error(f"Unknown AV provider '{provider}' configured! Falling back to safe unavailable state.")
         return InvalidProvider(provider)
+

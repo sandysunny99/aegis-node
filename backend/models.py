@@ -237,3 +237,4 @@ class RemediationRecord(Base):
             f"<RemediationRecord id={self.id} dataset_id={self.dataset_id} "
             f"status={self.remediation_status!r} reduction={self.threat_reduction_percent:.1f}%>"
         )
+

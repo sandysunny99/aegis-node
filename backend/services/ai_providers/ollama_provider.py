@@ -52,3 +52,4 @@ def call_ollama(
         text = data.get("message", {}).get("content", "")
         logger.info("Ollama call successful — model=%s", model)
         return text
+

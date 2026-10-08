@@ -181,3 +181,4 @@ class ErrorResponse(BaseModel):
     detail: str
     code: str = "error"
     extra: dict[str, Any] | None = None
+

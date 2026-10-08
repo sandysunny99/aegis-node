@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from backend.config import settings
+from config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -116,3 +116,4 @@ def get_allowed_providers() -> list[str]:
 def validate_provider_selection(provider_id: str, model_id: str | None = None) -> bool:
     allowed = get_allowed_providers()
     return provider_id in allowed
+

@@ -227,3 +227,4 @@ def get_storage_backend() -> ArtifactStorage:
         return LocalArtifactStorage(fallback)
 
 storage_backend = get_storage_backend()
+

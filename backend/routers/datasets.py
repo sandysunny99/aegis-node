@@ -476,3 +476,4 @@ def get_scan_report(
         findings=findings,
         threat_intel=ti_out,
     )
+

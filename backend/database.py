@@ -51,3 +51,4 @@ def get_db():
 def create_all_tables() -> None:
     """Creates all tables if they do not exist. Called once at app startup."""
     Base.metadata.create_all(bind=engine)
+

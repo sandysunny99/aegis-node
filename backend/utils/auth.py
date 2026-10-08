@@ -62,3 +62,4 @@ async def require_api_key(api_key: str | None = Security(_api_key_header)) -> No
             detail="Invalid API key.",
             headers={"WWW-Authenticate": "ApiKey"},
         )
+

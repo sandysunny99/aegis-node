@@ -156,3 +156,4 @@ async def lookup_url(raw_url: str) -> ThreatIntelResult:
         base_res.status = "provider_error"
         base_res.error_message = str(exc)
         return base_res
+

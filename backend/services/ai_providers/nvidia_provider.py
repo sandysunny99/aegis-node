@@ -40,3 +40,4 @@ def call_nvidia(
         return None, err_msg
     except Exception as exc:
         return None, str(exc)
+

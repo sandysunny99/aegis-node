@@ -18,3 +18,4 @@ rule EICAR_Test_Signature {
     condition:
         $eicar
 }
+

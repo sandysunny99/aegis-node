@@ -108,3 +108,4 @@ class ClamAVRestProvider(AntivirusProvider):
                 raw_response="",
                 error=str(exc),
             )
+

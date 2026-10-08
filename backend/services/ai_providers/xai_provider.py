@@ -82,3 +82,4 @@ def call_xai(
             raise last_exc
 
     return None, "xAI models exhausted"
+

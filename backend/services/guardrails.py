@@ -117,3 +117,4 @@ def evaluate_input_guardrail(evidence_text: str) -> tuple[str, int, list[str]]:
         status = "RESTRICT"
         
     return status, score, signals
+

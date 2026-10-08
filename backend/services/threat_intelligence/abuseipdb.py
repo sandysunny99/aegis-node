@@ -7,8 +7,8 @@ import time
 import ipaddress
 from typing import Dict, Tuple
 
-from backend.schemas import ThreatIntelResult
-from backend.config import settings
+from schemas import ThreatIntelResult
+from config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -148,3 +148,4 @@ async def lookup_ip(raw_ip: str) -> ThreatIntelResult:
         base_res.status = "provider_error"
         base_res.error_message = str(exc)
         return base_res
+

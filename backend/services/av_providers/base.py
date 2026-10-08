@@ -36,3 +36,4 @@ class AntivirusProvider(ABC):
     def scan_file(self, path: str) -> AVScanResult:
         """Scans the given file and returns the result."""
         pass
+

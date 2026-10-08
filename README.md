@@ -39,3 +39,13 @@ Run the regression suite: `python -m pytest tests/ -v`
 **RELEASE READY WITH DOCUMENTED LIMITATIONS.**
 Please review `docs/LIMITATIONS.md` for information regarding guardrail holdout metrics (80% / 20%), TI coverage limits, and binary remediation boundaries.
 
+
+## Local Docker Validation
+For validating the local ClamAV integration on a Windows machine:
+1. Install **Docker Desktop** and ensure docker compose is available.
+2. Run .\scripts\final_runtime_validation.ps1 from PowerShell.
+3. Open http://localhost:8000 in your browser.
+4. Follow the script instructions to upload the generated harmless eicar.txt test artifact.
+5. Upload safe_dataset.csv to verify full E2E pipeline.
+**WARNING:** Do not upload the EICAR file to public threat intelligence services (e.g. VirusTotal).
+

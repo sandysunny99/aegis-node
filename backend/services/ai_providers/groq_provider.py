@@ -58,3 +58,4 @@ def call_groq(
         logger.info("Groq API call successful — model=%s tokens=%s",
                     model, data.get("usage", {}).get("total_tokens", "?"))
         return text
+

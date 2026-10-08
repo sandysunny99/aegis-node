@@ -127,3 +127,4 @@ class MetaDefenderProvider(AntivirusProvider):
                 raw_response="",
                 error=str(exc),
             )
+

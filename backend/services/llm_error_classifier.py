@@ -103,3 +103,4 @@ def classify_error(exc: Exception, provider: str = "unknown", max_retry_after: i
         return ProviderErrorClassification(AegisProviderErrorType.NETWORK_ERROR, True, True, None, provider, None)
 
     return ProviderErrorClassification(AegisProviderErrorType.UNKNOWN_PROVIDER_ERROR, False, True, None, provider, None)
+

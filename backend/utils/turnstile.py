@@ -71,3 +71,4 @@ async def verify_turnstile_token(token: str | None, remote_ip: str | None = None
         # On upstream verification network failure, fail closed in production if secret is set
         return False
 
+

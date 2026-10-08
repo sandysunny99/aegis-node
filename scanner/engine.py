@@ -17,12 +17,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 try:
-    from backend.services.av_providers import AVScanResult as ClamAVResult, get_av_provider
+    from services.av_providers import AVScanResult as ClamAVResult, get_av_provider
     from scanner.content_checker import ContentCheckResult, ContentFinding, check_file
     from scanner.heuristics import heuristic_scan
     from scanner.yara_scanner import yara_scanner
 except ImportError:
-    from backend.services.av_providers import AVScanResult as ClamAVResult, get_av_provider  # type: ignore[no-redef]
+    from services.av_providers import AVScanResult as ClamAVResult, get_av_provider  # type: ignore[no-redef]
     from content_checker import (  # type: ignore[no-redef]
         ContentCheckResult,
         ContentFinding,
@@ -294,6 +294,7 @@ def run_scan(file_path: str, clamav_host: str = _CLAMAV_HOST, clamav_port: int =
         result.scan_duration_ms,
     )
     return result
+
 
 
 

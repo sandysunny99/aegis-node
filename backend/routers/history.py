@@ -97,3 +97,4 @@ def get_history(
         ))
 
     return HistoryResponse(total=total, page=page, page_size=page_size, items=items)
+

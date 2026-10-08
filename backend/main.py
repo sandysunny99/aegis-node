@@ -98,7 +98,7 @@ app.include_router(remediation_router)
 @limiter.limit("60/minute")
 async def health(request: Request) -> dict:
     """Public health probe with UI status fields."""
-    from backend.services.av_providers import get_av_provider
+    from services.av_providers import get_av_provider
     try:
         provider = get_av_provider()
         av_provider_name = provider.provider_name
@@ -188,6 +188,8 @@ else:
     @app.get("/", tags=["system"])
     async def root() -> dict:
         return {"message": "Aegis Node API — see /docs for usage. Frontend not bundled in dev mode."}
+
+
 
 
 

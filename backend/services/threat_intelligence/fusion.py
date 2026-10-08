@@ -4,7 +4,7 @@ Combines and normalizes evidence from multiple external providers.
 """
 
 from typing import List, Tuple
-from backend.schemas import NormalizedTIEvidence, TIFusionReport
+from schemas import NormalizedTIEvidence, TIFusionReport
 
 def _fuse_evidence(evidence_list: List[NormalizedTIEvidence], providers_checked: List[str]) -> Tuple[str, List[str], List[str]]:
     """
@@ -109,3 +109,4 @@ def evaluate_local_verdict_conflict(local_verdict: str, ti_report: TIFusionRepor
         return "CONFLICT_TI_MALICIOUS"
 
     return None
+
