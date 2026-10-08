@@ -145,8 +145,8 @@ function HealthStatus({ health }) {
             : (health.clamav_mock ? '0 0 6px var(--cyan)' : '0 0 6px var(--amber)'),
         }} />
         {health.clamav_running
-          ? 'ClamAV: Live'
-          : (health.clamav_mock ? 'AV: Simulated' : 'No AV')}
+          ? 'AV: ClamAV'
+          : (health.clamav_mock ? 'AV: Simulated' : 'AV: Unavailable')}
       </div>
 
       {/* AI */}

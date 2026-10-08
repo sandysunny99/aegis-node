@@ -132,7 +132,7 @@ class Settings(BaseSettings):
     # ─── Scanner & Multi-Engine Detection ────────────────────────────────────
     clamav_host: str = "localhost"
     clamav_port: int = 3310
-    clamav_mock_mode: bool = True
+    clamav_mock_mode: bool = False
     max_upload_size_mb: int = 50
     enable_heuristics: bool = True  # Set ENABLE_HEURISTICS=false to disable Stage 0.5
     enable_yara: bool = True        # Set ENABLE_YARA=false to disable Stage 1.5
