@@ -35,9 +35,10 @@ def _ensure_dir(d: Path) -> Path:
         return fallback
 
 
-_SAMPLES_DIR = _ensure_dir(_PROJECT_ROOT / "data" / "samples")
-_QUARANTINE_DIR = _ensure_dir(_PROJECT_ROOT / "data" / "quarantine")
-_SANITIZED_DIR = _ensure_dir(_PROJECT_ROOT / "data" / "sanitized")
+_BASE_DATA_DIR = Path("/tmp/aegis_data") if Path("/.dockerenv").exists() else _PROJECT_ROOT / "data"
+_SAMPLES_DIR = _ensure_dir(_BASE_DATA_DIR / "samples")
+_QUARANTINE_DIR = _ensure_dir(_BASE_DATA_DIR / "quarantine")
+_SANITIZED_DIR = _ensure_dir(_BASE_DATA_DIR / "sanitized")
 
 # Reserved Windows device names
 _WINDOWS_RESERVED_NAMES = {
