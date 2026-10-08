@@ -60,9 +60,11 @@ services:
       - key: XAI_API_KEY
         sync: false       # Set manually in Render dashboard
 
-      # ── ClamAV ────────────────────────────────────────────────────────────────
-      - key: CLAMAV_HOST
-        value: "localhost"
+      # ── ClamAV ────────────────────────────────────────────────────────────────      - key: CLAMAV_HOST
+        fromService:
+          type: pserv
+          name: aegis-node-clamav
+          property: host
 
       - key: CLAMAV_PORT
         value: "3310"
@@ -125,3 +127,12 @@ services:
         sync: false
 
 
+
+
+
+  - type: pserv
+    name: aegis-node-clamav
+    runtime: image
+    image:
+      url: docker.io/clamav/clamav:stable
+    plan: free

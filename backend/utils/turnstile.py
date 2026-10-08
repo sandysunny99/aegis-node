@@ -56,8 +56,18 @@ async def verify_turnstile_token(token: str | None, remote_ip: str | None = None
             if not success:
                 error_codes = data.get("error-codes", [])
                 logger.warning("Cloudflare Turnstile token verification failed: %s", error_codes)
-            return success
+                return False
+                
+            # Hostname validation
+            if success and is_production and settings.turnstile_allowed_hostnames:
+                actual_hostname = data.get("hostname", "")
+                allowed_hostnames = [h.strip() for h in settings.turnstile_allowed_hostnames.split(",")]
+                if actual_hostname not in allowed_hostnames:
+                    logger.error("SECURITY: Turnstile token hostname %s not in allowed list %s", actual_hostname, allowed_hostnames)
+                    return False
+            return True
     except Exception as exc:  # noqa: BLE001
         logger.error("Error communicating with Cloudflare Turnstile siteverify: %s", exc)
         # On upstream verification network failure, fail closed in production if secret is set
         return False
+

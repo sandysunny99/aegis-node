@@ -128,6 +128,7 @@ class Settings(BaseSettings):
     # ─── Cloudflare Turnstile Bot Protection (Optional) ──────────────────────
     cloudflare_turnstile_site_key: str = ""
     cloudflare_turnstile_secret_key: str = ""
+    turnstile_allowed_hostnames: str = "aegis-node.onrender.com"
 
     # ─── Scanner & Multi-Engine Detection ────────────────────────────────────
     clamav_host: str = "localhost"
@@ -280,15 +281,18 @@ class Settings(BaseSettings):
             self.fallback_cloudflare_api_token = _read_secret_file("FALLBACK_CLOUDFLARE_API_TOKEN")
 
         if self.app_env.lower() == "production":
-            if not self.api_key:
+            if not self.api_key and not bool(self.cloudflare_turnstile_secret_key):
                 logger.warning(
-                    "SECURITY WARNING: API_KEY is empty in production environment. "
+                    "SECURITY WARNING: Both API_KEY and Turnstile are empty in production environment. "
                     "Write endpoints are unprotected."
                 )
-        elif not self.api_key and self.app_env.lower() != "development":
-            logger.warning("API_KEY is not configured — write endpoints are publicly accessible.")
+        elif not self.api_key and not bool(self.cloudflare_turnstile_secret_key) and self.app_env.lower() != "development":
+            logger.warning("API_KEY and Turnstile are not configured - write endpoints are publicly accessible.")
         return self
 
 
 # Singleton — import this from anywhere in the backend.
 settings = Settings()
+
+
+
