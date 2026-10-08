@@ -135,6 +135,15 @@ class AnalysisResponse(BaseModel):
     created_at: datetime
     error: str | None = None
 
+    llm_mode: str = "auto"
+    requested_provider: str = "auto"
+    requested_model: str | None = None
+    initial_provider: str = ""
+    final_provider: str = ""
+    provider_attempts: list[str] = Field(default_factory=list)
+    fallback_used: bool = False
+    fallback_reason: str | None = None
+
 
 # ─── Remediation Schemas ──────────────────────────────────────────────────────
 

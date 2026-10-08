@@ -33,16 +33,16 @@ services:
       - CLAMAV_PORT=3310
       - CLAMAV_MOCK_MODE=${CLAMAV_MOCK_MODE:-false}
       # AI Provider — set to "gemini", "groq", "xai", "ollama", or "none"
-      - AI_PROVIDER=${AI_PROVIDER:-gemini}
+      - AI_PROVIDER=${AI_PROVIDER:-groq}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.0-flash}
       - GROQ_API_KEY=${GROQ_API_KEY:-}
-      - GROQ_MODEL=${GROQ_MODEL:-llama-3.1-8b-instant}
+      - GROQ_MODEL=${GROQ_MODEL:-openai/gpt-oss-20b}
       - XAI_API_KEY=${XAI_API_KEY:-}
       - XAI_MODEL=${XAI_MODEL:-grok-3-mini}
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       # AI Fallback
-      - AI_FALLBACK_CHAIN=${AI_FALLBACK_CHAIN:-cloudflare}
+      - AI_FALLBACK_CHAIN=${AI_FALLBACK_CHAIN:-nvidia,cloudflare,huggingface,freellmapi}
       - FALLBACK_CLOUDFLARE_API_TOKEN=${FALLBACK_CLOUDFLARE_API_TOKEN:-}
       - FALLBACK_GEMINI_API_KEY=${FALLBACK_GEMINI_API_KEY:-}
       - FALLBACK_GROQ_API_KEY=${FALLBACK_GROQ_API_KEY:-}
@@ -54,7 +54,7 @@ services:
       - DOWNLOAD_TOKEN_EXPIRY_MINUTES=${DOWNLOAD_TOKEN_EXPIRY_MINUTES:-60}
       # App
       - APP_ENV=production
-      - MAX_UPLOAD_SIZE_MB=500
+      - MAX_UPLOAD_SIZE_MB=50
       - DATABASE_URL=sqlite:////app/data/aegis_node.db
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-["*"]}
     volumes:

@@ -103,8 +103,15 @@ export async function getScanReport(datasetId) {
   return request(`/api/v1/datasets/${datasetId}/report`);
 }
 
-export async function analyseDataset(datasetId) {
-  return request(`/api/v1/datasets/${datasetId}/analyse`, { method: 'POST' });
+export async function analyseDataset(datasetId, { llmMode = 'auto', provider = null, model = null } = {}) {
+  const params = new URLSearchParams({ llm_mode: llmMode });
+  if (provider) params.append('provider', provider);
+  if (model) params.append('model', model);
+  return request(`/api/v1/datasets/${datasetId}/analyse?${params.toString()}`, { method: 'POST' });
+}
+
+export async function getLlmProviders() {
+  return request('/api/v1/datasets/llm/providers');
 }
 
 export async function getAnalysis(datasetId) {

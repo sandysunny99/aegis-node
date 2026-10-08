@@ -139,6 +139,16 @@ class LlmAnalysisRecord(Base):
     llm_bypassed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     llm_context_mode: Mapped[str] = mapped_column(String(32), nullable=False, default="UNKNOWN")
 
+    # Observability and Provider Fallback Fields
+    llm_mode: Mapped[str] = mapped_column(String(32), nullable=False, default="auto")
+    requested_provider: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    requested_model: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    initial_provider: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    final_provider: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    fallback_used: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    fallback_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    provider_attempts_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+
     # Metrics
     prompt_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     completion_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -164,6 +174,13 @@ class LlmAnalysisRecord(Base):
     def guardrail_signals(self) -> list[str]:
         try:
             return json.loads(self.guardrail_signals_json)
+        except Exception:
+            return []
+
+    @property
+    def provider_attempts(self) -> list[dict]:
+        try:
+            return json.loads(self.provider_attempts_json)
         except Exception:
             return []
 

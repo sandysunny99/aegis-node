@@ -58,3 +58,20 @@ def fresh_db_global():
         Base.metadata.drop_all(bind=engine)
     except Exception:  # noqa: BLE001
         pass
+
+
+# ---------------------------------------------------------------------------
+# Disable Turnstile for TestClient
+# ---------------------------------------------------------------------------
+# If the developer's local .env contains a real CLOUDFLARE_TURNSTILE_SECRET_KEY,
+# Turnstile enforcement is activated. The TestClient sends no tokens and fails
+# with 403. We patch the verification strictly inside tests to allow execution.
+
+@pytest.fixture(autouse=True)
+def mock_turnstile(monkeypatch):
+    """Bypass Cloudflare Turnstile verification strictly for tests."""
+    from unittest.mock import AsyncMock
+    monkeypatch.setattr(
+        "routers.datasets.verify_turnstile_token",
+        AsyncMock(return_value=True)
+    )

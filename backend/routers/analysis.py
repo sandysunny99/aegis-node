@@ -16,7 +16,7 @@ import json  # noqa: E402
 import functools  # noqa: E402
 
 from database import get_db  # noqa: E402
-from fastapi import APIRouter, Depends, HTTPException, Request  # noqa: E402
+from fastapi import APIRouter, Depends, HTTPException, Request, Query  # noqa: E402
 from fastapi.concurrency import run_in_threadpool  # noqa: E402
 from limiter import limiter  # noqa: E402
 from models import DatasetRecord, LlmAnalysisRecord  # noqa: E402
@@ -37,6 +37,9 @@ router = APIRouter(prefix="/api/v1/datasets", tags=["analysis"])
 async def analyse_dataset(
     request: Request,         # Required by slowapi for IP tracking
     dataset_id: int,
+    llm_mode: str = Query(default="auto", pattern="^(auto|manual)$"),
+    provider: str | None = Query(default=None),
+    model: str | None = Query(default=None),
     db: Session = Depends(get_db),  # noqa: B008
     _auth: None = Depends(require_api_key),  # noqa: B008  # Guard - triggers paid AI calls
 ) -> AnalysisResponse:
@@ -64,6 +67,9 @@ async def analyse_dataset(
             clamav_status=latest_report.clamav_status,
             risk_score=latest_report.risk_score,
             findings=findings,
+            llm_mode=llm_mode,
+            requested_provider=provider,
+            requested_model=model,
         )
     )
 
@@ -89,6 +95,14 @@ async def analyse_dataset(
         llm_invoked=result.llm_invoked,
         llm_bypassed=result.llm_bypassed,
         llm_context_mode=result.llm_context_mode,
+        llm_mode=result.llm_mode,
+        requested_provider=result.requested_provider or "",
+        requested_model=result.requested_model,
+        initial_provider=result.initial_provider or "",
+        final_provider=result.final_provider or "",
+        fallback_used=result.fallback_used,
+        fallback_reason=result.fallback_reason,
+        provider_attempts_json=json.dumps(result.provider_attempts),
     )
     db.add(db_record)
     db.commit()
@@ -116,6 +130,14 @@ async def analyse_dataset(
         llm_invoked=db_record.llm_invoked,
         llm_bypassed=db_record.llm_bypassed,
         llm_context_mode=db_record.llm_context_mode,
+        llm_mode=result.llm_mode,
+        requested_provider=result.requested_provider,
+        requested_model=result.requested_model,
+        initial_provider=result.initial_provider,
+        final_provider=result.final_provider,
+        provider_attempts=result.provider_attempts,
+        fallback_used=result.fallback_used,
+        fallback_reason=result.fallback_reason,
     )
 
 
@@ -162,4 +184,18 @@ def get_analysis(
         llm_invoked=latest.llm_invoked,
         llm_bypassed=latest.llm_bypassed,
         llm_context_mode=latest.llm_context_mode,
+        llm_mode=latest.llm_mode,
+        requested_provider=latest.requested_provider,
+        requested_model=latest.requested_model,
+        initial_provider=latest.initial_provider,
+        final_provider=latest.final_provider,
+        provider_attempts=latest.provider_attempts,
+        fallback_used=latest.fallback_used,
+        fallback_reason=latest.fallback_reason,
     )
+
+
+@router.get("/llm/providers", summary="Get available LLM providers")
+def get_llm_providers():
+    from services.provider_registry import get_registry
+    return get_registry()
