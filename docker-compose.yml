@@ -29,7 +29,7 @@ services:
       clamav-daemon:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/v1/version"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/v1/version', (res) => res.statusCode === 200 ? process.exit(0) : process.exit(1))"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -94,4 +94,6 @@ volumes:
     name: aegis_clamav_data
   aegis_db:
     name: aegis_node_db
+
+
 
