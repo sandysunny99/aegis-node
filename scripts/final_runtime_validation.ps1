@@ -49,6 +49,22 @@ while ($attempt -le $maxAttempts) {
             Write-Host "`nSuccess! Aegis Node is healthy."
             Write-Host "Health Response:"
             $health | ConvertTo-Json -Depth 3 | Write-Host
+            
+            $isClamAv = ($health.av_provider -eq "clamav_rest")
+            $isAvAvailable = ($health.av_available -eq $true)
+            $isMock = ($health.av_mock_mode -eq $true)
+            $avVersion = $health.av_version
+
+            if (-not $isClamAv -or -not $isAvAvailable -or $isMock) {
+                Write-Error "CRITICAL: AV provider state is not correct! Must be clamav_rest, available, and not mocked."
+                exit 1
+            }
+
+            if ($avVersion -eq "Unknown") {
+                Write-Host "`nWARN: AV_VERSION_UNRESOLVED - The actual version string could not be extracted." -ForegroundColor Yellow
+            } else {
+                Write-Host "`nAV Version verified: $avVersion" -ForegroundColor Green
+            }
             break
         } else {
             Write-Host -NoNewline "."
