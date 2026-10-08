@@ -49,7 +49,12 @@ class ClamAVRestProvider(AntivirusProvider):
                 if resp.status_code == 200:
                     data = resp.json()
                     if data.get("success"):
-                        return data.get("data", {}).get("clamav_version", "Unknown")
+                        version_data = data.get("data")
+                        if isinstance(version_data, str):
+                            return version_data
+                        elif isinstance(version_data, dict):
+                            return version_data.get("clamav_version", "Unknown")
+                        return "Unknown"
         except Exception:
             pass
         return "Unavailable"
