@@ -1,4 +1,5 @@
 import logging
+import os
 import threading
 import time
 import httpx
@@ -79,7 +80,8 @@ class ClamAVRestProvider(AntivirusProvider):
         try:
             with httpx.Client(timeout=60.0) as client:
                 with open(path, "rb") as fh:
-                    files = {"FILES": (path, fh)}
+                    filename = os.path.basename(path)
+                    files = {"FILES": (filename, fh, "application/octet-stream")}
                     resp = client.post(f"{self.api_url}/api/v1/scan", files=files)
                 
                 resp.raise_for_status()
@@ -106,7 +108,10 @@ class ClamAVRestProvider(AntivirusProvider):
 
         except (httpx.RequestError, httpx.HTTPStatusError, OSError) as exc:
             _last_failed_check = time.time()
-            logger.warning(f"ClamAV REST API unavailable at {self.api_url} - {exc}")
+            if isinstance(exc, httpx.HTTPStatusError):
+                logger.warning(f"ClamAV REST API unavailable at {self.api_url} - {exc}. Response: {exc.response.text}")
+            else:
+                logger.warning(f"ClamAV REST API unavailable at {self.api_url} - {exc}")
             return AVScanResult(
                 available=False,
                 infected=False,
