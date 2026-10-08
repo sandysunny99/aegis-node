@@ -98,22 +98,18 @@ app.include_router(remediation_router)
 @limiter.limit("60/minute")
 async def health(request: Request) -> dict:
     """Public health probe with UI status fields."""
-    # ClamAV ping — test live socket unless in mock mode
-    clamav_mock = bool(settings.clamav_mock_mode)
-    clamav_version = "Unavailable"
-    if clamav_mock:
-        clamav_running = False  # Explicitly false: running simulated/mock, not live daemon
-        clamav_version = "ClamAV (Mock)"
-    else:
-        try:
-            from scanner.clamd_client import ping as clamav_ping
-            from scanner.clamd_client import get_version as clamav_get_version
-            clamav_running = clamav_ping()
-            if clamav_running:
-                clamav_version = clamav_get_version()
-        except Exception:
-            clamav_running = False
-
+    from backend.services.av_providers import get_av_provider
+    try:
+        provider = get_av_provider()
+        av_provider_name = provider.provider_name
+        av_authority = provider.provider_authority
+        av_available = provider.ping()
+        av_version = provider.get_version() if av_available else "Unavailable"
+    except Exception:
+        av_provider_name = "unknown"
+        av_authority = "unknown"
+        av_available = False
+        av_version = "Unavailable"
     # AI availability check
     ai_provider = settings.ai_provider.strip().lower()
     
@@ -141,11 +137,11 @@ async def health(request: Request) -> dict:
     return {
         "status": "ok",
         "version": "1.0.0",
-        "clamav_running": clamav_running,
-        "clamav_mock": clamav_mock,
-        "clamav_mock_mode": clamav_mock,
-        "clamav_provider": "clamav-rest-api",
-        "clamav_version": clamav_version,
+        "av_available": av_available,
+        "av_authority": av_authority,
+        
+        "av_provider": av_provider_name,
+        "av_version": av_version,
         "ai_configured": ai_configured,
         "ai_provider": ai_provider,
         "ai_fallback_chain": ai_fallback_chain,

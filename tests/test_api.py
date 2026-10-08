@@ -61,7 +61,7 @@ class TestHealthEndpoint:
     def test_health_has_required_fields(self, client):
         resp = client.get("/health/diagnostics")
         data = resp.json()
-        assert "clamav_running" in data
+        assert "av_available" in data
         assert "ai_configured" in data
         assert "ai_provider" in data
         assert "supported_formats" in data
@@ -241,4 +241,5 @@ class TestSecurityEnhancements:
         )
         assert resp.status_code == 200
         assert len(resp.content) > 0
+
 
