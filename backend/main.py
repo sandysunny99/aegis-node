@@ -100,12 +100,17 @@ async def health(request: Request) -> dict:
     """Public health probe with UI status fields."""
     # ClamAV ping — test live socket unless in mock mode
     clamav_mock = bool(settings.clamav_mock_mode)
+    clamav_version = "Unavailable"
     if clamav_mock:
         clamav_running = False  # Explicitly false: running simulated/mock, not live daemon
+        clamav_version = "ClamAV (Mock)"
     else:
         try:
             from scanner.clamd_client import ping as clamav_ping
-            clamav_running = clamav_ping(host=settings.clamav_host, port=settings.clamav_port)
+            from scanner.clamd_client import get_version as clamav_get_version
+            clamav_running = clamav_ping()
+            if clamav_running:
+                clamav_version = clamav_get_version()
         except Exception:
             clamav_running = False
 
@@ -139,6 +144,8 @@ async def health(request: Request) -> dict:
         "clamav_running": clamav_running,
         "clamav_mock": clamav_mock,
         "clamav_mock_mode": clamav_mock,
+        "clamav_provider": "clamav-rest-api",
+        "clamav_version": clamav_version,
         "ai_configured": ai_configured,
         "ai_provider": ai_provider,
         "ai_fallback_chain": ai_fallback_chain,
@@ -185,3 +192,6 @@ else:
     @app.get("/", tags=["system"])
     async def root() -> dict:
         return {"message": "Aegis Node API — see /docs for usage. Frontend not bundled in dev mode."}
+
+
+

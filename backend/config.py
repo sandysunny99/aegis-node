@@ -131,8 +131,8 @@ class Settings(BaseSettings):
     turnstile_allowed_hostnames: str = "aegis-node.onrender.com"
 
     # ─── Scanner & Multi-Engine Detection ────────────────────────────────────
-    clamav_host: str = "localhost"
-    clamav_port: int = 3310
+    clamav_api_host: str = "localhost"
+    clamav_api_port: int = 3000
     clamav_mock_mode: bool = False
     max_upload_size_mb: int = 50
     enable_heuristics: bool = True  # Set ENABLE_HEURISTICS=false to disable Stage 0.5
@@ -293,6 +293,8 @@ class Settings(BaseSettings):
 
 # Singleton — import this from anywhere in the backend.
 settings = Settings()
+
+
 
 
 

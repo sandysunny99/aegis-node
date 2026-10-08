@@ -53,21 +53,20 @@ services:
       - key: FREELLMAPI_BASE_URL
         value: "http://localhost:3001/v1"
 
-
       # xAI / Grok — secondary AI provider (auto-failover from Gemini)
       # Key format: xai-...
       # Dashboard: https://console.x.ai/
       - key: XAI_API_KEY
         sync: false       # Set manually in Render dashboard
 
-      # ── ClamAV ────────────────────────────────────────────────────────────────      - key: CLAMAV_HOST
+      # ── ClamAV REST API ───────────────────────────────────────────────────────
+      - key: CLAMAV_API_HOST
         fromService:
           type: pserv
-          name: aegis-node-clamav
+          name: aegis-clamav-rest
           property: host
-
-      - key: CLAMAV_PORT
-        value: "3310"
+      - key: CLAMAV_API_PORT
+        value: "3000"
 
       - key: CLAMAV_MOCK_MODE
         value: "false"
@@ -88,10 +87,10 @@ services:
         value: sqlite:////tmp/aegis_node.db
 
       - key: ALLOWED_ORIGINS
-        value: "[\"https://aegis-node.vercel.app\"]"
+        value: '["https://aegis-node.onrender.com"]'
 
       - key: TRUSTED_PROXIES
-        value: "[\"10.0.0.0/8\",\"127.0.0.1\"]"
+        value: '["10.0.0.0/8", "127.0.0.1"]'
 
       # ── Auth & Token ──────────────────────────────────────────────────────────
       # Set API_KEY in Render dashboard to enable write-endpoint protection.
@@ -127,11 +126,26 @@ services:
         sync: false
 
 
-
-
-
+  # 1. Private REST API wrapper for ClamAV
   - type: pserv
-    name: aegis-node-clamav
+    name: aegis-clamav-rest
+    runtime: image
+    image:
+      url: docker.io/benzino77/clamav-rest-api:latest
+    plan: free
+    envVars:
+      - key: CLAMD_IP
+        value: "clamav-daemon"
+      - key: CLAMD_PORT
+        value: "3310"
+      - key: APP_PORT
+        value: "3000"
+      - key: APP_MAX_FILE_SIZE
+        value: "52428800"
+
+  # 2. Private ClamAV Daemon
+  - type: pserv
+    name: clamav-daemon
     runtime: image
     image:
       url: docker.io/clamav/clamav:stable

@@ -1,10 +1,8 @@
 services:
-  # ─── ClamAV Antivirus Daemon ──────────────────────────────────────────────
-  clamav:
+  # ─── ClamAV Antivirus Daemon ───────────────────────────────────────────────
+  clamav-daemon:
     image: clamav/clamav:stable
-    container_name: aegis-clamav
-    ports:
-      - "3310:3310"
+    container_name: aegis-clamav-daemon
     volumes:
       - clamav_data:/var/lib/clamav
     environment:
@@ -17,7 +15,27 @@ services:
       start_period: 120s  # ClamAV takes time for initial DB download (~250MB)
     restart: unless-stopped
 
-  # ─── Aegis Node (Backend + Frontend in one container) ─────────────────────
+  # ─── ClamAV REST API Wrapper ───────────────────────────────────────────────
+  clamav-rest:
+    image: benzino77/clamav-rest-api:latest
+    container_name: aegis-clamav-rest
+    environment:
+      - NODE_ENV=production
+      - CLAMD_IP=clamav-daemon
+      - CLAMD_PORT=3310
+      - APP_PORT=3000
+      - APP_MAX_FILE_SIZE=52428800
+    depends_on:
+      clamav-daemon:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/v1/version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # ─── Aegis Node (Backend + Frontend in one container) ──────────────────────────
   # Uses the root Dockerfile which builds React and bundles it with FastAPI.
   # Access the app at: http://localhost:8000
   app:
@@ -28,11 +46,11 @@ services:
     ports:
       - "8000:8000"
     environment:
-      # ClamAV — uses service name as hostname inside Docker network
-      - CLAMAV_HOST=clamav
-      - CLAMAV_PORT=3310
+      # ClamAV — connect via the REST wrapper
+      - CLAMAV_API_HOST=clamav-rest
+      - CLAMAV_API_PORT=3000
       - CLAMAV_MOCK_MODE=${CLAMAV_MOCK_MODE:-false}
-      # AI Provider — set to "gemini", "groq", "xai", "ollama", or "none"
+      # AI Provider
       - AI_PROVIDER=${AI_PROVIDER:-groq}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.0-flash}
@@ -61,7 +79,7 @@ services:
       # Persist uploads and DB across container restarts
       - ./data:/app/data
     depends_on:
-      clamav:
+      clamav-rest:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]

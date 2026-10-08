@@ -1,105 +1,51 @@
 """
-Aegis Node — ClamAV Daemon TCP Client.
-Connects to clamd on TCP port 3310 using the INSTREAM protocol.
-Falls back gracefully when daemon is unavailable (local dev without Docker).
-
-Protocol reference: https://linux.die.net/man/8/clamd
+Aegis Node — ClamAV REST API Client.
+Connects to a private benzino77/clamav-rest-api wrapper instance.
+Falls back gracefully when daemon is unavailable.
 """
 
 import logging
-import socket
-import struct
 import threading
 import time
 from dataclasses import dataclass
+import httpx
 
 logger = logging.getLogger(__name__)
-
-# ─── Default connection settings ─────────────────────────────────────────────
-_DEFAULT_HOST = "127.0.0.1"
-_DEFAULT_PORT = 3310
-_CONNECT_TIMEOUT = 0.5       # seconds (fast failure when daemon is offline)
-_CHUNK_SIZE = 4096           # bytes per INSTREAM chunk
-_MAX_RESPONSE_BYTES = 1024
 
 # Cache offline status for 5 seconds to avoid repeated socket timeouts when daemon is down
 _OFFLINE_CACHE_TTL = 5.0
 _last_failed_check: float = 0.0
-_offline_lock = threading.Lock()  # A-013: thread-safe offline cache
+_offline_lock = threading.Lock()
 
 
 @dataclass
 class ClamAVResult:
-    available: bool          # False when daemon is not reachable
+    available: bool          # False when API/daemon is not reachable
     infected: bool
     virus_name: str | None
     raw_response: str
     error: str | None
 
 
-def _clamd_instream(path: str, host: str, port: int) -> ClamAVResult:
-    """
-    Stream file bytes to clamd using the INSTREAM protocol.
-    Each chunk is prefixed with a 4-byte big-endian unsigned int length.
-    A zero-length chunk signals end of stream.
-    """
-    global _last_failed_check  # noqa: PLW0603
-
-    # A-013: thread-safe offline cache check (read-compare-write inside lock)
-    with _offline_lock:
-        if time.time() - _last_failed_check < _OFFLINE_CACHE_TTL:
-            return ClamAVResult(
-                available=False,
-                infected=False,
-                virus_name=None,
-                raw_response="",
-                error="ClamAV daemon offline (cached)",
-            )
-
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.settimeout(_CONNECT_TIMEOUT)
-            sock.connect((host, port))
-            sock.sendall(b"zINSTREAM\0")
-
-            with open(path, "rb") as fh:
-                while chunk := fh.read(_CHUNK_SIZE):
-                    sock.sendall(struct.pack("!I", len(chunk)) + chunk)
-
-            # Send EOF chunk
-            sock.sendall(struct.pack("!I", 0))
-
-            response = sock.recv(_MAX_RESPONSE_BYTES).decode("utf-8", errors="replace").strip().rstrip("\0")
-
-    except (TimeoutError, ConnectionRefusedError, OSError) as exc:
-        _last_failed_check = time.time()
-        logger.warning("ClamAV daemon unavailable at %s:%d — %s", host, port, exc)
-        return ClamAVResult(
-            available=False,
-            infected=False,
-            virus_name=None,
-            raw_response="",
-            error=str(exc),
-        )
-
-    # Response format: "stream: OK" or "stream: <VirusName> FOUND"
-    if "FOUND" in response:
-        parts = response.split(":")
-        virus = parts[-1].strip().replace(" FOUND", "").strip() if len(parts) > 1 else "Unknown"
-        return ClamAVResult(available=True, infected=True, virus_name=virus, raw_response=response, error=None)
-
-    if "OK" in response:
-        return ClamAVResult(available=True, infected=False, virus_name=None, raw_response=response, error=None)
-
-    # Unexpected response
-    return ClamAVResult(available=True, infected=False, virus_name=None, raw_response=response, error=f"Unexpected: {response}")
+def _get_api_url() -> str:
+    # Try to import from config, else default
+    for _mod in ("config", "backend.config"):
+        try:
+            import importlib
+            _cfg = importlib.import_module(_mod)
+            if getattr(_cfg, "settings", None) and hasattr(_cfg.settings, "clamav_api_host"):
+                host = _cfg.settings.clamav_api_host
+                port = getattr(_cfg.settings, "clamav_api_port", 3000)
+                if not host.startswith("http"):
+                    host = f"http://{host}"
+                return f"{host}:{port}"
+            break
+        except Exception:
+            continue
+    return "http://localhost:3000"
 
 
-def ping(host: str = _DEFAULT_HOST, port: int = _DEFAULT_PORT) -> bool:
-    """Returns True if clamd is reachable and responds to PING."""
-    if host.lower() == "mock":
-        return True
-    # Check mock mode — try both import paths (container: 'config', local dev: 'backend.config')
+def _check_mock_mode() -> bool:
     for _mod in ("config", "backend.config"):
         try:
             import importlib
@@ -109,32 +55,101 @@ def ping(host: str = _DEFAULT_HOST, port: int = _DEFAULT_PORT) -> bool:
             break
         except Exception:
             continue
+    return False
+
+
+def ping(api_url: str | None = None, host: str | None = None, port: int | None = None) -> bool:
+    """Returns True if clamav-rest-api is reachable and reports healthy ClamAV."""
+    # Note: host and port are accepted for backward compatibility with main.py/engine.py
+    if _check_mock_mode():
+        return True
+    
+    url = api_url or _get_api_url()
     try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.settimeout(_CONNECT_TIMEOUT)
-            sock.connect((host, port))
-            sock.sendall(b"zPING\0")
-            response = sock.recv(64).decode("utf-8", errors="replace").strip().rstrip("\0")
-            return response == "PONG"
-    except OSError:
-        return False
+        with httpx.Client(timeout=3.0) as client:
+            resp = client.get(f"{url.rstrip('/')}/api/v1/version")
+            if resp.status_code == 200:
+                data = resp.json()
+                return data.get("success", False)
+    except Exception:
+        pass
+    return False
 
 
-def scan_file(path: str, host: str = _DEFAULT_HOST, port: int = _DEFAULT_PORT) -> ClamAVResult:
+def get_version(api_url: str | None = None) -> str:
+    if _check_mock_mode():
+        return "ClamAV (Mock)"
+    
+    url = api_url or _get_api_url()
+    try:
+        with httpx.Client(timeout=3.0) as client:
+            resp = client.get(f"{url.rstrip('/')}/api/v1/version")
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("success"):
+                    return data.get("data", {}).get("clamav_version", "Unknown")
+    except Exception:
+        pass
+    return "Unavailable"
+
+
+def scan_file(path: str, api_url: str | None = None, host: str | None = None, port: int | None = None) -> ClamAVResult:
     """
-    Primary entry point — stream file to clamd and return the scan result.
-    If clamd is unreachable, returns ClamAVResult(available=False, infected=False).
+    Primary entry point — send file to clamav-rest-api and return the scan result.
+    If unreachable, returns ClamAVResult(available=False, infected=False).
     """
-    if host.lower() == "mock":
-        return ClamAVResult(available=True, infected=False, virus_name=None, raw_response="stream: OK (Mock)", error=None)
-    # Check mock mode — try both import paths (container: 'config', local dev: 'backend.config')
-    for _mod in ("config", "backend.config"):
-        try:
-            import importlib
-            _cfg = importlib.import_module(_mod)
-            if getattr(_cfg, "settings", None) and getattr(_cfg.settings, "clamav_mock_mode", False):
-                return ClamAVResult(available=True, infected=False, virus_name=None, raw_response="stream: OK (Mock)", error=None)
-            break
-        except Exception:
-            continue
-    return _clamd_instream(path, host, port)
+    if _check_mock_mode():
+        return ClamAVResult(available=True, infected=False, virus_name=None, raw_response="{\"success\":true,\"data\":{\"result\":[{\"is_infected\":false}]}} (Mock)", error=None)
+
+    global _last_failed_check
+
+    with _offline_lock:
+        if time.time() - _last_failed_check < _OFFLINE_CACHE_TTL:
+            return ClamAVResult(
+                available=False,
+                infected=False,
+                virus_name=None,
+                raw_response="",
+                error="ClamAV API offline (cached)",
+            )
+
+    url = api_url or _get_api_url()
+    
+    try:
+        with httpx.Client(timeout=60.0) as client:
+            with open(path, "rb") as fh:
+                files = {"FILES": (path, fh)}
+                resp = client.post(f"{url.rstrip('/')}/api/v1/scan", files=files)
+            
+            resp.raise_for_status()
+            data = resp.json()
+
+            if not data.get("success", False):
+                _last_failed_check = time.time()
+                error_msg = data.get("message", "Unknown upstream error")
+                return ClamAVResult(available=False, infected=False, virus_name=None, raw_response=resp.text, error=error_msg)
+
+            results = data.get("data", {}).get("result", [])
+            if not results:
+                return ClamAVResult(available=True, infected=False, virus_name=None, raw_response=resp.text, error="No result array")
+
+            first_result = results[0]
+            is_infected = first_result.get("is_infected", False)
+            viruses = first_result.get("viruses", [])
+
+            if is_infected:
+                virus_name = viruses[0] if viruses else "Unknown"
+                return ClamAVResult(available=True, infected=True, virus_name=virus_name, raw_response=resp.text, error=None)
+            
+            return ClamAVResult(available=True, infected=False, virus_name=None, raw_response=resp.text, error=None)
+
+    except (httpx.RequestError, httpx.HTTPStatusError, OSError) as exc:
+        _last_failed_check = time.time()
+        logger.warning("ClamAV REST API unavailable at %s — %s", url, exc)
+        return ClamAVResult(
+            available=False,
+            infected=False,
+            virus_name=None,
+            raw_response="",
+            error=str(exc),
+        )
