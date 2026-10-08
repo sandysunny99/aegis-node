@@ -1,4 +1,4 @@
-﻿Write-Host "============================================="
+Write-Host "============================================="
 Write-Host "INTERNAL EICAR PIPELINE TEST"
 Write-Host "============================================="
 Write-Host "Bypassing Windows Defender by testing entirely inside the Aegis Docker container."
@@ -19,10 +19,18 @@ with open('/tmp/eicar_internal.txt', 'rb') as f:
 print(f'\nHTTP Status: {resp.status_code}')
 try:
     data = resp.json()
-    print('\nAPI Response:')
-    print(json.dumps(data, indent=2))
+    dataset_id = data.get("dataset_id")
+    print(f"\nUploaded successfully! Dataset ID: {dataset_id}")
     
-    if data.get('scan_result', {}).get('clamav_status') == 'infected':
+    print("\n>>> TRIGGERING ANALYSIS (THIS RUNS CLAMAV)...")
+    analyse_resp = httpx.post(f"http://localhost:8000/api/v1/datasets/{dataset_id}/analyse", timeout=60.0)
+    
+    print(f"\nHTTP Status: {analyse_resp.status_code}")
+    analyse_data = analyse_resp.json()
+    print('\nAPI Response:')
+    print(json.dumps(analyse_data, indent=2))
+    
+    if analyse_data.get('scan_result', {}).get('clamav_status') == 'infected':
         print('\nSUCCESS! Real ClamAV correctly detected the EICAR file through Aegis!')
     else:
         print('\nFAILED! ClamAV did not detect the file as infected.')
