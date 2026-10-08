@@ -20,7 +20,7 @@ function friendlyError(status, fallback) {
   if (status === 429) return 'Too many requests — please wait a moment before trying again.';
   if (status === 403) return 'Access denied. The download link may have expired (60 min limit) — please re-run remediation.';
   if (status === 401) return 'API key required. Configure VITE_API_KEY in your environment.';
-  if (status === 413) return 'File is too large. Maximum upload size is 500 MB.';
+  if (status === 413) return 'File is too large. Maximum upload size is 50 MB.';
   if (status === 415) return 'Unsupported file type. Please upload a CSV, JSON, JSONL, Parquet, XLSX, or TXT file.';
   if (status === 404) return 'Resource not found. Please refresh and try again.';
   if (status === 500) return 'An internal server error occurred. Check that the backend is running.';
@@ -180,3 +180,4 @@ export async function getHistory(page = 1, pageSize = 20) {
 export async function healthCheck() {
   return request('/health');
 }
+

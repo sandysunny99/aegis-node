@@ -25,7 +25,7 @@ npm run dev
 ```
 
 ## Deployment Overview
-- **Frontend:** Vercel
+- **Frontend:** Render
 - **Backend:** Render (Docker)
 - **AI Gateway:** Cloudflare
 
@@ -38,3 +38,4 @@ Run the regression suite: `python -m pytest tests/ -v`
 ## Release Status & Limitations
 **RELEASE READY WITH DOCUMENTED LIMITATIONS.**
 Please review `docs/LIMITATIONS.md` for information regarding guardrail holdout metrics (80% / 20%), TI coverage limits, and binary remediation boundaries.
+
