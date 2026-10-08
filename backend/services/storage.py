@@ -215,7 +215,7 @@ def get_storage_backend() -> ArtifactStorage:
     # Resolve the data directory exactly as file_service.py did
     curr_dir = Path(__file__).resolve().parent
     root = curr_dir.parent.parent if curr_dir.parent.name == "backend" else curr_dir.parent
-    data_dir = root / "data"
+    data_dir = Path("/tmp/aegis_data") if Path("/.dockerenv").exists() else root / "data"
 
     # Try creating it to ensure permissions, fallback to /tmp/data if failed
     try:
