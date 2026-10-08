@@ -28,8 +28,8 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "Config is valid."
 
 # 3. Start stack
-Write-Host "`n[3/5] Starting Local Services..."
-docker compose up -d
+Write-Host "`n[3/5] Starting Local Services (with --build to pick up recent code changes)..."
+docker compose up -d --build
 docker compose ps
 
 # 4. Wait for health
