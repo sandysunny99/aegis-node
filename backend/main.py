@@ -141,6 +141,7 @@ async def health(request: Request) -> dict:
         "av_authority": av_authority,
         
         "av_provider": av_provider_name,
+        "av_mock_mode": getattr(provider, "mock_mode", False) if 'provider' in locals() else False,
         "av_version": av_version,
         "ai_configured": ai_configured,
         "ai_provider": ai_provider,
@@ -188,6 +189,9 @@ else:
     @app.get("/", tags=["system"])
     async def root() -> dict:
         return {"message": "Aegis Node API — see /docs for usage. Frontend not bundled in dev mode."}
+
+
+
 
 
 

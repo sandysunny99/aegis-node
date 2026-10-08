@@ -9,7 +9,7 @@ Write-Host "============================================="
 # 1. Verify Docker
 Write-Host "`n[1/5] Checking Docker..."
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
-    Write-Error "Docker is not installed or not in PATH. Please install Docker Desktop for Windows."
+    Write-Host "DOCKER_RUNTIME_UNAVAILABLE"
     exit 1
 }
 
@@ -44,7 +44,7 @@ $healthy = $false
 while ($attempt -le $maxAttempts) {
     try {
         $health = Invoke-RestMethod -Uri "http://localhost:8000/health" -Method Get -ErrorAction Stop
-        if ($health.av_available -eq $true) {
+        if ($health.av_available -eq $true -and $health.av_provider -eq "clamav_rest") {
             $healthy = $true
             Write-Host "`nSuccess! Aegis Node is healthy."
             Write-Host "Health Response:"
@@ -91,3 +91,5 @@ Write-Host "`nTo clean up after validation:"
 Write-Host "Remove-Item eicar.txt, safe_dataset.csv"
 Write-Host "docker compose down"
 Write-Host "============================================="
+
+

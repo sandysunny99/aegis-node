@@ -10,7 +10,7 @@ async def test_cloudflare_failure_mapping():
     from services.llm_service import _call_cloudflare
     
     with patch("services.ai_providers.cloudflare_provider.call_cloudflare") as mock_cf, \
-         patch("backend.services.llm_service.settings") as mock_settings:
+         patch("services.llm_service.settings") as mock_settings:
         mock_settings.cloudflare_api_token = "valid"
         mock_settings.cloudflare_account_id = "valid"
         # Test 401 Unauthorized
@@ -41,9 +41,9 @@ async def test_cloudflare_failure_mapping():
 @pytest.mark.asyncio
 async def test_fallback_chain_gemini_to_cloudflare():
     """Verify that a soft failure in Gemini triggers Cloudflare Workers AI."""
-    with patch("backend.services.llm_service._call_gemini") as mock_gemini, \
-         patch("backend.services.llm_service._call_cloudflare") as mock_cf, \
-         patch("backend.services.llm_service.settings") as mock_settings:
+    with patch("services.llm_service._call_gemini") as mock_gemini, \
+         patch("services.llm_service._call_cloudflare") as mock_cf, \
+         patch("services.llm_service.settings") as mock_settings:
          
          # Force the configuration chain
          mock_settings.ai_provider = "gemini"
@@ -71,9 +71,9 @@ async def test_fallback_chain_gemini_to_cloudflare():
 @pytest.mark.asyncio
 async def test_fallback_chain_ultimate_failure():
     """Verify that if all providers fail, a safe error is returned."""
-    with patch("backend.services.llm_service._call_gemini") as mock_gemini, \
-         patch("backend.services.llm_service._call_cloudflare") as mock_cf, \
-         patch("backend.services.llm_service.settings") as mock_settings:
+    with patch("services.llm_service._call_gemini") as mock_gemini, \
+         patch("services.llm_service._call_cloudflare") as mock_cf, \
+         patch("services.llm_service.settings") as mock_settings:
          
          # Force the configuration chain
          mock_settings.ai_provider = "gemini"
@@ -95,4 +95,5 @@ async def test_fallback_chain_ultimate_failure():
          assert mock_cf.called
          # Final result must reflect the failure safely
          assert final_result.status in ("failed", "timeout", "unavailable")
+
 

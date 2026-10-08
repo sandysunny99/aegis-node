@@ -202,7 +202,7 @@ def _determine_verdict(
     return "clean_verified", 0.0, limitations
 
 
-def run_scan(file_path: str, clamav_host: str = _CLAMAV_HOST, clamav_port: int = _CLAMAV_PORT) -> ScanEngineResult:
+def run_scan(file_path: str) -> ScanEngineResult:
     """
     Execute the full multi-stage scan pipeline against a file.
     Always returns a ScanEngineResult regardless of errors.
@@ -294,6 +294,8 @@ def run_scan(file_path: str, clamav_host: str = _CLAMAV_HOST, clamav_port: int =
         result.scan_duration_ms,
     )
     return result
+
+
 
 
 

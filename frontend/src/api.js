@@ -18,7 +18,11 @@ function authHeader() {
 /** Map HTTP status codes to user-friendly messages. */
 function friendlyError(status, fallback) {
   if (status === 429) return 'Too many requests — please wait a moment before trying again.';
-  if (status === 403) return 'Access denied. The download link may have expired (60 min limit) — please re-run remediation.';
+  if (status === 403) {
+    if (fallback && fallback.toLowerCase().includes('turnstile')) return 'Upload blocked: bot verification failed or is unavailable.';
+    if (fallback && fallback.toLowerCase().includes('download')) return 'Access denied: the sanitized download token may be invalid or expired.';
+    return fallback || 'Access denied.';
+  }
   if (status === 401) return 'API key required. Configure VITE_API_KEY in your environment.';
   if (status === 413) return 'File is too large. Maximum upload size is 50 MB.';
   if (status === 415) return 'Unsupported file type. Please upload a CSV, JSON, JSONL, Parquet, XLSX, or TXT file.';

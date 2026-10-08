@@ -134,17 +134,17 @@ function HealthStatus({ health }) {
       </div>
 
       {/* ClamAV */}
-      <div className="header-status" title={health.av_available ? (health.av_provider === 'metadefender' ? 'AV: MetaDefender Cloud (External)' : (health.clamav_mock ? 'AV: Mock/Test' : 'AV: ClamAV')) : (health.clamav_mock ? 'AV: Mock/Test' : 'AV: Unavailable')}>
+      <div className="header-status" title={health.av_available ? (health.av_provider === 'metadefender' ? 'AV: MetaDefender Cloud (External)' : (health.av_mock_mode ? 'AV: Mock/Test' : 'AV: ClamAV')) : (health.av_mock_mode ? 'AV: Mock/Test' : 'AV: Unavailable')}>
         <span style={{
           width: 7, height: 7, borderRadius: '50%', display: 'inline-block',
-          background: health.clamav_running
+          background: health.av_available
             ? 'var(--emerald)'
-            : (health.clamav_mock ? 'var(--cyan)' : 'var(--amber)'),
-          boxShadow: health.clamav_running
+            : (health.av_mock_mode ? 'var(--cyan)' : 'var(--amber)'),
+          boxShadow: health.av_available
             ? '0 0 6px var(--emerald)'
-            : (health.clamav_mock ? '0 0 6px var(--cyan)' : '0 0 6px var(--amber)'),
+            : (health.av_mock_mode ? '0 0 6px var(--cyan)' : '0 0 6px var(--amber)'),
         }} />
-        {health.av_available ? (health.av_provider === 'metadefender' ? 'AV: MetaDefender Cloud (External)' : (health.clamav_mock ? 'AV: Mock/Test' : 'AV: ClamAV')) : (health.clamav_mock ? 'AV: Mock/Test' : 'AV: Unavailable')}
+        {health.av_available ? (health.av_provider === 'metadefender' ? 'AV: MetaDefender Cloud (External)' : (health.av_mock_mode ? 'AV: Mock/Test' : 'AV: ClamAV')) : (health.av_mock_mode ? 'AV: Mock/Test' : 'AV: Unavailable')}
       </div>
 
       {/* AI */}
@@ -208,7 +208,7 @@ function ScanPage({ health }) {
   return (
     <>
       {/* Simulation Banner if ClamAV mock mode is active (A-019) */}
-      {health?.clamav_mock && (
+      {health?.av_mock_mode && (
         <div style={{
           padding: '0.625rem 1rem',
           background: 'rgba(6,182,212,0.08)',

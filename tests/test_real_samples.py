@@ -324,7 +324,7 @@ class TestFullPipeline:
         path = _tmp_bytes(b"payload\n" + eicar + b"\n")
         try:
             # Force ClamAV to an unreachable port
-            result = run_scan(str(path), clamav_host="127.0.0.1", clamav_port=59999)
+            from services.av_providers.clamav import ClamAVRestProvider; monkeypatch.setattr("scanner.engine.get_av_provider", lambda: ClamAVRestProvider("http://localhost:59999", mock_mode=False)); result = run_scan(str(path))
             assert result.clamav_status == "skipped"
             assert result.verdict == "malicious"
             rule_ids = [f["rule_id"] for f in result.to_findings_dicts()]
@@ -370,5 +370,7 @@ class TestFullPipeline:
                 os.unlink(clean_path)
         finally:
             os.unlink(path)
+
+
 
 

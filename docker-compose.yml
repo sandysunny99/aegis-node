@@ -49,7 +49,7 @@ services:
       # ClamAV — connect via the REST wrapper
       - AV_PROVIDER=clamav_rest
       - CLAMAV_API_URL=http://clamav-rest:3000
-      - CLAMAV_MOCK_MODE=${CLAMAV_MOCK_MODE:-false}
+      - CLAMAV_MOCK_MODE=false
       # AI Provider
       - AI_PROVIDER=${AI_PROVIDER:-groq}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
@@ -71,10 +71,10 @@ services:
       - API_KEY=${API_KEY:-}
       - DOWNLOAD_TOKEN_EXPIRY_MINUTES=${DOWNLOAD_TOKEN_EXPIRY_MINUTES:-60}
       # App
-      - APP_ENV=production
+      - APP_ENV=development
       - MAX_UPLOAD_SIZE_MB=50
       - DATABASE_URL=sqlite:////app/data/aegis_node.db
-      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-["*"]}
+      - ALLOWED_ORIGINS=["http://localhost:5173","http://localhost:8000"]
     volumes:
       # Persist uploads and DB across container restarts
       - ./data:/app/data
@@ -94,3 +94,4 @@ volumes:
     name: aegis_clamav_data
   aegis_db:
     name: aegis_node_db
+

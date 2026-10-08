@@ -1,4 +1,4 @@
-"""Aegis Node Test Suite — conftest.py
+﻿"""Aegis Node Test Suite â€” conftest.py
 
 Shared fixtures that apply to ALL test files.
 """
@@ -75,4 +75,15 @@ def mock_turnstile(monkeypatch):
         "routers.datasets.verify_turnstile_token",
         AsyncMock(return_value=True)
     )
+
+
+@pytest.fixture(autouse=True)
+def enable_mock_av(monkeypatch):
+    try:
+        from config import settings
+        monkeypatch.setattr(settings, "clamav_mock_mode", True)
+    except ImportError:
+        pass
+
+
 

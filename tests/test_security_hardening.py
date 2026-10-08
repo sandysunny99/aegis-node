@@ -133,7 +133,7 @@ def test_clamav_unavailable_yields_limited_verification(tmp_path: Path, monkeypa
     p.write_text("name,age,city\nAlice,30,New York\nBob,25,London\n", encoding="utf-8")
 
     # ClamAV on non-existent port
-    result = run_scan(str(p), clamav_host="127.0.0.1", clamav_port=9999)
+    from services.av_providers.clamav import ClamAVRestProvider; monkeypatch.setattr("scanner.engine.get_av_provider", lambda: ClamAVRestProvider("http://localhost:9999", mock_mode=False)); result = run_scan(str(p))
     assert result.clamav_available is False
     assert result.verdict == "clean_with_limitations"
     assert "CLAMAV_UNAVAILABLE" in result.verification_limitations
@@ -421,4 +421,6 @@ def test_llm_graceful_fallback_when_unavailable():
     )
     assert res.status in ("completed", "unavailable", "failed")
     assert res.verdict in ("clean", "suspicious", "high_risk", "inconclusive")
+
+
 

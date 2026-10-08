@@ -36,7 +36,7 @@ from scanner.engine import run_scan  # noqa: E402
 router = APIRouter(prefix="/api/v1/datasets", tags=["datasets"])
 
 # ─── Limits ───────────────────────────────────────────────────────────────────
-_MAX_UPLOAD_BYTES = 500 * 1024 * 1024  # 500 MB (matches MAX_UPLOAD_SIZE_MB in config)
+_MAX_UPLOAD_BYTES = settings.max_upload_size_mb * 1024 * 1024  # Enforces configured upload limit
 _CHUNK_SIZE_BYTES = 1024 * 1024       # 1 MB chunk size for streaming upload
 
 
@@ -476,4 +476,5 @@ def get_scan_report(
         findings=findings,
         threat_intel=ti_out,
     )
+
 
