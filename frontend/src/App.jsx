@@ -134,7 +134,7 @@ function HealthStatus({ health }) {
       </div>
 
       {/* ClamAV */}
-      <div className="header-status" title={health.clamav_running ? 'ClamAV daemon active' : (health.clamav_mock ? 'ClamAV: Simulated (heuristics active)' : 'ClamAV offline — rule-based scanning active')}>
+      <div className="header-status" title={health.av_available ? (health.av_provider === 'metadefender' ? 'AV: MetaDefender Cloud (External)' : (health.clamav_mock ? 'AV: Mock/Test' : 'AV: ClamAV')) : (health.clamav_mock ? 'AV: Mock/Test' : 'AV: Unavailable')}>
         <span style={{
           width: 7, height: 7, borderRadius: '50%', display: 'inline-block',
           background: health.clamav_running
@@ -144,9 +144,7 @@ function HealthStatus({ health }) {
             ? '0 0 6px var(--emerald)'
             : (health.clamav_mock ? '0 0 6px var(--cyan)' : '0 0 6px var(--amber)'),
         }} />
-        {health.clamav_running
-          ? 'AV: ClamAV'
-          : (health.clamav_mock ? 'AV: Simulated' : 'AV: Unavailable')}
+        {health.av_available ? (health.av_provider === 'metadefender' ? 'AV: MetaDefender Cloud (External)' : (health.clamav_mock ? 'AV: Mock/Test' : 'AV: ClamAV')) : (health.clamav_mock ? 'AV: Mock/Test' : 'AV: Unavailable')}
       </div>
 
       {/* AI */}
@@ -397,4 +395,6 @@ export default function App() {
     </>
   );
 }
+
+
 

@@ -297,3 +297,5 @@ def run_scan(file_path: str, clamav_host: str = _CLAMAV_HOST, clamav_port: int =
     )
     return result
 
+
+

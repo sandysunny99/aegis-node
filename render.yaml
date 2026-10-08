@@ -59,13 +59,13 @@ services:
       - key: XAI_API_KEY
         sync: false       # Set manually in Render dashboard
 
-      # ── ClamAV REST API ───────────────────────────────────────────────────────
-      - key: CLAMAV_API_URL
-        fromService:
-          type: pserv
-          name: aegis-clamav-rest
-          property: hostport
-
+      # ── AV Provider ───────────────────────────────────────────────────────────
+      - key: AV_PROVIDER
+        value: metadefender
+      - key: METADEFENDER_BASE_URL
+        value: "https://api.metadefender.com/v4"
+      - key: METADEFENDER_API_KEY
+        sync: false
       - key: CLAMAV_MOCK_MODE
         value: "false"
 
@@ -124,30 +124,5 @@ services:
         sync: false
 
 
-  # 1. Private REST API wrapper for ClamAV
-  - type: pserv
-    name: aegis-clamav-rest
-    runtime: image
-    image:
-      url: docker.io/benzino77/clamav-rest-api:latest
-    plan: standard
-    envVars:
-      - key: CLAMD_IP
-        fromService:
-          type: pserv
-          name: clamav-daemon
-          property: host
-      - key: CLAMD_PORT
-        value: "3310"
-      - key: APP_PORT
-        value: "3000"
-      - key: APP_MAX_FILE_SIZE
-        value: "52428800"
-
-  # 2. Private ClamAV Daemon
-  - type: pserv
-    name: clamav-daemon
-    runtime: image
-    image:
-      url: docker.io/clamav/clamav:stable
-    plan: standard
+  # Remove private services entirely for Render deployment. 
+  # Render environment will use the external MetaDefender Cloud provider.
