@@ -44,3 +44,4 @@ def test_eicar_remediation_and_rescan(tmp_path):
     rescan = run_scan(str(clean_f))
     assert rescan.verdict in ("clean", "clean_verified", "clean_with_limitations")
     assert rescan.threats_found_count == 0
+

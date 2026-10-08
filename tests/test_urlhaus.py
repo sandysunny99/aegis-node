@@ -2,7 +2,7 @@ import pytest
 import httpx
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from backend.services.threat_intelligence.urlhaus import lookup_url, _CACHE, _normalize_url
+from services.threat_intelligence.urlhaus import lookup_url, _CACHE, _normalize_url
 
 @pytest.fixture(autouse=True)
 def clear_cache():
@@ -10,7 +10,7 @@ def clear_cache():
 
 @pytest.fixture
 def mock_uh_settings():
-    from backend.services.threat_intelligence.urlhaus import settings
+    from services.threat_intelligence.urlhaus import settings
     old_enabled = settings.enable_urlhaus
     old_key = getattr(settings, 'urlhaus_auth_key', None)
     settings.enable_urlhaus = True
@@ -29,7 +29,7 @@ async def test_invalid_url_format(mock_uh_settings):
 
 @pytest.mark.asyncio
 async def test_missing_api_key():
-    from backend.services.threat_intelligence.urlhaus import settings
+    from services.threat_intelligence.urlhaus import settings
     old_key = getattr(settings, 'urlhaus_auth_key', None)
     settings.enable_urlhaus = True
     settings.urlhaus_auth_key = ""
@@ -213,3 +213,4 @@ def test_url_normalization():
     assert _normalize_url("HTTP://Example.COM/Path") == "http://example.com/Path"
     assert _normalize_url("https://example.com/#fragment") == "https://example.com/"
     assert _normalize_url("https://example.com/?q=1") == "https://example.com/?q=1"
+

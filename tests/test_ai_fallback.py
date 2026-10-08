@@ -350,3 +350,4 @@ def test_fallback_does_not_sleep_on_retry_after(monkeypatch):
 
     assert res.status == 'unavailable'
     sleep_mock.assert_not_called()
+

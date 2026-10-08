@@ -3,7 +3,7 @@ import time
 from email.utils import formatdate
 import httpx
 
-from backend.services.llm_error_classifier import (
+from services.llm_error_classifier import (
     classify_error, 
     parse_retry_after, 
     AegisProviderErrorType
@@ -102,3 +102,4 @@ def test_security_payload_not_in_exception():
     # and NEVER stores the exception text
     assert class_auth.category == AegisProviderErrorType.AUTHENTICATION_ERROR
     assert not hasattr(class_auth, "raw_message")
+

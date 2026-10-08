@@ -151,3 +151,4 @@ def test_engine_sha256_matches(tmp_path):
     expected_hash = hashlib.sha256(content_bytes).hexdigest()
     result = run_scan(str(path))
     assert result.sha256_hash == expected_hash
+

@@ -208,3 +208,4 @@ class TestMalwareAndFormatSanitization:
         assert scan_after.verdict in ("clean", "clean_verified", "clean_with_limitations")
         assert scan_after.threats_found_count == 0
 
+

@@ -371,3 +371,4 @@ class TestFullPipeline:
         finally:
             os.unlink(path)
 
+

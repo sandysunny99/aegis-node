@@ -5,3 +5,4 @@ id,encoding_type,payload,is_suspicious
 4,hex_safe,48656c6c6f20576f726c64,false
 5,url_sqli,%27%20OR%20%271%27%3D%271,true
 6,html_xss,&lt;script&gt;alert(1)&lt;/script&gt;,true
+

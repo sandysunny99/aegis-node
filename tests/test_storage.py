@@ -5,7 +5,7 @@ import hashlib
 from unittest.mock import MagicMock, patch
 from botocore.exceptions import ClientError, EndpointConnectionError
 
-from backend.services.storage import (
+from services.storage import (
     LocalArtifactStorage,
     R2ArtifactStorage,
     StorageUnavailableError,
@@ -98,3 +98,4 @@ def test_r2_missing_object(mock_r2_storage):
     
     with pytest.raises(FileNotFoundError):
         storage.get_object("missing.txt")
+

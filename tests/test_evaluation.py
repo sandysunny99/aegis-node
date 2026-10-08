@@ -145,3 +145,4 @@ def test_report_generator(tmp_path, monkeypatch):
     md_content = report_path.read_text(encoding="utf-8")
     assert "Research Evaluation Report" in md_content
     assert "Hypotheses Verification" in md_content
+

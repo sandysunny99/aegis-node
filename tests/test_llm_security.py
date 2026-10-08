@@ -151,3 +151,4 @@ def test_llm_valid_json_parsed_into_pydantic_model():
     assert parsed.severity == "high"
     assert parsed.confidence == 0.95
     assert len(parsed.recommendations) == 1
+

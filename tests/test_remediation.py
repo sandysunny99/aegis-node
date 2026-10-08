@@ -161,3 +161,4 @@ def test_download_sanitized_endpoint_and_path_traversal():
     res_dl_ok = client.get(f"/api/v1/datasets/{ds_id}/download-sanitized", params={"token": dl_token})
     assert res_dl_ok.status_code == 200
     assert "attachment; filename=\"sanitized_dummy.csv\"" in res_dl_ok.headers.get("content-disposition", "")
+

@@ -83,3 +83,4 @@ def test_real_sample_eicar_file():
     assert dl.status_code == 200
     assert b"[REMOVED]" in dl.content
     assert b"EICAR" not in dl.content
+

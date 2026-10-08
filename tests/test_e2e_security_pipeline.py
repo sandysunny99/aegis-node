@@ -294,3 +294,4 @@ def test_hash_provenance_integrity(tmp_path: Path):
     hash_san = hashlib.sha256(res_mod.sanitized_bytes).hexdigest()
     assert hash_orig != hash_san
     assert compute_sha256(p1) == hash_orig  # Original disk file completely unmodified
+

@@ -34,7 +34,7 @@ import pytest
 from fastapi.testclient import TestClient
 from main import app
 from models import DatasetRecord, ScanReportRecord
-from backend.services.av_providers import AVScanResult as ClamAVResult
+from services.av_providers import AVScanResult as ClamAVResult
 from scanner.content_checker import check_file, raw_bytes_scan
 from scanner.engine import _determine_verdict, run_scan
 from scanner.sanitizer import _remediate_formula_cell, _remediate_malware_cell, sanitize_file
@@ -421,3 +421,4 @@ def test_llm_graceful_fallback_when_unavailable():
     )
     assert res.status in ("completed", "unavailable", "failed")
     assert res.verdict in ("clean", "suspicious", "high_risk", "inconclusive")
+

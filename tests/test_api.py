@@ -20,7 +20,7 @@ from fastapi.testclient import TestClient
 @pytest.fixture(scope="module")
 def client():
     """Create a FastAPI TestClient for integration testing."""
-    from backend.main import app
+    from main import app
     return TestClient(app)
 
 
@@ -241,5 +241,6 @@ class TestSecurityEnhancements:
         )
         assert resp.status_code == 200
         assert len(resp.content) > 0
+
 
 

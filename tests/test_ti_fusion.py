@@ -1,8 +1,8 @@
 import pytest
 from datetime import datetime
 
-from backend.schemas import NormalizedTIEvidence, TIFusionReport
-from backend.services.threat_intelligence.fusion import _fuse_evidence, fuse_reports, evaluate_local_verdict_conflict
+from schemas import NormalizedTIEvidence, TIFusionReport
+from services.threat_intelligence.fusion import _fuse_evidence, fuse_reports, evaluate_local_verdict_conflict
 
 def test_normalization_models():
     """Verify the normalized models match the expected structure."""
@@ -76,3 +76,4 @@ def test_conflict_local_malicious_ti_unavailable():
     
     conflict = evaluate_local_verdict_conflict("malicious", report)
     assert conflict is None
+

@@ -2,7 +2,7 @@ import pytest
 import httpx
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from backend.services.threat_intelligence.abuseipdb import lookup_ip, _CACHE, _is_public_ip, _normalize_ip
+from services.threat_intelligence.abuseipdb import lookup_ip, _CACHE, _is_public_ip, _normalize_ip
 
 @pytest.fixture(autouse=True)
 def clear_cache():
@@ -10,7 +10,7 @@ def clear_cache():
 
 @pytest.fixture
 def mock_ab_settings():
-    from backend.services.threat_intelligence.abuseipdb import settings
+    from services.threat_intelligence.abuseipdb import settings
     old_enabled = settings.enable_abuseipdb
     old_key = getattr(settings, 'abuseipdb_api_key', None)
     settings.enable_abuseipdb = True
@@ -53,7 +53,7 @@ async def test_invalid_ip_rejection(mock_ab_settings):
 
 @pytest.mark.asyncio
 async def test_missing_api_key():
-    from backend.services.threat_intelligence.abuseipdb import settings
+    from services.threat_intelligence.abuseipdb import settings
     old_key = getattr(settings, 'abuseipdb_api_key', None)
     settings.enable_abuseipdb = True
     settings.abuseipdb_api_key = ""
@@ -190,3 +190,4 @@ async def test_cache_behavior_and_isolation(mock_get, mock_ab_settings):
     res3 = await lookup_ip(ip2)
     assert mock_get.call_count == 2
     assert res3.status == "malicious"
+

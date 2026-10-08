@@ -314,3 +314,4 @@ def test_observability_metadata(monkeypatch):
         assert res.provider_attempts == ["groq"]
         assert res.fallback_used is False
         assert res.fallback_reason is None
+

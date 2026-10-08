@@ -130,3 +130,4 @@ def test_history_requires_api_key_when_configured(monkeypatch):
     assert auth_resp.status_code == 200
 
 
+

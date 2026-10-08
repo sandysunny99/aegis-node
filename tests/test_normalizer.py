@@ -68,3 +68,4 @@ def test_bounded_recursion_on_deep_nesting():
     nested = "%2525253Cscript%2525253E"
     norm, transformations = normalize_text(nested, max_depth=3)
     assert len(transformations) <= 3
+

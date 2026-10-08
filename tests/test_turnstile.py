@@ -82,3 +82,4 @@ async def test_turnstile_already_spent_token_rejected():
         mock_settings.cloudflare_turnstile_secret_key = "0x4AAAAAAtest"
         res = await verify_turnstile_token("spent-token")
         assert res is False
+

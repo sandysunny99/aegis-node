@@ -502,3 +502,4 @@ class TestHeuristicsDisableFlag:
             assert "HEUR-001" in [f.rule_id for f in findings]
         finally:
             _cleanup(path)
+

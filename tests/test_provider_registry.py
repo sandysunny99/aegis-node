@@ -1,6 +1,6 @@
 import pytest
-from backend.services.provider_registry import get_registry, get_allowed_providers, validate_provider_selection, _is_configured
-from backend.config import Settings
+from services.provider_registry import get_registry, get_allowed_providers, validate_provider_selection, _is_configured
+from config import Settings
 
 def test_registry_builds_correctly(monkeypatch):
     registry = get_registry()
@@ -9,7 +9,7 @@ def test_registry_builds_correctly(monkeypatch):
     assert len(registry["providers"]) > 0
 
 def test_is_configured(monkeypatch):
-    from backend.config import settings
+    from config import settings
     monkeypatch.setattr(settings, "groq_api_key", "secret")
     assert _is_configured("groq") is True
     
@@ -17,7 +17,7 @@ def test_is_configured(monkeypatch):
     assert _is_configured("nvidia") is False
 
 def test_get_allowed_providers(monkeypatch):
-    from backend.config import settings
+    from config import settings
     monkeypatch.setattr(settings, "groq_api_key", "secret")
     monkeypatch.setattr(settings, "cloudflare_api_token", "")
     allowed = get_allowed_providers()
@@ -28,6 +28,7 @@ def test_validate_provider_selection_rejects_unknown(monkeypatch):
     assert validate_provider_selection("nonexistent") is False
 
 def test_validate_provider_selection_accepts_known(monkeypatch):
-    from backend.config import settings
+    from config import settings
     monkeypatch.setattr(settings, "groq_api_key", "secret")
     assert validate_provider_selection("groq") is True
+

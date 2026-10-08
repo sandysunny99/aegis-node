@@ -59,3 +59,4 @@ def test_cloudflare_in_provider_chain():
     cfg.ai_fallback_chain = "cloudflare,groq"
     chain = _build_provider_chain(cfg)
     assert chain == [("gemini", False), ("cloudflare", True), ("groq", True)]
+

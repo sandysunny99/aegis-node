@@ -68,3 +68,4 @@ def test_prompt_injection_benchmark_metrics(benchmark_data):
     assert fp == 0, f"Expected 0 false positives on benign hard negatives, got {fp}"
     assert tp >= 20, f"Expected high recall on adversarial attacks, detected {tp}/25"
     assert precision == 1.0, f"Expected 100% precision, got {precision:.4f}"
+

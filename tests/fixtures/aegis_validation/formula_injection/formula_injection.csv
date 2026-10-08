@@ -3,3 +3,4 @@ id,account_balance,phone_code,twitter_handle,formula_col
 2,-100.25,+1,@bob_security,"=CMD(""test"")"
 3,-0.005,+44,@charlie_data,=SUM(A1:A10)
 4,450.00,+33,@david_analyst,=1+1
+

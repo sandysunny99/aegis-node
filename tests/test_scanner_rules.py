@@ -163,3 +163,4 @@ class TestNullByteDetection:
         findings = _check_string_value("completely clean value", "field", "1")
         null_findings = [f for f in findings if f.rule_id == "BIN-001"]
         assert len(null_findings) == 0
+

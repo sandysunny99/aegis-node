@@ -25,7 +25,7 @@ def disable_rate_limits():
     """Globally disable the SlowAPI limiter during test execution."""
     # Attempt to import limiter directly
     try:
-        from backend.limiter import limiter
+        from limiter import limiter
         limiter.enabled = False
     except ImportError:
         pass
@@ -75,3 +75,4 @@ def mock_turnstile(monkeypatch):
         "routers.datasets.verify_turnstile_token",
         AsyncMock(return_value=True)
     )
+

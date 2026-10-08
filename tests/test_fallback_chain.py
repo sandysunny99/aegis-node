@@ -1,13 +1,13 @@
 import pytest
 from unittest.mock import patch, MagicMock
-from backend.services.llm_service import analyse, LlmAnalysisResult
-from backend.schemas import ThreatFinding
+from services.llm_service import analyse, LlmAnalysisResult
+from schemas import ThreatFinding
 
 @pytest.mark.asyncio
 async def test_cloudflare_failure_mapping():
     """Verify Cloudflare API error codes map to explicit soft failure statuses."""
-    from backend.services.ai_providers.cloudflare_provider import call_cloudflare
-    from backend.services.llm_service import _call_cloudflare
+    from services.ai_providers.cloudflare_provider import call_cloudflare
+    from services.llm_service import _call_cloudflare
     
     with patch("services.ai_providers.cloudflare_provider.call_cloudflare") as mock_cf, \
          patch("backend.services.llm_service.settings") as mock_settings:
@@ -95,3 +95,4 @@ async def test_fallback_chain_ultimate_failure():
          assert mock_cf.called
          # Final result must reflect the failure safely
          assert final_result.status in ("failed", "timeout", "unavailable")
+

@@ -2,7 +2,7 @@ import pytest
 import httpx
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from backend.services.threat_intelligence.virustotal import lookup_file_hash, _CACHE
+from services.threat_intelligence.virustotal import lookup_file_hash, _CACHE
 
 @pytest.fixture(autouse=True)
 def clear_cache():
@@ -10,7 +10,7 @@ def clear_cache():
     
 @pytest.fixture
 def mock_vt_settings():
-    from backend.services.threat_intelligence.virustotal import settings
+    from services.threat_intelligence.virustotal import settings
     old_enabled = settings.enable_virustotal
     old_key = settings.virustotal_api_key
     settings.enable_virustotal = True
@@ -29,7 +29,7 @@ async def test_invalid_hash_format(mock_vt_settings):
 
 @pytest.mark.asyncio
 async def test_missing_api_key():
-    from backend.services.threat_intelligence.virustotal import settings
+    from services.threat_intelligence.virustotal import settings
     old_key = settings.virustotal_api_key
     settings.enable_virustotal = True
     settings.virustotal_api_key = ""
@@ -153,3 +153,4 @@ async def test_cache_behavior(mock_get, mock_vt_settings):
     # Different hash misses cache
     res3 = await lookup_file_hash("3" * 64)
     assert mock_get.call_count == 2
+
