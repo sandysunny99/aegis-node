@@ -17,14 +17,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 try:
-    from scanner.clamd_client import ClamAVResult
-    from scanner.clamd_client import scan_file as clamd_scan
+    from backend.services.av_providers import AVScanResult as ClamAVResult, get_av_provider
     from scanner.content_checker import ContentCheckResult, ContentFinding, check_file
     from scanner.heuristics import heuristic_scan
     from scanner.yara_scanner import yara_scanner
 except ImportError:
-    from clamd_client import ClamAVResult  # type: ignore[no-redef]
-    from clamd_client import scan_file as clamd_scan  # type: ignore[no-redef]
+    from backend.services.av_providers import AVScanResult as ClamAVResult, get_av_provider  # type: ignore[no-redef]
     from content_checker import (  # type: ignore[no-redef]
         ContentCheckResult,
         ContentFinding,
@@ -229,7 +227,7 @@ def run_scan(file_path: str, clamav_host: str = _CLAMAV_HOST, clamav_port: int =
 
     # ─── Stage 1: ClamAV ─────────────────────────────────────────────────────
     logger.info("Stage 1: ClamAV scan for %s", path.name)
-    clam: ClamAVResult = clamd_scan(file_path, host=clamav_host, port=clamav_port)
+    clam: ClamAVResult = get_av_provider().scan_file(file_path)
     result.clamav_available = clam.available
 
     if not clam.available:

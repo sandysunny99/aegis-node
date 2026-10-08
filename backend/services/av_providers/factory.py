@@ -1,10 +1,37 @@
 import logging
 from backend.config import settings
-from .base import AntivirusProvider
+from .base import AntivirusProvider, AVScanResult
 from .clamav import ClamAVRestProvider
 from .metadefender import MetaDefenderProvider
 
 logger = logging.getLogger(__name__)
+
+class InvalidProvider(AntivirusProvider):
+    def __init__(self, provider_name: str):
+        self._name = provider_name
+
+    @property
+    def provider_name(self) -> str:
+        return self._name
+
+    @property
+    def provider_authority(self) -> str:
+        return "invalid"
+
+    def ping(self) -> bool:
+        return False
+
+    def get_version(self) -> str:
+        return "Invalid Provider Configuration"
+
+    def scan_file(self, path: str) -> AVScanResult:
+        return AVScanResult(
+            available=False,
+            infected=False,
+            virus_name=None,
+            raw_response="",
+            error=f"Invalid AV provider configured: {self._name}"
+        )
 
 def get_av_provider() -> AntivirusProvider:
     provider = settings.av_provider.lower().strip()
@@ -19,7 +46,8 @@ def get_av_provider() -> AntivirusProvider:
             api_url=settings.clamav_api_url,
             mock_mode=settings.clamav_mock_mode
         )
+    elif provider == "none":
+        return InvalidProvider("none")
     else:
-        # Fallback to a stub provider or log warning and use ClamAV mock
-        logger.warning(f"Unknown AV provider '{provider}', defaulting to ClamAV (Mock)")
-        return ClamAVRestProvider(api_url="http://localhost:3000", mock_mode=True)
+        logger.error(f"Unknown AV provider '{provider}' configured! Falling back to safe unavailable state.")
+        return InvalidProvider(provider)

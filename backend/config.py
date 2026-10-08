@@ -131,9 +131,12 @@ class Settings(BaseSettings):
     turnstile_allowed_hostnames: str = "aegis-node.onrender.com"
 
     # ─── Scanner & Multi-Engine Detection ────────────────────────────────────
-    clamav_api_host: str = "localhost"
-    clamav_api_port: int = 3000
+    av_provider: str = "clamav_rest"
+    clamav_api_url: str = "http://localhost:3000"
     clamav_mock_mode: bool = False
+    metadefender_api_key: str = ""
+    metadefender_base_url: str = "https://api.metadefender.com/v4"
+    metadefender_timeout_seconds: int = 60
     max_upload_size_mb: int = 50
     enable_heuristics: bool = True  # Set ENABLE_HEURISTICS=false to disable Stage 0.5
     enable_yara: bool = True        # Set ENABLE_YARA=false to disable Stage 1.5

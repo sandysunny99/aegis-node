@@ -34,7 +34,7 @@ import pytest
 from fastapi.testclient import TestClient
 from main import app
 from models import DatasetRecord, ScanReportRecord
-from scanner.clamd_client import ClamAVResult
+from backend.services.av_providers import AVScanResult as ClamAVResult
 from scanner.content_checker import check_file, raw_bytes_scan
 from scanner.engine import _determine_verdict, run_scan
 from scanner.sanitizer import _remediate_formula_cell, _remediate_malware_cell, sanitize_file
@@ -155,7 +155,10 @@ def test_clamav_timeout_handling(tmp_path: Path):
         raw_response="ERROR",
         error="Connection timeout after 5.0s",
     )
-    with patch("scanner.engine.clamd_scan", return_value=mock_clam):
+    with patch("scanner.engine.get_av_provider") as mock_get_av:
+        mock_provider = mock_get_av.return_value
+        mock_provider.scan_file.return_value = mock_clam
+
         result = run_scan(str(p))
         assert result.clamav_available is False
         assert "CLAMAV_UNAVAILABLE" in result.verification_limitations
