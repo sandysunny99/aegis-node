@@ -59,6 +59,12 @@ services:
       - GROQ_MODEL=${GROQ_MODEL:-openai/gpt-oss-20b}
       - XAI_API_KEY=${XAI_API_KEY:-}
       - XAI_MODEL=${XAI_MODEL:-grok-3-mini}
+        - NVIDIA_API_KEY=${NVIDIA_API_KEY:-}
+        - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN:-}
+        - CLOUDFLARE_ACCOUNT_ID=${CLOUDFLARE_ACCOUNT_ID:-}
+        - HF_TOKEN=${HF_TOKEN:-}
+        - FREELLMAPI_API_KEY=${FREELLMAPI_API_KEY:-}
+        - FREELLMAPI_ENABLED=${FREELLMAPI_ENABLED:-true}
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       # AI Fallback
       - AI_FALLBACK_CHAIN=${AI_FALLBACK_CHAIN:-nvidia,cloudflare,huggingface,freellmapi}
