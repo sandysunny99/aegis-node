@@ -41,15 +41,21 @@ export default function HistoryPage() {
               <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', fontSize: '0.8rem' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.65rem', color: 'var(--text-3)' }}>RISK</span>
-                  <strong style={{ color: item.risk_score > 6 ? 'var(--rose)' : item.risk_score > 3 ? 'var(--amber)' : 'var(--emerald)' }}>{item.risk_score.toFixed(1)}</strong>
+                  <strong style={{ color: item.risk_score === null ? 'var(--text-3)' : item.risk_score > 6 ? 'var(--rose)' : item.risk_score > 3 ? 'var(--amber)' : 'var(--emerald)' }}>
+                    {item.risk_score !== null ? item.risk_score.toFixed(1) : 'N/A'}
+                  </strong>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.65rem', color: 'var(--text-3)' }}>VERDICT</span>
-                  <strong style={{ color: item.verdict === 'malicious' ? 'var(--rose)' : item.verdict === 'suspicious' ? 'var(--amber)' : 'var(--emerald)' }}>{item.verdict.toUpperCase()}</strong>
+                  <strong style={{ color: item.verdict === 'malicious' ? 'var(--rose)' : item.verdict === 'suspicious' ? 'var(--amber)' : item.verdict === null ? 'var(--text-3)' : 'var(--emerald)' }}>
+                    {item.verdict ? item.verdict.toUpperCase() : 'PENDING'}
+                  </strong>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.65rem', color: 'var(--text-3)' }}>THREATS</span>
-                  <strong style={{ color: item.threats_found_count > 0 ? 'var(--rose)' : 'var(--emerald)' }}>{item.threats_found_count}</strong>
+                  <strong style={{ color: item.threats_found_count > 0 ? 'var(--rose)' : item.threats_found_count === null ? 'var(--text-3)' : 'var(--emerald)' }}>
+                    {item.threats_found_count !== null ? item.threats_found_count : '-'}
+                  </strong>
                 </div>
               </div>
             </div>
