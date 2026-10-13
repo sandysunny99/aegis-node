@@ -49,3 +49,9 @@ tests/
 # Logs
 *.log
 logs/
+
+# Runtime uploads and stale SPA build output
+data/originals/
+backend/static/
+*.env
+!.env.example
