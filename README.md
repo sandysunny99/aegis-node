@@ -41,11 +41,11 @@ Please review `docs/LIMITATIONS.md` for information regarding guardrail holdout 
 
 
 ## Local Docker Validation
-For validating the local ClamAV integration on a Windows machine:
-1. Install **Docker Desktop** and ensure docker compose is available.
-2. Run .\scripts\final_runtime_validation.ps1 from PowerShell.
-3. Open http://localhost:8000 in your browser.
-4. Follow the script instructions to upload the generated harmless eicar.txt test artifact.
-5. Upload safe_dataset.csv to verify full E2E pipeline.
-**WARNING:** Do not upload the EICAR file to public threat intelligence services (e.g. VirusTotal).
-
+To validate the local ClamAV integration on Windows, install and start **Docker Desktop**, then run
+`.\scripts\final_runtime_validation.ps1` from PowerShell. The script starts the Compose `app`
+service and its declared dependencies, waits for ClamAV REST and Aegis readiness, then submits a
+harmless CSV and the standard EICAR test signature from memory through Aegis's upload and scan
+endpoints. It fails unless Aegis reports an actual ClamAV clean result for the harmless file and a
+ClamAV EICAR detection for the test signature. No EICAR file is written to the Windows filesystem,
+and host security protection should remain enabled. Do not send the EICAR fixture to public threat
+intelligence services (for example, VirusTotal).
