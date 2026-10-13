@@ -80,10 +80,11 @@ services:
       # App
       - APP_ENV=development
       - MAX_UPLOAD_SIZE_MB=50
+      - DATA_DIR=/app/data
       - DATABASE_URL=sqlite:////app/data/aegis_node.db
       - ALLOWED_ORIGINS=["http://localhost:5173","http://localhost:8000"]
     volumes:
-      # Persist uploads and DB across container restarts
+      # Persist uploaded/sanitized artifacts and the SQLite database across restarts
       - ./data:/app/data
     depends_on:
       clamav-rest:
@@ -101,6 +102,5 @@ volumes:
     name: aegis_clamav_data
   aegis_db:
     name: aegis_node_db
-
 
 

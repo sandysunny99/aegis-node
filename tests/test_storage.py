@@ -11,11 +11,21 @@ from services.storage import (
     StorageUnavailableError,
     StorageError,
     StorageIntegrityError,
+    get_data_directory,
 )
 
 @pytest.fixture
 def temp_local_storage(tmp_path):
     return LocalArtifactStorage(tmp_path)
+
+
+def test_data_directory_uses_configured_path(tmp_path, monkeypatch):
+    data_dir = tmp_path / "persistent-data"
+    monkeypatch.setattr("services.storage.settings.data_dir", data_dir)
+
+    assert get_data_directory() == data_dir
+    assert data_dir.is_dir()
+
 
 def test_local_storage_lifecycle(temp_local_storage):
     content = b"test payload"
@@ -98,4 +108,3 @@ def test_r2_missing_object(mock_r2_storage):
     
     with pytest.raises(FileNotFoundError):
         storage.get_object("missing.txt")
-

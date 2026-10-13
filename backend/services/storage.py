@@ -9,6 +9,25 @@ from config import settings
 
 logger = logging.getLogger(__name__)
 
+
+def get_data_directory() -> Path:
+    """Resolve the configured local artifact directory, with a logged writable fallback."""
+    data_dir = settings.data_dir
+    try:
+        data_dir.mkdir(parents=True, exist_ok=True)
+        return data_dir
+    except OSError as exc:
+        fallback = Path("/tmp/aegis_data")
+        fallback.mkdir(parents=True, exist_ok=True)
+        logger.warning(
+            "Cannot create configured data directory %s (%s); using %s",
+            data_dir,
+            exc,
+            fallback,
+        )
+        return fallback
+
+
 class StorageError(Exception):
     """Base exception for storage failures."""
     pass
@@ -212,19 +231,6 @@ def get_storage_backend() -> ArtifactStorage:
     if settings.r2_enabled:
         return R2ArtifactStorage()
 
-    # Resolve the data directory exactly as file_service.py did
-    curr_dir = Path(__file__).resolve().parent
-    root = curr_dir.parent.parent if curr_dir.parent.name == "backend" else curr_dir.parent
-    data_dir = Path("/tmp/aegis_data") if Path("/.dockerenv").exists() else root / "data"
-
-    # Try creating it to ensure permissions, fallback to /tmp/data if failed
-    try:
-        data_dir.mkdir(parents=True, exist_ok=True)
-        return LocalArtifactStorage(data_dir)
-    except (PermissionError, OSError):
-        fallback = Path("/tmp/data")
-        fallback.mkdir(parents=True, exist_ok=True)
-        return LocalArtifactStorage(fallback)
+    return LocalArtifactStorage(get_data_directory())
 
 storage_backend = get_storage_backend()
-

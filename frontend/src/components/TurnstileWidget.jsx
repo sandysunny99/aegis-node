@@ -59,8 +59,8 @@ export default function TurnstileWidget({ siteKey, onVerify, onExpire, onError }
       if (widgetIdRef.current !== null && window.turnstile) {
         try {
           window.turnstile.remove(widgetIdRef.current);
-        } catch (e) {
-          // ignore
+        } catch (error) {
+          console.warn('Turnstile cleanup warning:', error);
         }
         widgetIdRef.current = null;
       }

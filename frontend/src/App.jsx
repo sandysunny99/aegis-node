@@ -3,7 +3,6 @@ import { healthCheck, scanDataset, uploadDataset } from './api';
 import AiSummary from './components/AiSummary';
 import FindingsList from './components/FindingsList';
 import RemediationCard from './components/RemediationCard';
-import RiskMeter from './components/RiskMeter';
 import StatusBadge from './components/StatusBadge';
 import ThreatIntelligence from './components/ThreatIntelligence';
 import TurnstileWidget from './components/TurnstileWidget';
@@ -395,6 +394,5 @@ export default function App() {
     </>
   );
 }
-
 
 

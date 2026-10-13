@@ -17,25 +17,15 @@ import uuid
 from pathlib import Path
 
 from config import settings
-
-# ─── Data directories ─────────────────────────────────────────────────────────
-# Project root resolution (handles both local dev under /backend and Docker container under /app)
-_CURR_DIR = Path(__file__).resolve().parent  # .../services
-_PROJECT_ROOT = _CURR_DIR.parent.parent if _CURR_DIR.parent.name == "backend" else _CURR_DIR.parent
-
+from services.storage import get_data_directory, storage_backend, StorageError
 
 def _ensure_dir(d: Path) -> Path:
-    """Ensure directory exists with graceful fallback to /tmp/data if permission denied."""
-    try:
-        d.mkdir(parents=True, exist_ok=True)
-        return d
-    except (PermissionError, OSError):
-        fallback = Path("/tmp") / "data" / d.name
-        fallback.mkdir(parents=True, exist_ok=True)
-        return fallback
+    """Ensure the configured data directory exists, surfacing permission errors."""
+    d.mkdir(parents=True, exist_ok=True)
+    return d
 
 
-_BASE_DATA_DIR = Path("/tmp/aegis_data") if Path("/.dockerenv").exists() else _PROJECT_ROOT / "data"
+_BASE_DATA_DIR = get_data_directory()
 _SAMPLES_DIR = _ensure_dir(_BASE_DATA_DIR / "samples")
 _QUARANTINE_DIR = _ensure_dir(_BASE_DATA_DIR / "quarantine")
 _SANITIZED_DIR = _ensure_dir(_BASE_DATA_DIR / "sanitized")
@@ -134,8 +124,6 @@ def compute_sha256(path: Path) -> str:
             h.update(chunk)
     return h.hexdigest()
 
-
-from services.storage import storage_backend, StorageError
 
 class FileService:
     """Encapsulates all file handling operations for dataset uploads & sanitized artifacts."""
@@ -357,4 +345,3 @@ class FileService:
 
 
 file_service = FileService()
-

@@ -17,16 +17,23 @@ export default [
         },
       },
       globals: {
+        alert: "readonly",
         document: "readonly",
         window: "readonly",
         console: "readonly",
         fetch: "readonly",
+        FormData: "readonly",
+        URL: "readonly",
+        URLSearchParams: "readonly",
+        XMLHttpRequest: "readonly",
         setTimeout: "readonly",
         clearTimeout: "readonly",
       }
     },
     rules: {
       "react/prop-types": "off",
+      "react/jsx-uses-react": "error",
+      "react/jsx-uses-vars": "error",
       "no-unused-vars": "warn",
     },
   },

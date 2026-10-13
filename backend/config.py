@@ -184,6 +184,7 @@ class Settings(BaseSettings):
 
     # 💾 Database
     database_url: str = "sqlite:///./aegis_node.db"
+    data_dir: Path = _ROOT_ENV.parent / "data"
 
     
     @field_validator("trusted_proxies", mode="before")
@@ -296,7 +297,6 @@ class Settings(BaseSettings):
 
 # Singleton — import this from anywhere in the backend.
 settings = Settings()
-
 
 
 
