@@ -75,3 +75,9 @@ Render's `/tmp/aegis_data` and `/tmp/aegis_node.db` remain ephemeral unless pers
 configured separately. Application-container recreation has been verified against the named
 volume; recovery after Docker-volume loss or host failure requires a separate backup/restore
 drill and is not implied by that persistence check.
+
+The server-side `API_KEY` is a privileged machine-client credential and is never exposed through
+the Vite frontend. The browser client does not read or embed `VITE_API_KEY`; if `API_KEY` is
+enabled for a deployment, browser write access requires a separately authenticated gateway or
+user-session design. Do not place a production API key in any `VITE_*` variable, because Vite
+embeds those values in public browser assets.
