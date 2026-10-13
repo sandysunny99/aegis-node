@@ -1,5 +1,3 @@
-import React from 'react';
-
 const VERDICT_CONFIG = {
   clean_verified:         { label: 'Clean (Verified)',          icon: '🛡️', cls: 'verdict-clean',      glow: 'var(--emerald)' },
   clean_with_limitations: { label: 'Clean (With Limitations)',  icon: 'ℹ️',  cls: 'verdict-limited',    glow: 'var(--amber)' },

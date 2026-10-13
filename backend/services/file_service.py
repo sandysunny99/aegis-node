@@ -11,6 +11,7 @@ Security rules enforced here:
 """
 
 import hashlib
+import logging
 import mimetypes
 import re
 import uuid
@@ -18,24 +19,18 @@ from pathlib import Path
 
 from config import settings
 
+from services.storage import StorageError, storage_backend
+
+logger = logging.getLogger(__name__)
+
 # ─── Data directories ─────────────────────────────────────────────────────────
-# Project root resolution (handles both local dev under /backend and Docker container under /app)
-_CURR_DIR = Path(__file__).resolve().parent  # .../services
-_PROJECT_ROOT = _CURR_DIR.parent.parent if _CURR_DIR.parent.name == "backend" else _CURR_DIR.parent
-
-
 def _ensure_dir(d: Path) -> Path:
-    """Ensure directory exists with graceful fallback to /tmp/data if permission denied."""
-    try:
-        d.mkdir(parents=True, exist_ok=True)
-        return d
-    except (PermissionError, OSError):
-        fallback = Path("/tmp") / "data" / d.name
-        fallback.mkdir(parents=True, exist_ok=True)
-        return fallback
+    """Ensure the configured data directory exists; fail instead of using unconfigured storage."""
+    d.mkdir(parents=True, exist_ok=True)
+    return d
 
 
-_BASE_DATA_DIR = Path("/tmp/aegis_data") if Path("/.dockerenv").exists() else _PROJECT_ROOT / "data"
+_BASE_DATA_DIR = Path(settings.data_dir)
 _SAMPLES_DIR = _ensure_dir(_BASE_DATA_DIR / "samples")
 _QUARANTINE_DIR = _ensure_dir(_BASE_DATA_DIR / "quarantine")
 _SANITIZED_DIR = _ensure_dir(_BASE_DATA_DIR / "sanitized")
@@ -135,8 +130,6 @@ def compute_sha256(path: Path) -> str:
     return h.hexdigest()
 
 
-from services.storage import storage_backend, StorageError
-
 class FileService:
     """Encapsulates all file handling operations for dataset uploads & sanitized artifacts."""
 
@@ -220,7 +213,7 @@ class FileService:
                 object_key, backend_sha256 = storage_backend.save_original(scan_id, safe_orig, temp_path.read_bytes())
             except StorageError as e:
                 logger.error(f"Storage backend failed: {e}")
-                raise ValueError(f"STORAGE_UPLOAD_FAILED: {e}")
+                raise ValueError(f"STORAGE_UPLOAD_FAILED: {e}") from e
 
             # Atomic finalize
             temp_path.replace(dest_path)
@@ -262,7 +255,7 @@ class FileService:
             object_key, sha256 = storage_backend.save_sanitized(scan_id, safe_name, content)
         except StorageError as e:
             logger.error(f"Storage backend failed for sanitized: {e}")
-            raise ValueError(f"STORAGE_UPLOAD_FAILED: {e}")
+            raise ValueError(f"STORAGE_UPLOAD_FAILED: {e}") from e
 
         sanitized_name = f"{scan_id}_sanitized{ext}"
         dest_path = _SANITIZED_DIR / sanitized_name
@@ -357,4 +350,3 @@ class FileService:
 
 
 file_service = FileService()
-

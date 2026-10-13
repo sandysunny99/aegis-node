@@ -1,11 +1,6 @@
-import React, { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 const ACCEPTED_EXTS = ['.csv', '.json', '.jsonl', '.parquet', '.xlsx', '.txt'];
-const ACCEPTED_MIME = [
-  'text/csv', 'application/json', 'application/octet-stream',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'text/plain',
-];
 
 function formatBytes(b) {
   if (!b) return '0 B';

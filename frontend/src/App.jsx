@@ -1,9 +1,8 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import { healthCheck, scanDataset, uploadDataset } from './api';
 import AiSummary from './components/AiSummary';
 import FindingsList from './components/FindingsList';
 import RemediationCard from './components/RemediationCard';
-import RiskMeter from './components/RiskMeter';
 import StatusBadge from './components/StatusBadge';
 import ThreatIntelligence from './components/ThreatIntelligence';
 import TurnstileWidget from './components/TurnstileWidget';
@@ -48,7 +47,7 @@ function Stepper({ currentStep }) {
         const border = isDone ? 'rgba(16,185,129,0.4)' : isCurrent ? 'rgba(6,182,212,0.4)' : 'var(--border)';
 
         return (
-          <React.Fragment key={s.num}>
+          <Fragment key={s.num}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <div style={{
                 width: '26px', height: '26px', borderRadius: '50%',
@@ -73,7 +72,7 @@ function Stepper({ currentStep }) {
                 transition: 'background 0.3s',
               }} />
             )}
-          </React.Fragment>
+          </Fragment>
         );
       })}
     </div>
@@ -395,6 +394,4 @@ export default function App() {
     </>
   );
 }
-
-
 
