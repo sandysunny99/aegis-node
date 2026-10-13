@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { downloadSanitized, remediateDataset } from '../api';
 
 function CircleProgress({ value, size = 56, strokeWidth = 5, color }) {
@@ -194,7 +194,7 @@ function MetricBox({ label, value, color }) {
 }
 
 function ActionsList({ actions }) {
-  const [show, setShow] = React.useState(false);
+  const [show, setShow] = useState(false);
   return (
     <div>
       <button

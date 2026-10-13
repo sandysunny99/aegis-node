@@ -1,6 +1,4 @@
 
-import React, { useState } from 'react';
-
 export default function FindingsList({ findings }) {
   if (!findings || findings.length === 0) {
     return (

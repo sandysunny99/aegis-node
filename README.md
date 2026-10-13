@@ -72,4 +72,6 @@ Only perform this copy when the named volume is the intended destination and its
 contents have been backed up; it can overwrite files with matching names. Do not use
 `down -v`, `docker volume rm`, or another destructive volume command as part of migration.
 Render's `/tmp/aegis_data` and `/tmp/aegis_node.db` remain ephemeral unless persistent storage is
-configured separately.
+configured separately. Application-container recreation has been verified against the named
+volume; recovery after Docker-volume loss or host failure requires a separate backup/restore
+drill and is not implied by that persistence check.

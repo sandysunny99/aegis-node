@@ -141,7 +141,7 @@ export async function downloadSanitized(datasetId, token) {
     ...authHeader(),
   };
   if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+    headers.Authorization = 'Bearer ' + token;
   }
 
   const res = await fetch(`${BASE}/api/v1/datasets/${datasetId}/download-sanitized`, {
