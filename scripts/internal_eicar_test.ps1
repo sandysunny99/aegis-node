@@ -1,4 +1,13 @@
+param(
+    [string]$RestContainer = $env:AEGIS_CLAMAV_REST_CONTAINER,
+    [string]$AppContainer = $env:AEGIS_APP_CONTAINER,
+    [string]$BaseUrl = $env:AEGIS_BASE_URL
+)
+
 $ErrorActionPreference = "Stop"
+if (-not $RestContainer) { $RestContainer = "aegis-clamav-rest" }
+if (-not $AppContainer) { $AppContainer = "aegis-node" }
+if (-not $BaseUrl) { $BaseUrl = "http://localhost:8000" }
 
 function Get-ContainerHealth([string]$Name) {
     $status = docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' $Name 2>$null
@@ -29,7 +38,7 @@ docker info *> $null
 if ($LASTEXITCODE -ne 0) {
     throw "Docker engine is unavailable."
 }
-Wait-ContainerHealthy "aegis-clamav-rest" 300
+Wait-ContainerHealthy $RestContainer 300
 
 Write-Host "Waiting for Aegis health and real ClamAV availability..."
 $deadline = (Get-Date).AddSeconds(120)
@@ -57,11 +66,14 @@ import json
 import os
 import httpx
 
-BASE = "http://localhost:8000"
+BASE = "__AEGIS_BASE_URL__"
 HEADERS = {}
 if os.environ.get("API_KEY"):
     HEADERS["X-API-Key"] = os.environ["API_KEY"]
-EICAR = r"X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
+EICAR = bytes.fromhex(
+    "58354f2150254041505b345c505a58353428505e2937434329377d2445494341522d"
+    "5354414e444152442d414e544956495255532d544553542d46494c452124482b482a"
+).decode("ascii")
 
 def upload_and_scan(client, name, content):
     upload = client.post(
@@ -101,8 +113,8 @@ with httpx.Client() as client:
 
     eicar_result, eicar_summary = upload_and_scan(
         client,
-        "aegis_eicar_probe.csv",
-        ("test,payload\n1," + EICAR + "\n").encode("ascii"),
+        "aegis_eicar_probe.txt",
+        EICAR.encode("ascii"),
     )
     if eicar_result.get("clamav_status") != "infected":
         raise RuntimeError("ClamAV did not report EICAR as infected")
@@ -113,20 +125,24 @@ with httpx.Client() as client:
 
 print("CLAMAV_AEGIS_E2E_PASSED")
 '@
+$pythonScript = $pythonScript.Replace("__AEGIS_BASE_URL__", $BaseUrl.TrimEnd("/"))
 
 $tempScript = Join-Path ([System.IO.Path]::GetTempPath()) ("aegis-clamav-e2e-{0}.py" -f [guid]::NewGuid().ToString("N"))
 $containerScript = "/tmp/aegis-clamav-e2e.py"
 try {
     Set-Content -Path $tempScript -Value $pythonScript -Encoding UTF8
-    docker cp $tempScript "aegis-node:$containerScript"
+    docker cp $tempScript "${AppContainer}:$containerScript"
     if ($LASTEXITCODE -ne 0) {
         throw "Could not copy the E2E runner into the running app container."
     }
-    docker exec aegis-node python $containerScript
+    docker exec $AppContainer python $containerScript
     if ($LASTEXITCODE -ne 0) {
         throw "Harmless/EICAR Aegis pipeline verification failed."
     }
 } finally {
-    docker exec aegis-node rm -f $containerScript 2>$null
+    docker exec --user 0 $AppContainer rm -f $containerScript *> $null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "Could not remove the temporary E2E runner from the app container."
+    }
     Remove-Item -LiteralPath $tempScript -Force -ErrorAction SilentlyContinue
 }

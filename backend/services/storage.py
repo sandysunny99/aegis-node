@@ -212,19 +212,8 @@ def get_storage_backend() -> ArtifactStorage:
     if settings.r2_enabled:
         return R2ArtifactStorage()
 
-    # Resolve the data directory exactly as file_service.py did
-    curr_dir = Path(__file__).resolve().parent
-    root = curr_dir.parent.parent if curr_dir.parent.name == "backend" else curr_dir.parent
-    data_dir = Path("/tmp/aegis_data") if Path("/.dockerenv").exists() else root / "data"
-
-    # Try creating it to ensure permissions, fallback to /tmp/data if failed
-    try:
-        data_dir.mkdir(parents=True, exist_ok=True)
-        return LocalArtifactStorage(data_dir)
-    except (PermissionError, OSError):
-        fallback = Path("/tmp/data")
-        fallback.mkdir(parents=True, exist_ok=True)
-        return LocalArtifactStorage(fallback)
+    data_dir = Path(settings.data_dir)
+    data_dir.mkdir(parents=True, exist_ok=True)
+    return LocalArtifactStorage(data_dir)
 
 storage_backend = get_storage_backend()
-

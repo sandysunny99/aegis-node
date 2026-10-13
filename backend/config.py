@@ -5,10 +5,10 @@ Loaded once at startup via pydantic-settings.
 
 import ipaddress
 import logging
-from pydantic import model_validator, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
-
 from pathlib import Path
+
+from pydantic import field_validator, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger("aegis.config")
 
@@ -184,8 +184,16 @@ class Settings(BaseSettings):
 
     # 💾 Database
     database_url: str = "sqlite:///./aegis_node.db"
+    data_dir: Path = Path(__file__).resolve().parent.parent / "data"
 
-    
+    @field_validator("data_dir", mode="before")
+    @classmethod
+    def resolve_data_dir(cls, value: str | Path) -> Path:
+        path = Path(value).expanduser()
+        if not path.is_absolute():
+            path = _ROOT_ENV.parent / path
+        return path.resolve()
+
     @field_validator("trusted_proxies", mode="before")
     @classmethod
     def parse_trusted_proxies(cls, v) -> list[str]:
@@ -203,7 +211,7 @@ class Settings(BaseSettings):
                 res = [x.strip() for x in v.split(",") if x.strip()]
         else:
             raise ValueError("trusted_proxies must be a list or a comma-separated string")
-        
+
         valid_proxies = []
         import ipaddress
         for proxy in res:
@@ -216,7 +224,7 @@ class Settings(BaseSettings):
                     ipaddress.ip_address(proxy)
                 valid_proxies.append(proxy)
             except ValueError:
-                raise ValueError(f"Invalid IP or CIDR network: {proxy}")
+                raise ValueError(f"Invalid IP or CIDR network: {proxy}") from None
         return valid_proxies
 
     def is_trusted_proxy(self, host: str) -> bool:
@@ -296,9 +304,6 @@ class Settings(BaseSettings):
 
 # Singleton — import this from anywhere in the backend.
 settings = Settings()
-
-
-
 
 
 

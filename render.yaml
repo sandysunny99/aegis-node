@@ -83,6 +83,8 @@ services:
       # Ephemeral SQLite path — data resets on restart (free tier limitation)
       - key: DATABASE_URL
         value: sqlite:////tmp/aegis_node.db
+      - key: DATA_DIR
+        value: /tmp/aegis_data
 
       - key: ALLOWED_ORIGINS
         value: '["https://aegis-node.onrender.com"]'
