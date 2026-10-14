@@ -232,6 +232,8 @@ class RemediationRecord(Base):
     # Percentage of dataset fields left unchanged after sanitization (0–100)
     # Stored so GET /remediation can return the real value (not a default).
     integrity_preserved: Mapped[float] = mapped_column(Float, nullable=False, default=100.0)
+    # C11: "exact_rows" or "estimated_rows" — how the field count behind the score was obtained
+    integrity_method: Mapped[str] = mapped_column(String(16), nullable=False, default="estimated_rows")
     remediation_actions_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
 
     remediated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, server_default=func.now())

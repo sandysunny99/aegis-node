@@ -96,7 +96,7 @@ export default function RemediationCard({ datasetId, scanResult }) {
               color={report.threat_reduction_percent === 100 ? 'var(--emerald)' : 'var(--amber)'}
             />
             <MetricRing
-              label="Data Integrity"
+              label={report.integrity_method === 'exact_rows' ? 'Data Integrity' : 'Data Integrity (est.)'}
               value={report.integrity_preserved ?? 100}
               color="var(--cyan)"
             />

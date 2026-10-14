@@ -62,6 +62,23 @@ def _read_sample_df(path: str, fmt: str):  # type: ignore[return]
     return pd.DataFrame()
 
 
+def compute_integrity(
+    *, changes_count: int, total_cols: int, rows_total: int | None, file_bytes: int
+) -> tuple[float, str]:
+    """
+    Percentage of fields left unchanged by sanitization, and how the field count was
+    obtained: "exact_rows" (scanner row count) or "estimated_rows" (size heuristic).
+    """
+    cols = max(total_cols, 1)
+    if rows_total and rows_total > 0 and total_cols > 0:
+        rows, method = rows_total, "exact_rows"
+    else:
+        rows, method = max(file_bytes // (cols * 20), 1), "estimated_rows"
+    total_fields = max(rows * cols, 1)
+    pct = round(100.0 * (1.0 - changes_count / total_fields), 2)
+    return max(0.0, min(100.0, pct)), method
+
+
 router = APIRouter(prefix="/api/v1/datasets", tags=["remediation"])
 
 
@@ -147,22 +164,20 @@ async def remediate_dataset(
 
     resolved_count = max(0, orig_findings_count - len(remaining_actionable))
 
-    # ── Compute data integrity preservation score ──────────────────────────
-    import os
+    # ── Compute data integrity preservation score (C11) ────────────────────
+    # Exact when the scanner reported the row count; otherwise an estimate
+    # (bytes / (cols * 20)) that is labelled as such in the API and UI.
     try:
         sample_df = _read_sample_df(orig_source_path, record.file_format)
-        _total_cols = max(len(sample_df.columns), 1)
-        _file_bytes = os.path.getsize(orig_source_path)
-        _est_rows = max(_file_bytes // max(_total_cols * 20, 1), 1)
-        _total_fields = _est_rows * _total_cols
-        integrity_preserved = round(
-            100.0 * (1.0 - san_result.changes_count / max(_total_fields, 1)), 2
-        )
-        integrity_preserved = max(0.0, min(100.0, integrity_preserved))
+        total_cols = len(sample_df.columns)
     except Exception:  # noqa: BLE001
-        integrity_preserved = round(
-            100.0 * (1.0 - san_result.changes_count / max(san_result.changes_count + 1000, 1)), 2
-        )
+        total_cols = 0
+    integrity_preserved, integrity_method = compute_integrity(
+        changes_count=san_result.changes_count,
+        total_cols=total_cols,
+        rows_total=latest_report.rows_total,
+        file_bytes=Path(orig_source_path).stat().st_size,
+    )
 
     # Determine status: "completed" if 0 remaining actionable threats, else "partial"
     rem_status = "completed" if len(remaining_actionable) == 0 else "partial"
@@ -207,6 +222,7 @@ async def remediate_dataset(
         threat_reduction_percent=reduction_pct,
         changes_count=san_result.changes_count,
         integrity_preserved=integrity_preserved,
+        integrity_method=integrity_method,
         remediation_actions_json=json.dumps(action_dicts),
     )
     db.add(db_record)
@@ -229,6 +245,7 @@ async def remediate_dataset(
         resolved_findings_count=db_record.resolved_findings_count,
         threat_reduction_percent=db_record.threat_reduction_percent,
         integrity_preserved=integrity_preserved,
+        integrity_method=db_record.integrity_method,
         changes_count=db_record.changes_count,
         remediated_at=db_record.remediated_at,
         actions=action_schemas,
@@ -270,6 +287,7 @@ def get_remediation_report(
         resolved_findings_count=latest.resolved_findings_count,
         threat_reduction_percent=latest.threat_reduction_percent,
         integrity_preserved=latest.integrity_preserved,
+        integrity_method=latest.integrity_method,
         changes_count=latest.changes_count,
         remediated_at=latest.remediated_at,
         actions=action_schemas,

@@ -105,3 +105,29 @@ def test_frontend_does_not_ship_api_key():
         text = f.read_text(encoding="utf-8")
         assert "VITE_API_KEY" not in text.replace("// ", ""), f
         assert "X-API-Key" not in text, f
+
+
+# ─── C11 ─────────────────────────────────────────────────────────────────────
+
+def test_integrity_uses_scanner_row_count_when_known():
+    from routers.remediation import compute_integrity
+
+    pct, method = compute_integrity(changes_count=2, total_cols=4, rows_total=50, file_bytes=10)
+    assert method == "exact_rows"
+    assert pct == 99.0  # 2 of 200 fields changed
+
+
+def test_integrity_is_labelled_estimate_without_row_count():
+    from routers.remediation import compute_integrity
+
+    _pct, method = compute_integrity(changes_count=1, total_cols=2, rows_total=None, file_bytes=4000)
+    assert method == "estimated_rows"
+
+
+def test_remediation_api_reports_integrity_method():
+    res = client.post("/api/v1/datasets/upload", files={"file": ("i.csv", b"a,b\n=1+1,2\n3,4\n", "text/csv")})
+    ds = res.json()["dataset_id"]
+    client.post(f"/api/v1/datasets/{ds}/scan")
+    body = client.post(f"/api/v1/datasets/{ds}/remediate").json()
+    assert body["integrity_method"] in ("exact_rows", "estimated_rows")
+    assert client.get(f"/api/v1/datasets/{ds}/remediation").json()["integrity_method"] == body["integrity_method"]

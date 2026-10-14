@@ -169,6 +169,10 @@ class RemediationResponse(BaseModel):
     resolved_findings_count: int
     threat_reduction_percent: float
     integrity_preserved: float = Field(default=100.0, description="Percentage of dataset fields unchanged after sanitization")
+    integrity_method: str = Field(
+        default="estimated_rows",
+        description="exact_rows (scanner row count) | estimated_rows (file-size heuristic)",
+    )
     changes_count: int
     remediated_at: datetime
     actions: list[RemediationActionSchema] = Field(default_factory=list)

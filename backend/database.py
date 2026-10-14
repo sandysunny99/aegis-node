@@ -52,6 +52,7 @@ def create_all_tables() -> None:
     """Creates all tables if they do not exist. Called once at app startup."""
     Base.metadata.create_all(bind=engine)
     _migrate_dataset_public_id()
+    _migrate_remediation_integrity_method()
 
 
 def _migrate_dataset_public_id() -> None:
@@ -78,3 +79,15 @@ def _migrate_dataset_public_id() -> None:
             text("CREATE UNIQUE INDEX IF NOT EXISTS ix_datasets_public_id ON datasets (public_id)")
         )
 
+
+def _migrate_remediation_integrity_method() -> None:
+    """Add remediations.integrity_method (C11) to databases created before it existed."""
+    from sqlalchemy import inspect, text
+
+    columns = {c["name"] for c in inspect(engine).get_columns("remediations")}
+    if "integrity_method" not in columns:
+        with engine.begin() as conn:
+            conn.execute(text(
+                "ALTER TABLE remediations ADD COLUMN integrity_method VARCHAR(16) "
+                "NOT NULL DEFAULT 'estimated_rows'"
+            ))
