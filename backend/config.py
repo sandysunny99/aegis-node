@@ -29,6 +29,29 @@ def _read_secret_file(name: str) -> str:
     return ""
 
 
+def is_turnstile_test_key(key: str) -> bool:
+    """Cloudflare's published dummy Turnstile keys (always pass/fail), e.g. 1x0000…AA."""
+    key = (key or "").strip()
+    return len(key) > 12 and key[0] in "123" and key[1:12] == "x0000000000"
+
+
+def production_config_problems(cfg: "Settings") -> list[str]:
+    """Return the reasons a configuration is unsafe to run with APP_ENV=production."""
+    problems = []
+    if "*" in cfg.allowed_origins:
+        problems.append('ALLOWED_ORIGINS must list explicit origins, not "*"')
+    if is_turnstile_test_key(cfg.cloudflare_turnstile_secret_key) or is_turnstile_test_key(
+        cfg.cloudflare_turnstile_site_key
+    ):
+        problems.append("Cloudflare Turnstile test keys (1x00…/2x00…/3x00…) are not allowed")
+    turnstile_on = bool(
+        cfg.cloudflare_turnstile_secret_key.strip() and cfg.cloudflare_turnstile_site_key.strip()
+    )
+    if not cfg.api_key and not turnstile_on:
+        problems.append("set API_KEY or Cloudflare Turnstile keys; write endpoints would be open")
+    return problems
+
+
 class Settings(BaseSettings):
     """All settings are read from the .env file or environment variables."""
 
@@ -143,13 +166,17 @@ class Settings(BaseSettings):
     enable_encoding_normalization: bool = True # Multi-encoding deobfuscation
 
     # ─── Threat Intelligence (External APIs) ──────────────────────────────────
-    # Default OFF for privacy. Opt-in via .env.
+    # Default OFF for privacy: lookups send hashes/URLs/IPs extracted from user
+    # datasets to third parties, so each provider is opt-in via .env.
     enable_virustotal: bool = False
-    virustotal_api_key: str = ""
-    virustotal_timeout_seconds: int = 10
+    virustotal_api_key: str | None = None
+    virustotal_timeout_seconds: float = 5.0
 
     enable_urlhaus: bool = False
-    enable_abuseipdb: bool = True
+    urlhaus_auth_key: str | None = None
+    urlhaus_timeout_seconds: float = 5.0
+
+    enable_abuseipdb: bool = False
     abuseipdb_api_key: str | None = None
     abuseipdb_timeout_seconds: float = 5.0
 
@@ -172,15 +199,6 @@ class Settings(BaseSettings):
     cloudflare_ai_gateway_id: str = ""
     cloudflare_ai_gateway_url: str = ""
     cloudflare_ai_gateway_log_payload: bool = False
-
-    # 🛡️ Threat Intelligence (Phase 9)
-    enable_virustotal: bool = True
-    virustotal_api_key: str | None = None
-    virustotal_timeout_seconds: float = 5.0
-
-    enable_urlhaus: bool = True
-    urlhaus_auth_key: str | None = None
-    urlhaus_timeout_seconds: float = 5.0
 
     # 💾 Database
     database_url: str = "sqlite:///./aegis_node.db"
@@ -285,10 +303,10 @@ class Settings(BaseSettings):
             self.fallback_cloudflare_api_token = _read_secret_file("FALLBACK_CLOUDFLARE_API_TOKEN")
 
         if self.app_env.lower() == "production":
-            if not self.api_key and not bool(self.cloudflare_turnstile_secret_key):
-                logger.warning(
-                    "SECURITY WARNING: Both API_KEY and Turnstile are empty in production environment. "
-                    "Write endpoints are unprotected."
+            problems = production_config_problems(self)
+            if problems:
+                raise ValueError(
+                    "Refusing to start with APP_ENV=production: " + "; ".join(problems)
                 )
         elif not self.api_key and not bool(self.cloudflare_turnstile_secret_key) and self.app_env.lower() != "development":
             logger.warning("API_KEY and Turnstile are not configured - write endpoints are publicly accessible.")
