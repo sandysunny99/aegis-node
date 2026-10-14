@@ -1,5 +1,6 @@
 import logging
 from dataclasses import dataclass
+
 from config import settings
 
 logger = logging.getLogger(__name__)
@@ -36,7 +37,7 @@ def _is_configured(provider_id: str) -> bool:
 
 def get_registry() -> dict:
     providers = []
-    
+
     # Provider mapping
     provider_configs = [
         {"id": "groq", "name": "Groq Cloud"},
@@ -54,7 +55,7 @@ def get_registry() -> dict:
     for config in provider_configs:
         pid = config["id"]
         role = "primary" if pid == settings.ai_provider else "fallback"
-        
+
         # FreeLLMAPI has an explicit enabled flag
         if pid == "freellmapi":
             enabled = settings.freellmapi_enabled
@@ -62,7 +63,7 @@ def get_registry() -> dict:
             enabled = True
 
         configured = _is_configured(pid)
-        
+
         if pid == "cloudflare":
             pid_for_model = "cloudflare_ai"
         elif pid == "huggingface":
@@ -71,7 +72,7 @@ def get_registry() -> dict:
             pid_for_model = pid
 
         model_id = getattr(settings, f"{pid_for_model}_model", "default")
-        
+
         provider = ProviderInfo(
             provider_id=pid,
             display_name=config["name"],

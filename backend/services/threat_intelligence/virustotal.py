@@ -2,11 +2,11 @@
 Aegis Node - VirusTotal API v3 Hash-First Reputation Client.
 """
 import logging
-import httpx
 import time
-from typing import Dict, Tuple
-from schemas import ThreatIntelResult
+
+import httpx
 from config import settings
+from schemas import ThreatIntelResult
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +14,7 @@ _VT_FILES_URL = "https://www.virustotal.com/api/v3/files"
 
 # Simple in-memory TTL cache to avoid hitting VT limits (500/day, 4/min)
 # Key: sha256, Value: (timestamp_seconds, ThreatIntelResult)
-_CACHE: Dict[str, Tuple[float, ThreatIntelResult]] = {}
+_CACHE: dict[str, tuple[float, ThreatIntelResult]] = {}
 CACHE_TTL_SECONDS = 3600  # 1 hour
 
 async def lookup_file_hash(sha256: str) -> ThreatIntelResult:

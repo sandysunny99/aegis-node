@@ -28,7 +28,7 @@ _TEST_SAMPLES = _REPO_ROOT.parent / "test sample"
 sys.path.insert(0, str(_SCANNER_DIR))
 sys.path.insert(0, str(_BACKEND_DIR))
 
-from content_checker import ContentCheckResult, check_file, raw_bytes_scan
+from content_checker import check_file, raw_bytes_scan
 from engine import run_scan
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -324,7 +324,13 @@ class TestFullPipeline:
         path = _tmp_bytes(b"payload\n" + eicar + b"\n")
         try:
             # Force ClamAV to an unreachable port
-            from services.av_providers.clamav import ClamAVRestProvider; monkeypatch.setattr("scanner.engine.get_av_provider", lambda: ClamAVRestProvider("http://localhost:59999", mock_mode=False)); result = run_scan(str(path))
+            from services.av_providers.clamav import ClamAVRestProvider
+
+            monkeypatch.setattr(
+                "scanner.engine.get_av_provider",
+                lambda: ClamAVRestProvider("http://localhost:59999", mock_mode=False),
+            )
+            result = run_scan(str(path))
             assert result.clamav_status == "skipped"
             assert result.verdict == "malicious"
             rule_ids = [f["rule_id"] for f in result.to_findings_dicts()]

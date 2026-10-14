@@ -7,6 +7,11 @@ extend-exclude = ["backend/.venv", "frontend/node_modules"]
 select = ["E", "W", "F", "I", "B", "UP"]
 ignore = ["E501"]
 
+[tool.ruff.lint.per-file-ignores]
+# Tests, benchmarks and scripts put backend/ on sys.path before importing app modules.
+"tests/**" = ["E402"]
+"scripts/**" = ["E402"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["backend"]

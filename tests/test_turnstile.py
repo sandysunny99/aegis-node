@@ -3,6 +3,7 @@ Tests for Cloudflare Turnstile Verification Utility.
 """
 
 from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 from utils.turnstile import verify_turnstile_token
 

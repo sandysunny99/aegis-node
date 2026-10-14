@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
+
 @dataclass
 class AVScanResult:
     available: bool          # False when API/daemon is not reachable

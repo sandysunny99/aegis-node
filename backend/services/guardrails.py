@@ -1,8 +1,8 @@
-import re
 import base64
-import unicodedata
-import string
 import logging
+import re
+import string
+import unicodedata
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ def bounded_base64_decode(text: str) -> str:
                 decoded_fragments.append(canonicalize(decoded_str))
         except Exception:
             pass
-    
+
     if decoded_fragments:
         return text + " " + " ".join(decoded_fragments)
     return text
@@ -80,21 +80,21 @@ def bounded_base64_decode(text: str) -> str:
 def evaluate_input_guardrail(evidence_text: str) -> tuple[str, int, list[str]]:
     score = 0
     signals = []
-    
+
     normalized = canonicalize(evidence_text)
     analyzed_text = bounded_base64_decode(normalized)
-    
+
     # Shadow check for spaced out characters: "i g n o r e" -> "ignore"
     spaced_out_removed = analyzed_text.replace(" ", "")
-    
+
     if _SIG_INSTRUCTION_OVERRIDE.search(analyzed_text) or "ignorepreviousinstructions" in spaced_out_removed.lower() or "override" in spaced_out_removed.lower() and "rules" in spaced_out_removed.lower():
         score += 3
         signals.append("INSTRUCTION_OVERRIDE")
-        
+
     if _SIG_ROLE_IMPERSONATION.search(analyzed_text) or "system:youare" in spaced_out_removed.lower() or "developerinstruction" in spaced_out_removed.lower() or "actasa" in spaced_out_removed.lower():
         score += 3
         signals.append("ROLE_IMPERSONATION")
-        
+
     if _SIG_ROOT_OVERRIDE.search(analyzed_text):
         score += 3
         signals.append("ROLE_IMPERSONATION")
@@ -102,24 +102,24 @@ def evaluate_input_guardrail(evidence_text: str) -> tuple[str, int, list[str]]:
     if _SIG_PROMPT_EXTRACTION.search(analyzed_text) or "revealsystemprompt" in spaced_out_removed.lower() or "showhiddeninstructions" in spaced_out_removed.lower() or "translatesystemprompt" in spaced_out_removed.lower():
         score += 3
         signals.append("PROMPT_EXTRACTION")
-        
+
     if _SIG_VERDICT_MANIPULATION.search(analyzed_text) or "setverdictclean" in spaced_out_removed.lower() or "markverdictclean" in spaced_out_removed.lower() or "ignorescannerfindings" in spaced_out_removed.lower():
         score += 2
         signals.append("VERDICT_MANIPULATION")
-        
+
     if _SIG_ACTION_MANIPULATION.search(analyzed_text) or "disablescanning" in spaced_out_removed.lower() or "executecommand" in spaced_out_removed.lower() or "callshell" in spaced_out_removed.lower() or "<tool_call>" in spaced_out_removed.lower() or "donotremediate" in spaced_out_removed.lower():
         score += 3
         signals.append("ACTION_MANIPULATION")
-        
+
     if _SIG_SECRET_EXFILTRATION.search(analyzed_text) or "returnapikey" in spaced_out_removed.lower() or "outputpassword" in spaced_out_removed.lower() or "exposecredentials" in spaced_out_removed.lower():
         score += 3
         signals.append("SECRET_EXFILTRATION")
-        
+
     status = "ALLOW"
     if score >= 3:
         status = "BLOCK"
     elif score >= 2:
         status = "RESTRICT"
-        
+
     return status, score, signals
 

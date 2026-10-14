@@ -9,19 +9,13 @@ Validates:
 """
 
 import json
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
 from services.llm_service import (
     _build_compact_evidence,
     _validate_and_parse,
     analyse,
-    _DANGEROUS_PATTERNS,
 )
-from scanner.engine import ScanEngineResult
-from scanner.content_checker import ContentFinding
-
 
 # ─── 1. Boundary Isolation & System Prompt Protection ─────────────────────────
 

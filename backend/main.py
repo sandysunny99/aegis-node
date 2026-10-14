@@ -6,12 +6,13 @@ FastAPI application with dataset scanning API, rate limiting, and rich health ch
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
+
 from config import settings
 from database import create_all_tables
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from limiter import limiter
 from routers.analysis import router as analysis_router
@@ -22,7 +23,6 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.types import ASGIApp
 from utils.auth import require_api_key
 from version import APP_VERSION
 

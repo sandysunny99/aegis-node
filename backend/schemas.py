@@ -121,7 +121,7 @@ class AnalysisResponse(BaseModel):
     evidence: list[str] = Field(default_factory=list)
     recommendations: list[str] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)
-    
+
     # Observability Fields
     guardrail_status: str = "N/A"
     guardrail_score: float | None = None
@@ -129,7 +129,7 @@ class AnalysisResponse(BaseModel):
     llm_invoked: bool = False
     llm_bypassed: bool = False
     llm_context_mode: str = "UNKNOWN"
-    
+
     prompt_tokens: int = 0
     completion_tokens: int = 0
     created_at: datetime

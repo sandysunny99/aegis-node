@@ -25,28 +25,26 @@ Run with:  pytest tests/test_heuristics.py -v
 
 from __future__ import annotations
 
-import math
 import os
+
+# ── Path bootstrap ────────────────────────────────────────────────────────────
+import sys
 import tempfile
 from pathlib import Path
 
 import pytest
 
-# ── Path bootstrap ────────────────────────────────────────────────────────────
-import sys
 _SCANNER = Path(__file__).resolve().parent.parent / "scanner"
 _BACKEND = Path(__file__).resolve().parent.parent / "backend"
 sys.path.insert(0, str(_SCANNER))
 sys.path.insert(0, str(_BACKEND))
 
+from engine import run_scan
 from heuristics import (
-    _B64_ENTROPY_THRESHOLD,
     _ENTROPY_HIGH,
     calculate_entropy,
     heuristic_scan,
 )
-from engine import run_scan
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers

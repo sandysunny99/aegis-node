@@ -1,14 +1,13 @@
 """
 Aegis Node - AbuseIPDB API Threat Intelligence Client.
 """
-import logging
-import httpx
-import time
 import ipaddress
-from typing import Dict, Tuple
+import logging
+import time
 
-from schemas import ThreatIntelResult
+import httpx
 from config import settings
+from schemas import ThreatIntelResult
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +15,7 @@ _ABUSEIPDB_URL = "https://api.abuseipdb.com/api/v2/check"
 
 # Simple in-memory TTL cache to avoid repeating identical queries
 # Key: "abuseipdb:" + normalized_ip, Value: (timestamp_seconds, ThreatIntelResult)
-_CACHE: Dict[str, Tuple[float, ThreatIntelResult]] = {}
+_CACHE: dict[str, tuple[float, ThreatIntelResult]] = {}
 CACHE_TTL_SECONDS = 3600  # 1 hour
 
 def _is_public_ip(ip_str: str) -> bool:

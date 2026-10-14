@@ -12,11 +12,11 @@ _ROOT = _curr.parent.parent if _curr.parent.name == "backend" else _curr.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-import json  # noqa: E402
 import functools  # noqa: E402
+import json  # noqa: E402
 
 from database import get_db  # noqa: E402
-from fastapi import APIRouter, Depends, HTTPException, Request, Query  # noqa: E402
+from fastapi import APIRouter, Depends, HTTPException, Query, Request  # noqa: E402
 from fastapi.concurrency import run_in_threadpool  # noqa: E402
 from limiter import limiter  # noqa: E402
 from models import LlmAnalysisRecord  # noqa: E402

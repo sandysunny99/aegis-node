@@ -193,16 +193,16 @@ class TestMalwareAndFormatSanitization:
         from scanner.sanitizer import sanitize_file
         eicar_file = tmp_path / "eicar.csv"
         eicar_file.write_text("id,payload\n1,X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*\n", encoding="utf-8")
-        
+
         # Scan before
         scan_before = run_scan(str(eicar_file))
         assert scan_before.verdict == "malicious"
-        
+
         # Remediate
         res = sanitize_file(str(eicar_file), "csv")
         clean_file = tmp_path / "eicar_clean.csv"
         clean_file.write_bytes(res.sanitized_bytes)
-        
+
         # Scan after -> must be clean with 0 threats
         scan_after = run_scan(str(clean_file))
         assert scan_after.verdict in ("clean", "clean_verified", "clean_with_limitations")

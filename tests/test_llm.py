@@ -11,7 +11,7 @@ Security & Integrity Requirements Tested:
 
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "scanner"))
 
 from database import Base, create_all_tables, engine
 from main import app
-from services.llm_service import LlmAnalysisOutput, analyse
+from services.llm_service import analyse
 
 client = TestClient(app)
 
@@ -36,7 +36,7 @@ def fresh_db():
 
 def test_analyse_missing_api_key(monkeypatch):
     """When no AI API keys are set, analyse() returns status='unavailable' gracefully.
-    
+
     With the xAI fallback chain added, we must clear both gemini_api_key and xai_api_key.
     The error message reflects the last provider tried in the chain.
     """
@@ -174,6 +174,7 @@ def test_analyse_endpoint_integration(monkeypatch):
 
 from services.llm_service import LlmAnalysisResult
 
+
 def _mock_success(provider_name):
     return LlmAnalysisResult(
         status="completed",
@@ -194,10 +195,10 @@ def _mock_failure(provider_name, reason="failed"):
 def test_auto_mode_primary_success(monkeypatch):
     monkeypatch.setattr("config.settings.ai_provider", "groq")
     monkeypatch.setattr("config.settings.ai_fallback_chain", "nvidia,cloudflare")
-    
+
     with patch("services.llm_service._call_provider", side_effect=[_mock_success("groq")]) as mock_call:
         res = analyse(1, "csv", 100, "clean", 0.0, [], llm_mode="auto")
-        
+
         assert mock_call.call_count == 1
         assert res.llm_mode == "auto"
         assert res.final_provider == "groq"
@@ -207,10 +208,10 @@ def test_auto_mode_primary_success(monkeypatch):
 def test_auto_mode_fallback_success(monkeypatch):
     monkeypatch.setattr("config.settings.ai_provider", "groq")
     monkeypatch.setattr("config.settings.ai_fallback_chain", "nvidia,cloudflare")
-    
+
     with patch("services.llm_service._call_provider", side_effect=[_mock_failure("groq"), _mock_success("nvidia")]) as mock_call:
         res = analyse(1, "csv", 100, "clean", 0.0, [], llm_mode="auto")
-        
+
         assert mock_call.call_count == 2
         assert res.final_provider == "nvidia"
         assert res.fallback_used is True
@@ -220,10 +221,10 @@ def test_auto_mode_fallback_success(monkeypatch):
 def test_auto_mode_groq_rate_limited(monkeypatch):
     monkeypatch.setattr("config.settings.ai_provider", "groq")
     monkeypatch.setattr("config.settings.ai_fallback_chain", "nvidia")
-    
+
     with patch("services.llm_service._call_provider", side_effect=[_mock_failure("groq", "quota_exhausted"), _mock_success("nvidia")]):
         res = analyse(1, "csv", 100, "clean", 0.0, [], llm_mode="auto")
-        
+
         assert res.fallback_used is True
         assert res.provider_attempts == ["groq", "nvidia"]
         assert res.final_provider == "nvidia"
@@ -231,10 +232,10 @@ def test_auto_mode_groq_rate_limited(monkeypatch):
 def test_auto_mode_all_fail(monkeypatch):
     monkeypatch.setattr("config.settings.ai_provider", "groq")
     monkeypatch.setattr("config.settings.ai_fallback_chain", "nvidia")
-    
+
     with patch("services.llm_service._call_provider", side_effect=[_mock_failure("groq"), _mock_failure("nvidia")]):
         res = analyse(1, "csv", 100, "clean", 0.0, [], llm_mode="auto")
-        
+
         assert res.status == "unavailable"
         assert res.final_provider == ""
         assert res.provider_attempts == ["groq", "nvidia"]
@@ -244,7 +245,7 @@ def test_manual_mode_success(monkeypatch):
     monkeypatch.setattr("config.settings.groq_api_key", "secret")
     with patch("services.llm_service._call_provider", side_effect=[_mock_success("groq")]):
         res = analyse(1, "csv", 100, "clean", 0.0, [], llm_mode="manual", requested_provider="groq")
-        
+
         assert res.llm_mode == "manual"
         assert res.requested_provider == "groq"
         assert res.final_provider == "groq"
@@ -255,7 +256,7 @@ def test_manual_mode_no_fallback(monkeypatch):
     monkeypatch.setattr("config.settings.groq_api_key", "secret")
     with patch("services.llm_service._call_provider", side_effect=[_mock_failure("groq")]):
         res = analyse(1, "csv", 100, "clean", 0.0, [], llm_mode="manual", requested_provider="groq")
-        
+
         assert res.status == "unavailable"
         assert res.fallback_used is False
         assert res.provider_attempts == ["groq"]
@@ -268,24 +269,24 @@ def test_invalid_provider_rejected(monkeypatch):
 def test_provider_attempts_tracked(monkeypatch):
     monkeypatch.setattr("config.settings.ai_provider", "groq")
     monkeypatch.setattr("config.settings.ai_fallback_chain", "nvidia,cloudflare,huggingface")
-    
+
     with patch("services.llm_service._call_provider", side_effect=[
-        _mock_failure("groq"), 
-        _mock_failure("nvidia"), 
+        _mock_failure("groq"),
+        _mock_failure("nvidia"),
         _mock_success("cloudflare")
     ]):
         res = analyse(1, "csv", 100, "clean", 0.0, [], llm_mode="auto")
-        
+
         assert res.provider_attempts == ["groq", "nvidia", "cloudflare"]
         assert res.final_provider == "cloudflare"
 
 def test_freellmapi_terminal_fallback(monkeypatch):
     monkeypatch.setattr("config.settings.ai_provider", "groq")
     monkeypatch.setattr("config.settings.ai_fallback_chain", "freellmapi")
-    
+
     with patch("services.llm_service._call_provider", side_effect=[_mock_failure("groq"), _mock_success("freellmapi")]):
         res = analyse(1, "csv", 100, "clean", 0.0, [], llm_mode="auto")
-        
+
         assert res.final_provider == "freellmapi"
         assert res.provider_attempts == ["groq", "freellmapi"]
 
@@ -293,10 +294,10 @@ def test_freellmapi_disabled_skipped(monkeypatch):
     monkeypatch.setattr("config.settings.ai_provider", "groq")
     monkeypatch.setattr("config.settings.ai_fallback_chain", "freellmapi")
     monkeypatch.setattr("config.settings.freellmapi_enabled", False)
-    
+
     with patch("services.llm_service._call_provider", side_effect=[_mock_failure("groq")]):
         res = analyse(1, "csv", 100, "clean", 0.0, [], llm_mode="auto")
-        
+
         # freellmapi skipped in chain or unavailable due to config
         # _build_provider_chain builds it, but _call_provider returns unavailable
         pass # The behavior is dependent on the _call_provider, let's just assert final_provider is empty
@@ -306,7 +307,7 @@ def test_observability_metadata(monkeypatch):
     monkeypatch.setattr("config.settings.ai_provider", "groq")
     with patch("services.llm_service._call_provider", side_effect=[_mock_success("groq")]):
         res = analyse(1, "csv", 100, "clean", 0.0, [], llm_mode="auto")
-        
+
         assert res.llm_mode == "auto"
         assert res.requested_provider == "auto"
         assert res.initial_provider == "groq"

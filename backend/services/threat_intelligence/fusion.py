@@ -3,10 +3,11 @@ Aegis Node - Threat Intelligence Deterministic Fusion Layer.
 Combines and normalizes evidence from multiple external providers.
 """
 
-from typing import List, Tuple
+
 from schemas import NormalizedTIEvidence, TIFusionReport
 
-def _fuse_evidence(evidence_list: List[NormalizedTIEvidence], providers_checked: List[str]) -> Tuple[str, List[str], List[str]]:
+
+def _fuse_evidence(evidence_list: list[NormalizedTIEvidence], providers_checked: list[str]) -> tuple[str, list[str], list[str]]:
     """
     Applies deterministic fusion rules to a list of normalized evidence.
     Returns:
@@ -61,7 +62,7 @@ def _fuse_evidence(evidence_list: List[NormalizedTIEvidence], providers_checked:
 
     return strength, limitations, conflicts
 
-def fuse_reports(evidence_list: List[NormalizedTIEvidence], providers_checked: List[str]) -> TIFusionReport:
+def fuse_reports(evidence_list: list[NormalizedTIEvidence], providers_checked: list[str]) -> TIFusionReport:
     """
     Constructs a TIFusionReport from gathered evidence.
     """

@@ -27,6 +27,7 @@ for p in (_ROOT, _BACKEND_DIR, _SCANNER_DIR):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
+from scanner.clamd_client import scan_file as clamav_scan_file  # noqa: E402
 from services.llm_service import analyse  # noqa: E402
 
 from evaluation.dataset_generator import generate_benchmark_corpus  # noqa: E402
@@ -39,7 +40,6 @@ from evaluation.metrics import (  # noqa: E402
 
 # Reuse existing application scanner modules
 from evaluation.report_generator import generate_reports  # noqa: E402
-from scanner.clamd_client import scan_file as clamav_scan_file  # noqa: E402
 from scanner.content_checker import check_file  # noqa: E402
 from scanner.engine import run_scan  # noqa: E402
 from scanner.sanitizer import sanitize_file  # noqa: E402

@@ -7,6 +7,7 @@ Endpoint: https://challenges.cloudflare.com/turnstile/v0/siteverify
 """
 
 import logging
+
 import httpx
 from config import settings
 
@@ -57,7 +58,7 @@ async def verify_turnstile_token(token: str | None, remote_ip: str | None = None
                 error_codes = data.get("error-codes", [])
                 logger.warning("Cloudflare Turnstile token verification failed: %s", error_codes)
                 return False
-                
+
             # Hostname validation
             if success and is_production and settings.turnstile_allowed_hostnames:
                 actual_hostname = data.get("hostname", "")

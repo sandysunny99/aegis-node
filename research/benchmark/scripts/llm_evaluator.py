@@ -9,7 +9,8 @@ import logging
 import re
 import time as _time
 from dataclasses import dataclass, field
-from pydantic import BaseModel, Field, ValidationError
+
+from pydantic import BaseModel, Field
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -147,7 +148,7 @@ def _call_groq(system_prompt: str, user_prompt: str, api_key: str) -> LlmEvalRes
     import httpx
     t0 = _time.perf_counter()
     model_name = "openai/gpt-oss-20b"
-    
+
     for attempt in range(3):
         try:
             resp = httpx.post(
@@ -164,12 +165,12 @@ def _call_groq(system_prompt: str, user_prompt: str, api_key: str) -> LlmEvalRes
                 },
                 timeout=45.0,
             )
-            
+
             if resp.status_code == 429:
                 logger.info(f"Groq rate-limited (attempt {attempt+1}/3), backing off...")
                 _time.sleep(2 ** attempt)
                 continue
-                
+
             latency = int((_time.perf_counter() - t0) * 1000)
             if resp.status_code != 200:
                 return LlmEvalResult(
@@ -189,11 +190,11 @@ def _call_groq(system_prompt: str, user_prompt: str, api_key: str) -> LlmEvalRes
                 )
             logger.info(f"Groq request failed (attempt {attempt+1}/3): {e}, retrying...")
             _time.sleep(2 ** attempt)
-            
+
     try:
         data = resp.json()
         raw_text = data["choices"][0]["message"]["content"]
-        
+
         # Ensure it parses
         parsed = LlmEvalSchema.model_validate_json(raw_text)
         return LlmEvalResult(

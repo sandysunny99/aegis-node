@@ -1,8 +1,11 @@
-import pytest
-from datetime import datetime
 
-from schemas import NormalizedTIEvidence, TIFusionReport
-from services.threat_intelligence.fusion import _fuse_evidence, fuse_reports, evaluate_local_verdict_conflict
+from schemas import NormalizedTIEvidence
+from services.threat_intelligence.fusion import (
+    _fuse_evidence,
+    evaluate_local_verdict_conflict,
+    fuse_reports,
+)
+
 
 def test_normalization_models():
     """Verify the normalized models match the expected structure."""
@@ -57,7 +60,7 @@ def test_conflict_local_clean_ti_malicious():
     """TI says malicious while local scanner says clean_verified -> CONFLICT_TI_MALICIOUS."""
     ev = NormalizedTIEvidence(provider="urlhaus", indicator_type="url", indicator="x", reputation="malicious", severity="critical")
     report = fuse_reports([ev], ["urlhaus", "abuseipdb"])
-    
+
     conflict = evaluate_local_verdict_conflict("clean_verified", report)
     assert conflict == "CONFLICT_TI_MALICIOUS"
 
@@ -65,7 +68,7 @@ def test_conflict_local_clean_ti_suspicious():
     """TI says suspicious while local scanner says clean_verified -> No conflict."""
     ev = NormalizedTIEvidence(provider="abuseipdb", indicator_type="ipv4", indicator="x", reputation="suspicious", severity="high")
     report = fuse_reports([ev], ["urlhaus", "abuseipdb"])
-    
+
     conflict = evaluate_local_verdict_conflict("clean_verified", report)
     assert conflict is None
 
@@ -73,7 +76,7 @@ def test_conflict_local_malicious_ti_unavailable():
     """Local malicious + TI unavailable -> No conflict."""
     ev = NormalizedTIEvidence(provider="urlhaus", indicator_type="url", indicator="x", reputation="unknown", severity="informational", error_status="timeout")
     report = fuse_reports([ev], ["urlhaus", "abuseipdb"])
-    
+
     conflict = evaluate_local_verdict_conflict("malicious", report)
     assert conflict is None
 

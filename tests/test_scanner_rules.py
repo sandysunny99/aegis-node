@@ -76,7 +76,6 @@ class TestFormulaInjectionDetection:
 
     def test_clean_value_no_formula(self):
         findings = _check_string_value("alice@example.com", "email", "1")
-        formula_rules = {f.rule_id for f in findings if f.rule_id.startswith("FORM")}
         # Email with @ should NOT trigger formula injection (it doesn't start the cell)
         # Actually it may — this documents current behavior
         assert isinstance(findings, list)

@@ -9,6 +9,7 @@ Cloudflare Workers AI Free plan includes 10,000 neurons/day; usage beyond the fr
 
 import json
 import logging
+
 import httpx
 
 logger = logging.getLogger(__name__)

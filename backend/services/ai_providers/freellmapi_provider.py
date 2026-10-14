@@ -1,5 +1,6 @@
 import httpx
 
+
 def call_freellmapi(
     system_prompt: str,
     user_prompt: str,
@@ -15,7 +16,7 @@ def call_freellmapi(
     }
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
-        
+
     payload = {
         "model": model,
         "messages": [

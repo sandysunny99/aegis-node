@@ -2,7 +2,7 @@ import email.utils
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
+
 
 class AegisProviderErrorType(Enum):
     RATE_LIMITED = "rate_limited"
@@ -20,11 +20,11 @@ class ProviderErrorClassification:
     category: AegisProviderErrorType
     retryable: bool
     fallback_eligible: bool
-    retry_after_seconds: Optional[int] = None
-    provider: Optional[str] = None
-    http_status: Optional[int] = None
+    retry_after_seconds: int | None = None
+    provider: str | None = None
+    http_status: int | None = None
 
-def parse_retry_after(header_value: Optional[str], max_delay: int = 60) -> Optional[int]:
+def parse_retry_after(header_value: str | None, max_delay: int = 60) -> int | None:
     """
     Parse Retry-After header. Supports delta-seconds and HTTP-date.
     Clamps to max_delay to prevent unbounded sleep or provider control.
@@ -61,7 +61,7 @@ def classify_error(exc: Exception, provider: str = "unknown", max_retry_after: i
     Fallback eligible means we can move to the next provider in the chain.
     """
     import httpx
-    
+
     status = None
     retry_after = None
 

@@ -3,9 +3,9 @@ Tests for Cloudflare Workers AI Provider and fallback integration.
 """
 
 from unittest.mock import MagicMock, patch
-import pytest
+
 from services.ai_providers.cloudflare_provider import call_cloudflare
-from services.llm_service import _call_cloudflare, _build_provider_chain, analyse
+from services.llm_service import _build_provider_chain, _call_cloudflare
 
 
 def test_cloudflare_provider_missing_credentials():

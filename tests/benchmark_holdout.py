@@ -1,12 +1,12 @@
 import json
-import time
-from pathlib import Path
 import sys
+from pathlib import Path
 
 _ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(_ROOT / "backend"))
 
 from services.guardrails import evaluate_input_guardrail
+
 
 def load_fixtures(name):
     path = Path(__file__).parent / "fixtures" / "guardrails" / f"{name}.json"
@@ -19,13 +19,13 @@ def run_benchmark():
     false_positives = 0
     detected_attacks = 0
     missed_attacks = 0
-    
+
     for payload in benign:
         status, score, signals = evaluate_input_guardrail(payload)
         if status in ("RESTRICT", "BLOCK"):
             false_positives += 1
             print(f"[FP] Status: {status}, Score: {score}, Signals: {signals} -> {payload}")
-        
+
     for payload in adversarial:
         status, score, signals = evaluate_input_guardrail(payload)
         if status in ("RESTRICT", "BLOCK"):

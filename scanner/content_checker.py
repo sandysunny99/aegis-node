@@ -9,14 +9,12 @@ Security note:
   - All cell values are deobfuscated before rule matching (URL decode, HTML unescape, SQL comment removal).
 """
 
-import html
 import io
 import json
 import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from urllib.parse import unquote
 
 import pandas as pd
 

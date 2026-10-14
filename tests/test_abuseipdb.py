@@ -1,8 +1,9 @@
-import pytest
-import httpx
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
-from services.threat_intelligence.abuseipdb import lookup_ip, _CACHE, _is_public_ip, _normalize_ip
+import httpx
+import pytest
+from services.threat_intelligence.abuseipdb import _CACHE, _is_public_ip, _normalize_ip, lookup_ip
+
 
 @pytest.fixture(autouse=True)
 def clear_cache():
@@ -25,7 +26,7 @@ def test_ip_validation():
     assert _is_public_ip("8.8.8.8") is True
     assert _is_public_ip("1.1.1.1") is True
     assert _is_public_ip("2001:4860:4860::8888") is True
-    
+
     # Private / Reserved / Loopback
     assert _is_public_ip("192.168.1.1") is False
     assert _is_public_ip("10.0.0.1") is False
@@ -33,7 +34,7 @@ def test_ip_validation():
     assert _is_public_ip("169.254.169.254") is False
     assert _is_public_ip("172.16.0.1") is False
     assert _is_public_ip("::1") is False
-    
+
     # Malformed
     assert _is_public_ip("999.999.999.999") is False
     assert _is_public_ip("not.an.ip") is False
@@ -47,7 +48,7 @@ def test_ip_normalization():
 async def test_invalid_ip_rejection(mock_ab_settings):
     res = await lookup_ip("192.168.1.1")
     assert res.status == "invalid_ip"
-    
+
     res = await lookup_ip("invalid")
     assert res.status == "invalid_ip"
 
@@ -75,13 +76,13 @@ async def test_successful_malicious_result(mock_get, mock_ab_settings):
         }
     }
     mock_get.return_value = mock_response
-    
+
     res = await lookup_ip("8.8.8.8")
-    
+
     assert res.status == "malicious"
     assert res.malicious_count == 500
     assert res.confidence == "score:100"
-    
+
     mock_get.assert_called_once()
     args, kwargs = mock_get.call_args
     assert args[0] == "https://api.abuseipdb.com/api/v2/check"
@@ -100,7 +101,7 @@ async def test_successful_suspicious_result(mock_get, mock_ab_settings):
         }
     }
     mock_get.return_value = mock_response
-    
+
     res = await lookup_ip("8.8.8.8")
     assert res.status == "suspicious"
     assert res.suspicious_count == 10
@@ -117,7 +118,7 @@ async def test_successful_clean_result(mock_get, mock_ab_settings):
         }
     }
     mock_get.return_value = mock_response
-    
+
     res = await lookup_ip("8.8.8.8")
     assert res.status == "clean"
 
@@ -127,7 +128,7 @@ async def test_rate_limited(mock_get, mock_ab_settings):
     mock_response = MagicMock()
     mock_response.status_code = 429
     mock_get.return_value = mock_response
-    
+
     res = await lookup_ip("8.8.8.8")
     assert res.status == "rate_limited"
 
@@ -137,7 +138,7 @@ async def test_unauthorized_and_forbidden(mock_get, mock_ab_settings):
     mock_response = MagicMock()
     mock_response.status_code = 401
     mock_get.return_value = mock_response
-    
+
     res = await lookup_ip("8.8.8.8")
     assert res.status == "unauthorized"
 
@@ -149,7 +150,7 @@ async def test_unauthorized_and_forbidden(mock_get, mock_ab_settings):
 @patch("httpx.AsyncClient.get")
 async def test_network_timeout(mock_get, mock_ab_settings):
     mock_get.side_effect = httpx.TimeoutException("Timeout")
-    
+
     res = await lookup_ip("8.8.8.8")
     assert res.status == "timeout"
     assert "Request timed out" in res.error_message
@@ -160,7 +161,7 @@ async def test_5xx_error(mock_get, mock_ab_settings):
     mock_response = MagicMock()
     mock_response.status_code = 500
     mock_get.return_value = mock_response
-    
+
     res = await lookup_ip("8.8.8.8")
     assert res.status == "provider_error"
 
@@ -175,17 +176,17 @@ async def test_cache_behavior_and_isolation(mock_get, mock_ab_settings):
         }
     }
     mock_get.return_value = mock_response
-    
+
     ip1 = "1.1.1.1"
-    
+
     res1 = await lookup_ip(ip1)
     assert mock_get.call_count == 1
     assert res1.status == "malicious"
-    
+
     res2 = await lookup_ip(ip1)
     assert mock_get.call_count == 1
     assert res1 is res2
-    
+
     ip2 = "2.2.2.2"
     res3 = await lookup_ip(ip2)
     assert mock_get.call_count == 2

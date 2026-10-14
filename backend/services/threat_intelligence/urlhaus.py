@@ -2,13 +2,12 @@
 Aegis Node - URLhaus API Threat Intelligence Client.
 """
 import logging
-import httpx
 import time
-from typing import Dict, Tuple
 from urllib.parse import urlparse
 
-from schemas import ThreatIntelResult
+import httpx
 from config import settings
+from schemas import ThreatIntelResult
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +15,7 @@ _URLHAUS_API_URL = "https://urlhaus-api.abuse.ch/v1/url/"
 
 # Simple in-memory TTL cache to avoid repeating identical queries
 # Key: "urlhaus:" + normalized_url, Value: (timestamp_seconds, ThreatIntelResult)
-_CACHE: Dict[str, Tuple[float, ThreatIntelResult]] = {}
+_CACHE: dict[str, tuple[float, ThreatIntelResult]] = {}
 CACHE_TTL_SECONDS = 3600  # 1 hour
 
 def _normalize_url(raw_url: str) -> str:

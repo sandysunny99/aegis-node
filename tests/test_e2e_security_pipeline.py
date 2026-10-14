@@ -7,17 +7,15 @@ Validates the entire lifecycle:
 
 import hashlib
 import io
-import json
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 from main import app
-from database import Base, engine, create_all_tables
-from scanner.content_checker import check_file, raw_bytes_scan
+from services.file_service import compute_sha256
+
 from scanner.engine import run_scan
 from scanner.sanitizer import sanitize_file
-from services.file_service import FileService, _sanitize_filename, compute_sha256
 
 _FIXTURES_DIR = Path(__file__).parent / "fixtures" / "aegis_validation"
 
@@ -30,8 +28,9 @@ def client():
 # ─── 1. Full E2E Flow: Clean Dataset ──────────────────────────────────────────
 
 def test_e2e_clean_dataset_pipeline(client, monkeypatch):
-    from services.av_providers.clamav import ClamAVRestProvider
-    import config; monkeypatch.setattr(config.settings, "clamav_mock_mode", True)
+    import config
+
+    monkeypatch.setattr(config.settings, "clamav_mock_mode", True)
     """
     Test complete lifecycle for a clean dataset:
     Upload -> Verify SHA-256 -> Scan -> Verify Clean Verdict -> No Remediation Needed.
@@ -122,7 +121,6 @@ def test_e2e_formula_injection_and_remediation_pipeline(client):
     """
     csv_path = _FIXTURES_DIR / "formula_injection" / "formula_injection.csv"
     content = csv_path.read_bytes()
-    orig_sha256 = hashlib.sha256(content).hexdigest()
 
     # 1. Upload
     up_resp = client.post(
@@ -176,7 +174,7 @@ def test_e2e_eicar_test_signature_pipeline(client):
     Test EICAR test string detection, quarantine/malicious status, remediation, and re-scan.
     """
     eicar_str = "X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
-    csv_data = f"id,artifact_payload\n1,{eicar_str}\n".encode("utf-8")
+    csv_data = f"id,artifact_payload\n1,{eicar_str}\n".encode()
 
     # Upload
     up_resp = client.post(

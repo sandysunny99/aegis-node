@@ -7,7 +7,6 @@ Pull model:     ollama pull llama3.1
 Run server:     ollama serve (auto-starts on install)
 """
 
-import json
 import logging
 
 import httpx

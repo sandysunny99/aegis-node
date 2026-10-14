@@ -2,7 +2,6 @@
 Tests for Multi-Encoding Normalization Pipeline (scanner/normalizer.py).
 """
 
-import pytest
 from scanner.normalizer import normalize_text
 
 

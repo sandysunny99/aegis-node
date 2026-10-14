@@ -4,10 +4,12 @@ from pathlib import Path
 # Run from the repo root: python scripts/<name>.py  (backend/ holds config and services)
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "backend"))
 
+import logging
 import os
 import sys
-import logging
+
 from dotenv import load_dotenv
+
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
 
 from config import settings

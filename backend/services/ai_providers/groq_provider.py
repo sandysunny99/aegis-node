@@ -6,7 +6,6 @@ Groq is significantly faster than Gemini for inference.
 Free tier: https://console.groq.com/
 """
 
-import json
 import logging
 
 import httpx

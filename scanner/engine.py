@@ -17,18 +17,21 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 try:
-    from services.av_providers import AVScanResult as ClamAVResult, get_av_provider
+    from services.av_providers import AVScanResult as ClamAVResult
+    from services.av_providers import get_av_provider
+
     from scanner.content_checker import ContentCheckResult, ContentFinding, check_file
     from scanner.heuristics import heuristic_scan
     from scanner.yara_scanner import yara_scanner
 except ImportError:
-    from services.av_providers import AVScanResult as ClamAVResult, get_av_provider  # type: ignore[no-redef]
     from content_checker import (  # type: ignore[no-redef]
         ContentCheckResult,
         ContentFinding,
         check_file,
     )
     from heuristics import heuristic_scan  # type: ignore[no-redef]
+    from services.av_providers import AVScanResult as ClamAVResult  # type: ignore[no-redef]
+    from services.av_providers import get_av_provider
     from yara_scanner import yara_scanner  # type: ignore[no-redef]
 
 logger = logging.getLogger(__name__)

@@ -1,6 +1,4 @@
-import os
-from pathlib import Path
-from scanner.content_checker import check_file, raw_bytes_scan, ContentFinding
+from scanner.content_checker import check_file, raw_bytes_scan
 from scanner.engine import run_scan
 from scanner.sanitizer import sanitize_file
 

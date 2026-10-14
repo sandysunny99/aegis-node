@@ -4,10 +4,11 @@ from pathlib import Path
 # Run from the repo root: python scripts/<name>.py  (backend/ holds config and services)
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "backend"))
 
-import os
 import hashlib
+
 from config import settings
 from services.storage import storage_backend
+
 
 def run_smoke_test():
     if not settings.r2_enabled:

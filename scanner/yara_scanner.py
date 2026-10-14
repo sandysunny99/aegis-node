@@ -10,6 +10,7 @@ Architecture:
 
 import logging
 from pathlib import Path
+
 from schemas import ThreatFinding
 
 logger = logging.getLogger(__name__)

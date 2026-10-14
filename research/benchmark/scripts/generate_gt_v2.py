@@ -7,7 +7,7 @@ gt_path = base_dir / "ground_truth" / "ground_truth.json"
 gt_v2_path = base_dir / "ground_truth_v2" / "ground_truth.json"
 
 # Load original
-with open(gt_path, "r", encoding="utf-8") as f:
+with open(gt_path, encoding="utf-8") as f:
     gt_data = json.load(f)
 
 # Add new cases

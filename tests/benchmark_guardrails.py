@@ -1,12 +1,13 @@
 import json
+import sys
 import time
 from pathlib import Path
-import sys
 
 _ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(_ROOT / "backend"))
 
 from services.guardrails import evaluate_input_guardrail
+
 
 def load_fixtures(name):
     path = Path(__file__).parent / "fixtures" / "guardrails" / f"{name}.json"
@@ -20,7 +21,7 @@ def run_benchmark():
     detected_attacks = 0
     missed_attacks = 0
     latencies = []
-    
+
     allow_count = 0
     restrict_count = 0
     block_count = 0
@@ -33,10 +34,13 @@ def run_benchmark():
         if status in ("RESTRICT", "BLOCK"):
             false_positives += 1
             print(f"[FP] Status: {status}, Score: {score}, Signals: {signals} -> {payload}")
-        
-        if status == "ALLOW": allow_count += 1
-        elif status == "RESTRICT": restrict_count += 1
-        elif status == "BLOCK": block_count += 1
+
+        if status == "ALLOW":
+            allow_count += 1
+        elif status == "RESTRICT":
+            restrict_count += 1
+        elif status == "BLOCK":
+            block_count += 1
 
     # Test adversarial (True Positives / Misses)
     for payload in adversarial:
@@ -49,9 +53,12 @@ def run_benchmark():
             missed_attacks += 1
             print(f"[MISS] Status: {status}, Score: {score}, Signals: {signals} -> {payload}")
 
-        if status == "ALLOW": allow_count += 1
-        elif status == "RESTRICT": restrict_count += 1
-        elif status == "BLOCK": block_count += 1
+        if status == "ALLOW":
+            allow_count += 1
+        elif status == "RESTRICT":
+            restrict_count += 1
+        elif status == "BLOCK":
+            block_count += 1
 
     avg_latency = sum(latencies) / len(latencies) * 1000 if latencies else 0
 

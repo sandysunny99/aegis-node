@@ -86,13 +86,13 @@ _PRINTABLE = frozenset(range(0x20, 0x7F)) | {0x09, 0x0A, 0x0D}
 
 # ── Try to import optional dependencies ───────────────────────────────────────
 try:
-    import magic as _magic         # python-magic (libmagic wrapper)
+    import magic as _magic  # python-magic (libmagic wrapper)
     _HAS_MAGIC = True
 except ImportError:               # pragma: no cover
     _HAS_MAGIC = False
 
 try:
-    import pefile as _pefile       # PE analysis
+    import pefile as _pefile  # PE analysis
     _HAS_PEFILE = True
 except ImportError:               # pragma: no cover
     _HAS_PEFILE = False
@@ -341,7 +341,6 @@ def _check_pe_suspicious_imports(data: bytes) -> list[ContentFinding]:
     if not _HAS_PEFILE or data[:2] != b"MZ":
         return []
     try:
-        import io
         pe = _pefile.PE(data=data, fast_load=True)  # type: ignore[union-attr]
         pe.parse_data_directories(
             directories=[_pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_IMPORT"]]  # type: ignore[index]

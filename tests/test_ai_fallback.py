@@ -18,8 +18,6 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 # ── Path setup so imports work from project root ───────────────────────────────
 _BACKEND = Path(__file__).parent.parent / "backend"
 if str(_BACKEND) not in sys.path:
@@ -329,9 +327,10 @@ class TestAnalyseFallbackChain:
         assert result.status == "completed"
         assert mock_call.call_count == 2
 def test_fallback_does_not_sleep_on_retry_after(monkeypatch):
-    import httpx
     import time
     from unittest.mock import MagicMock
+
+    import httpx
     from services.llm_service import _call_provider
 
     class MockResponse:

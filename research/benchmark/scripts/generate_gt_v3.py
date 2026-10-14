@@ -9,7 +9,7 @@ base_dir = Path("research/benchmark")
 gt_v2 = base_dir / "ground_truth_v2" / "ground_truth.json"
 gt_v3 = base_dir / "ground_truth_v3" / "ground_truth.json"
 
-with open(gt_v2, "r", encoding="utf-8") as f:
+with open(gt_v2, encoding="utf-8") as f:
     gt_data = json.load(f)
 
 new_cases = [

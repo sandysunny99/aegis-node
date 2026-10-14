@@ -8,6 +8,7 @@ Free tier / dashboard: https://console.x.ai/
 """
 
 import logging
+
 import httpx
 
 logger = logging.getLogger(__name__)
@@ -42,8 +43,6 @@ def call_xai(
         if candidate not in models_to_try:
             models_to_try.append(candidate)
 
-    last_error_msg: str | None = None
-
     with httpx.Client(timeout=timeout) as client:
         last_exc = None
         for m in models_to_try:
@@ -73,7 +72,7 @@ def call_xai(
                 last_exc = e
                 logger.warning("xAI API HTTP error with model %s: status=%s", m, status_code)
                 if status_code in (401, 403, 429):
-                    raise last_exc
+                    raise last_exc from None
             except Exception as e:  # noqa: BLE001
                 last_exc = e
                 logger.warning("xAI API call error with model %s: %s", m, e)

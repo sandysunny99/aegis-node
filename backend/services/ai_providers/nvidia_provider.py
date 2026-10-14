@@ -1,5 +1,6 @@
 import httpx
 
+
 def call_nvidia(
     system_prompt: str,
     user_prompt: str,

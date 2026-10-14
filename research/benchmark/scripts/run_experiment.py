@@ -25,7 +25,6 @@ Output:
 import argparse
 import csv
 import datetime
-import hashlib
 import json
 import logging
 import platform
@@ -57,7 +56,7 @@ logging.basicConfig(
 # ---------------------------------------------------------------------------
 # Import the FROZEN scanner — NO modifications allowed
 # ---------------------------------------------------------------------------
-from scanner.engine import run_scan, ScanEngineResult  # noqa: E402
+from scanner.engine import ScanEngineResult, run_scan  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -94,19 +93,19 @@ class EvaluationResult:
     ai_result: str = "N/A"
     remediation_result: str = "N/A"
     verification_result: str = "N/A"
-    
+
     # Prompt Guard Details
     prompt_guard_available: bool = False
     prompt_guard_score: float = 0.0
     prompt_guard_prediction: str = "none"
     prompt_guard_evidence: str = "none"
-    
+
     # Threat Intelligence Details
     ti_available: bool = False
     ti_error: str = "none"
     ti_prediction: str = "none"
     ti_evidence: str = "none"
-    
+
     # LLM Details
     llm_status: str = "none"
     llm_summary: str = "none"
@@ -117,7 +116,7 @@ class EvaluationResult:
     llm_model_used: str = ""
     llm_latency_ms: int = 0
     llm_error: str = ""
-    
+
     latency_ms: int = 0
     error: str = ""
     timestamp: str = ""
@@ -170,7 +169,7 @@ def _load_ground_truth() -> list[GroundTruth]:
 def evaluate_case(gt: GroundTruth, variant: str, git_commit: str) -> EvaluationResult:
     """Run the scanner against a single benchmark case and record the result."""
     file_path = DATASET_DIR / gt.file_name
-    
+
     if not file_path.exists():
         return EvaluationResult(
             case_id=gt.case_id,
@@ -186,69 +185,71 @@ def evaluate_case(gt: GroundTruth, variant: str, git_commit: str) -> EvaluationR
             heuristic_result="N/A",
             normalization_result="N/A",
             error=f"File not found: {file_path}",
-            timestamp=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            timestamp=datetime.datetime.now(datetime.UTC).isoformat(),
         )
 
     # Isolated Variant Configuration via memory patching
     # (We DO NOT modify production source code)
-    import scanner.engine
-    from scanner.yara_scanner import yara_scanner
-    import scanner.content_checker
-    
-    # Prompt Guard is a research module only
-    import prompt_guard
-    # Threat Intelligence mock is a research module only
-    import threat_intel
     # LLM Eval module is a research module only
     import llm_evaluator
+
+    # Prompt Guard is a research module only
+    import prompt_guard
+
+    # Threat Intelligence mock is a research module only
+    import threat_intel
+
+    import scanner.content_checker
+    import scanner.engine
     from backend.config import settings
-    
+    from scanner.yara_scanner import yara_scanner
+
     # Store original states
     orig_yara_available = yara_scanner.is_available
     orig_normalize = scanner.content_checker.normalize_text
-    
+
     # Mock no-op normalizer
     def noop_normalize(text: str, max_depth: int = 3) -> tuple[str, list[str]]:
         return text, []
-        
+
     pg_result_obj = None
     ti_result_obj = None
     llm_result_obj = None
     t0 = time.perf_counter()
-    
+
     try:
         if variant == "A":
             # Rules + ClamAV + Heuristics ONLY
             yara_scanner.is_available = False
             scanner.content_checker.normalize_text = noop_normalize
-            
+
         elif variant == "B":
             # Variant A + YARA
             yara_scanner.is_available = orig_yara_available
             scanner.content_checker.normalize_text = noop_normalize
-            
+
         elif variant == "C":
             # Variant B + Normalization
             yara_scanner.is_available = orig_yara_available
             scanner.content_checker.normalize_text = orig_normalize
-            
+
         elif variant in ["D", "E", "F"]:
             # Variant C + Prompt Guard (+ Threat Intel for E/F) (+ LLM for F)
             yara_scanner.is_available = orig_yara_available
             scanner.content_checker.normalize_text = orig_normalize
-        
+
         # Run the frozen scanner
         result: ScanEngineResult = run_scan(str(file_path))
-        
+
         # Research Layer: If Variant D, E, or F, run Prompt Guard independently
         if variant in ["D", "E", "F"]:
             try:
                 import csv
                 import json
-                
+
                 rows = []
                 ext = file_path.suffix.lower()
-                with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                with open(file_path, encoding="utf-8", errors="ignore") as f:
                     if ext == ".csv":
                         reader = csv.DictReader(f)
                         for row in reader:
@@ -262,25 +263,25 @@ def evaluate_case(gt: GroundTruth, variant: str, git_commit: str) -> EvaluationR
                                         rows.append({k: orig_normalize(str(v))[0] for k, v in item.items() if v})
                             elif isinstance(data, dict):
                                 rows.append({k: orig_normalize(str(v))[0] for k, v in data.items() if v})
-                        except:
+                        except Exception:  # noqa: BLE001 — malformed JSON lines are skipped
                             pass
                     else:
                         rows.append({"text": orig_normalize(f.read())[0]})
-                
+
                 pg_results = prompt_guard.classify_file_cells(rows)
                 # Take highest confidence result
                 if pg_results:
                     pg_result_obj = max(pg_results, key=lambda x: x.confidence)
                 else:
                     pg_result_obj = prompt_guard.PromptGuardResult(is_injection=False, confidence=0.0)
-                    
+
                 # If Prompt Guard detects injection, escalate to SUSPICIOUS or MALICIOUS
                 if pg_result_obj.is_injection:
                     # Treat prompt injection as SUSPICIOUS (which triggers review) unless engine already says MALICIOUS
                     current_verdict = getattr(result.verdict, "value", str(result.verdict))
                     if current_verdict.startswith("clean"):
                         result.verdict = "suspicious" # _map_verdict_to_class handles string values gracefully
-                
+
                 # Research Layer: If Variant E or F, run Threat Intelligence independently
                 if variant in ["E", "F"]:
                     ti_result_obj = threat_intel.evaluate_rows(rows)
@@ -289,7 +290,7 @@ def evaluate_case(gt: GroundTruth, variant: str, git_commit: str) -> EvaluationR
                         current_verdict = getattr(result.verdict, "value", str(result.verdict))
                         if current_verdict.startswith("clean"):
                             result.verdict = "suspicious"
-                            
+
                 # Research Layer: If Variant F, run LLM Evaluator
                 if variant == "F":
                     # Build evidence payload
@@ -310,12 +311,12 @@ def evaluate_case(gt: GroundTruth, variant: str, git_commit: str) -> EvaluationR
                         xai_api_key=getattr(settings, 'xai_api_key', ''),
                     )
                     # Note: We explicitly DO NOT overwrite deterministic verdicts based on LLM output.
-                    
+
             except Exception as e:
                 print(f" Research Layer Error: {e} ")
                 # Failure must NOT silently overwrite security finding
                 pass
-                
+
     except Exception as exc:
         return EvaluationResult(
             case_id=gt.case_id,
@@ -331,7 +332,7 @@ def evaluate_case(gt: GroundTruth, variant: str, git_commit: str) -> EvaluationR
             heuristic_result="N/A",
             normalization_result="N/A",
             error=str(exc),
-            timestamp=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            timestamp=datetime.datetime.now(datetime.UTC).isoformat(),
         )
     finally:
         # Restore original state
@@ -342,8 +343,8 @@ def evaluate_case(gt: GroundTruth, variant: str, git_commit: str) -> EvaluationR
     correct = predicted == gt.expected_class
 
     yara_matches = ", ".join(f.rule_id for f in result.yara_findings) if result.yara_findings else "none"
-    latency = int((time.perf_counter() - t0) * 1000)
-    
+    _latency_ms = int((time.perf_counter() - t0) * 1000)  # kept for parity with older runs
+
     pg_avail = bool(variant in ["D", "E"] and pg_result_obj is not None)
     pg_score = pg_result_obj.confidence if pg_result_obj else 0.0
     pg_pred = "injection" if (pg_result_obj and pg_result_obj.is_injection) else "clean"
@@ -387,7 +388,7 @@ def evaluate_case(gt: GroundTruth, variant: str, git_commit: str) -> EvaluationR
         llm_latency_ms=llm_result_obj.latency_ms if llm_result_obj else 0,
         llm_error=llm_result_obj.error if llm_result_obj else "none",
         latency_ms=result.scan_duration_ms,
-        timestamp=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        timestamp=datetime.datetime.now(datetime.UTC).isoformat(),
         findings_count=result.threats_found_count,
         findings_detail=result.to_findings_dicts(),
     )
@@ -422,7 +423,7 @@ def compute_metrics(results: list[EvaluationResult]) -> dict:
     tpr = tp / (tp + fn) if (tp + fn) > 0 else 0.0
     fpr = fp / (fp + tn) if (fp + tn) > 0 else 0.0
     fnr = fn / (fn + tp) if (fn + tp) > 0 else 0.0
-    
+
     precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
     recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
     f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
@@ -533,7 +534,7 @@ def write_results_json(results: list[EvaluationResult], metrics: dict,
             "git_commit": git_commit,
             "variant": variant,
             "python_version": platform.python_version(),
-            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
             "total_cases": len(results),
         },
         "metrics": metrics,
@@ -550,7 +551,7 @@ def write_results_json(results: list[EvaluationResult], metrics: dict,
 def write_results_csv(results: list[EvaluationResult], variant: str):
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     out_path = RESULTS_DIR / f"variant_{variant}_results.csv"
-    
+
     fieldnames = [
         "case_id", "expected_class", "predicted_class", "correct",
         "scanner_status", "clamav_result", "yara_result", "heuristic_result",
@@ -561,7 +562,7 @@ def write_results_csv(results: list[EvaluationResult], variant: str):
         "llm_model_used", "llm_latency_ms", "llm_error",
         "findings_count", "latency_ms", "error"
     ]
-    
+
     with out_path.open("w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
@@ -614,7 +615,7 @@ def write_summary_md(results: list[EvaluationResult], metrics: dict,
     lines = [
         f"# Aegis Node Benchmark — Variant {variant} Results\n",
         f"**Git Commit**: `{git_commit}`",
-        f"**Timestamp**: {datetime.datetime.now(datetime.timezone.utc).isoformat()}",
+        f"**Timestamp**: {datetime.datetime.now(datetime.UTC).isoformat()}",
         f"**Python**: {platform.python_version()}",
         f"**Total Cases**: {len(results)}\n",
         "## Binary Classification (CLEAN vs SUSPICIOUS/MALICIOUS)\n",
@@ -710,7 +711,7 @@ def write_confusion_matrix_csv(metrics: dict, variant: str) -> Path:
     out_path = RESULTS_DIR / f"confusion_matrix_{variant}.csv"
     mcm = metrics["multiclass_confusion_matrix"]
     classes = ["CLEAN", "SUSPICIOUS", "MALICIOUS"]
-    
+
     with out_path.open("w", encoding="utf-8", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(["Expected \\ Predicted"] + classes)
@@ -722,21 +723,21 @@ def write_confusion_matrix_csv(metrics: dict, variant: str) -> Path:
 def write_ablation_csv(results_a: list[EvaluationResult], results_b: list[EvaluationResult]) -> Path:
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     out_path = RESULTS_DIR / "ablation_A_vs_B.csv"
-    
+
     fieldnames = [
         "case_id", "expected_class", "predicted_class_A", "predicted_class_B",
         "changed", "yara_matches", "improved", "degraded"
     ]
-    
+
     with out_path.open("w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
-        
-        for ra, rb in zip(results_a, results_b):
+
+        for ra, rb in zip(results_a, results_b, strict=False):
             changed = ra.predicted_class != rb.predicted_class
             improved = changed and rb.correct and not ra.correct
             degraded = changed and not rb.correct and ra.correct
-            
+
             writer.writerow({
                 "case_id": ra.case_id,
                 "expected_class": ra.expected_class,
@@ -760,7 +761,7 @@ def main():
 
     variant = args.variant.upper()
     variants_to_run = ["A", "B", "C", "D", "E", "F"] if variant == "ALL" else (["A", "B"] if variant == "BOTH" else [variant])
-    
+
     # Path override based on dataset version
     global DATASET_DIR, GROUND_TRUTH_DIR
     if args.dataset_version == "2":
@@ -776,14 +777,14 @@ def main():
         DATASET_DIR = BENCHMARK_DIR / "dataset_v5"
         GROUND_TRUTH_DIR = BENCHMARK_DIR / "ground_truth_v5"
 
-    print(f"=" * 60)
+    print("=" * 60)
     print(f"AEGIS NODE BENCHMARK — VARIANT {variant} (Dataset v{args.dataset_version})")
-    print(f"=" * 60)
+    print("=" * 60)
 
     git_commit = _get_git_commit()
     print(f"Git commit: {git_commit}")
     print(f"Python:     {platform.python_version()}")
-    print(f"Timestamp:  {datetime.datetime.now(datetime.timezone.utc).isoformat()}")
+    print(f"Timestamp:  {datetime.datetime.now(datetime.UTC).isoformat()}")
     print()
 
     ground_truth = _load_ground_truth()
@@ -791,7 +792,7 @@ def main():
     print()
 
     all_results = {}
-    
+
     for v in variants_to_run:
         print(f"\n--- Running Variant {v} ---")
         results: list[EvaluationResult] = []
@@ -809,7 +810,7 @@ def main():
         write_results_csv(results, v)
         write_summary_md(results, metrics, errors, v, git_commit)
         write_confusion_matrix_csv(metrics, v)
-        
+
         all_results[v] = {"results": results, "metrics": metrics, "errors": errors}
 
     # Custom ablation for A vs B vs C vs D vs E vs F
@@ -817,30 +818,30 @@ def main():
         print("\n--- Ablation Analysis (A vs B vs C vs D vs E vs F) ---")
         RESULTS_DIR.mkdir(parents=True, exist_ok=True)
         abcdef_path = RESULTS_DIR / "ablation_A_vs_B_vs_C_vs_D_vs_E_vs_F.csv"
-        
+
         fieldnames = [
-            "case_id", "expected_class", 
+            "case_id", "expected_class",
             "predicted_class_A", "predicted_class_B", "predicted_class_C", "predicted_class_D", "predicted_class_E", "predicted_class_F",
-            "B_misses_C_detects", "C_misses_D_detects", "D_misses_E_detects", 
+            "B_misses_C_detects", "C_misses_D_detects", "D_misses_E_detects",
             "D_clean_E_false_positive",
             "F_llm_risk_level", "F_prompt_injection", "F_contradiction"
         ]
-        
+
         with abcdef_path.open("w", encoding="utf-8", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
-            
-            for ra, rb, rc, rd, re_result, rf in zip(all_results["A"]["results"], all_results["B"]["results"], all_results["C"]["results"], all_results["D"]["results"], all_results["E"]["results"], all_results["F"]["results"]):
+
+            for ra, rb, rc, rd, re_result, rf in zip(all_results["A"]["results"], all_results["B"]["results"], all_results["C"]["results"], all_results["D"]["results"], all_results["E"]["results"], all_results["F"]["results"], strict=False):
                 b_binary_correct = (rb.predicted_class != "CLEAN") == (rb.expected_class != "CLEAN")
                 c_binary_correct = (rc.predicted_class != "CLEAN") == (rc.expected_class != "CLEAN")
                 d_binary_correct = (rd.predicted_class != "CLEAN") == (rd.expected_class != "CLEAN")
                 e_binary_correct = (re_result.predicted_class != "CLEAN") == (re_result.expected_class != "CLEAN")
-                
+
                 b_misses_c_detects = (not b_binary_correct) and c_binary_correct
                 c_misses_d_detects = (not c_binary_correct) and d_binary_correct
                 d_misses_e_detects = (not d_binary_correct) and e_binary_correct
                 d_clean_e_fp = rd.predicted_class == "CLEAN" and re_result.predicted_class != "CLEAN" and re_result.expected_class == "CLEAN"
-                
+
                 writer.writerow({
                     "case_id": ra.case_id,
                     "expected_class": ra.expected_class,
@@ -861,7 +862,7 @@ def main():
         print(f"A vs B vs C vs D vs E vs F Ablation saved to: {abcdef_path}")
         ablation_csv = write_ablation_csv(all_results["A"]["results"], all_results["B"]["results"])
         print(f"Ablation comparison saved to: {ablation_csv}")
-        
+
     if "F" in all_results:
         # Write llm_quality_review.csv
         llm_quality_path = RESULTS_DIR / "llm_quality_review.csv"
@@ -881,11 +882,11 @@ def main():
                     "reviewer_note": ""
                 })
         print(f"LLM Quality Review Template saved to: {llm_quality_path}")
-        
+
     if "A" in all_results and "B" in all_results:
         metrics_a = all_results["A"]["metrics"]["binary_classification"]
         metrics_b = all_results["B"]["metrics"]["binary_classification"]
-        
+
         print("\nMetrics Delta (B - A):")
         for k in metrics_a:
             delta = metrics_b[k] - metrics_a[k]

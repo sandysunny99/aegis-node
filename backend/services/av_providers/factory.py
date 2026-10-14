@@ -1,5 +1,7 @@
 import logging
+
 from config import settings
+
 from .base import AntivirusProvider, AVScanResult
 from .clamav import ClamAVRestProvider
 from .metadefender import MetaDefenderProvider
@@ -35,7 +37,7 @@ class InvalidProvider(AntivirusProvider):
 
 def get_av_provider() -> AntivirusProvider:
     provider = settings.av_provider.lower().strip()
-    
+
     if provider == "metadefender":
         return MetaDefenderProvider(
             api_key=settings.metadefender_api_key,

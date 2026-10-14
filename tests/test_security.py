@@ -9,8 +9,6 @@ import types
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
-
 # ─── Path Setup ───────────────────────────────────────────────────────────────
 _ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(_ROOT))
@@ -25,7 +23,6 @@ sys.modules.setdefault("config", _mock_config)
 
 # Module-level imports of the functions under test
 from services.llm_service import _validate_and_parse  # noqa: E402
-
 
 # ─── AI Output Validation Tests ───────────────────────────────────────────────
 

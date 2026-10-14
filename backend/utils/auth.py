@@ -13,10 +13,9 @@ Usage in routers:
     @router.post("/...", dependencies=[Depends(require_api_key)])
 """
 
-from fastapi import Depends, HTTPException, Security, status
-from fastapi.security import APIKeyHeader
-
 from config import settings
+from fastapi import HTTPException, Security, status
+from fastapi.security import APIKeyHeader
 
 # FastAPI security scheme — reads X-API-Key header
 _api_key_header = APIKeyHeader(

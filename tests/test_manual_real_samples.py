@@ -1,7 +1,9 @@
 import io
+
+from database import Base, create_all_tables, engine
 from fastapi.testclient import TestClient
 from main import app
-from database import Base, engine, create_all_tables
+
 
 def test_real_sample_demo_clean():
     Base.metadata.drop_all(bind=engine)

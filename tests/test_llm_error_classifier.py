@@ -1,13 +1,9 @@
-import pytest
 import time
 from email.utils import formatdate
-import httpx
 
-from services.llm_error_classifier import (
-    classify_error, 
-    parse_retry_after, 
-    AegisProviderErrorType
-)
+import httpx
+from services.llm_error_classifier import AegisProviderErrorType, classify_error, parse_retry_after
+
 
 class MockResponse:
     def __init__(self, status_code, headers=None, text=""):
@@ -44,21 +40,21 @@ def test_classify_httpx_status_error():
     assert classification.retryable is True
     assert classification.fallback_eligible is True
     assert classification.retry_after_seconds == 10
-    
+
     # 401
     exc_401 = httpx.HTTPStatusError("Unauthorized", request=httpx.Request("GET", "url"), response=MockResponse(401))
     class_401 = classify_error(exc_401, "groq")
     assert class_401.category == AegisProviderErrorType.AUTHENTICATION_ERROR
     assert class_401.retryable is False
     assert class_401.fallback_eligible is True  # We want to fallback to the next provider on Auth err
-    
+
     # 400 Bad Request
     exc_400 = httpx.HTTPStatusError("Bad Request", request=httpx.Request("GET", "url"), response=MockResponse(400))
     class_400 = classify_error(exc_400, "groq")
     assert class_400.category == AegisProviderErrorType.BAD_REQUEST
     assert class_400.retryable is False
     assert class_400.fallback_eligible is True
-    
+
     # 5xx Server Error
     exc_500 = httpx.HTTPStatusError("Internal Server Error", request=httpx.Request("GET", "url"), response=MockResponse(500))
     class_500 = classify_error(exc_500, "groq")
@@ -71,7 +67,7 @@ def test_classify_httpx_timeout_and_network():
     class_time = classify_error(exc_timeout, "groq")
     assert class_time.category == AegisProviderErrorType.TIMEOUT
     assert class_time.fallback_eligible is True
-    
+
     exc_net = httpx.NetworkError("Network Error")
     class_net = classify_error(exc_net, "groq")
     assert class_net.category == AegisProviderErrorType.NETWORK_ERROR
@@ -83,7 +79,7 @@ def test_classify_generic_exception():
     class_rate = classify_error(exc, "gemini")
     assert class_rate.category == AegisProviderErrorType.RATE_LIMITED
     assert class_rate.fallback_eligible is True
-    
+
     exc_auth = Exception("unauthorized invalid api key")
     class_auth = classify_error(exc_auth, "gemini")
     assert class_auth.category == AegisProviderErrorType.AUTHENTICATION_ERROR
@@ -97,8 +93,8 @@ def test_classify_generic_exception():
 def test_security_payload_not_in_exception():
     exc_auth = Exception("unauthorized API key XYZ123 payload <script>alert(1)</script>")
     class_auth = classify_error(exc_auth, "gemini")
-    
-    # Check that classification only exposes ENUMs, safe statuses, and safe provider names, 
+
+    # Check that classification only exposes ENUMs, safe statuses, and safe provider names,
     # and NEVER stores the exception text
     assert class_auth.category == AegisProviderErrorType.AUTHENTICATION_ERROR
     assert not hasattr(class_auth, "raw_message")

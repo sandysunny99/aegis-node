@@ -9,9 +9,7 @@ import httpx
 BASE = "http://127.0.0.1:8000"
 
 print("Uploading...")
-r = httpx.post(f"{BASE}/api/v1/datasets/upload", files={"file": ("test.csv", b"col1
-val1
-")})
+r = httpx.post(f"{BASE}/api/v1/datasets/upload", files={"file": ("test.csv", b"col1\nval1\n")})
 print("Upload status:", r.status_code)
 assert r.status_code == 201, r.text
 ds_id = r.json()["dataset_id"]  # C8: the API returns dataset_id, not id

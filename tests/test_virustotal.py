@@ -1,13 +1,14 @@
-import pytest
-import httpx
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
-from services.threat_intelligence.virustotal import lookup_file_hash, _CACHE
+import httpx
+import pytest
+from services.threat_intelligence.virustotal import _CACHE, lookup_file_hash
+
 
 @pytest.fixture(autouse=True)
 def clear_cache():
     _CACHE.clear()
-    
+
 @pytest.fixture
 def mock_vt_settings():
     from services.threat_intelligence.virustotal import settings
@@ -58,17 +59,17 @@ async def test_successful_malicious_result(mock_get, mock_vt_settings):
         }
     }
     mock_get.return_value = mock_response
-    
+
     sha256 = "b" * 64
     res = await lookup_file_hash(sha256)
-    
+
     assert res.status == "malicious"
     assert res.malicious_count == 15
     assert res.suspicious_count == 2
     assert res.confidence == "15/77"
     assert "trojan.emotet" in res.tags
     assert res.raw_reference == f"https://www.virustotal.com/gui/file/{sha256}"
-    
+
     mock_get.assert_called_once()
     args, kwargs = mock_get.call_args
     # Verify ONLY hash is sent, no file upload
@@ -84,7 +85,7 @@ async def test_successful_clean_result(mock_get, mock_vt_settings):
         "data": {"attributes": {"last_analysis_stats": {"malicious": 0, "suspicious": 0, "harmless": 60, "undetected": 5}}}
     }
     mock_get.return_value = mock_response
-    
+
     res = await lookup_file_hash("c" * 64)
     assert res.status == "clean"
 
@@ -94,7 +95,7 @@ async def test_not_found(mock_get, mock_vt_settings):
     mock_response = MagicMock()
     mock_response.status_code = 404
     mock_get.return_value = mock_response
-    
+
     res = await lookup_file_hash("d" * 64)
     assert res.status == "not_found"
 
@@ -104,7 +105,7 @@ async def test_rate_limited(mock_get, mock_vt_settings):
     mock_response = MagicMock()
     mock_response.status_code = 429
     mock_get.return_value = mock_response
-    
+
     res = await lookup_file_hash("e" * 64)
     assert res.status == "rate_limited"
 
@@ -114,7 +115,7 @@ async def test_unauthorized(mock_get, mock_vt_settings):
     mock_response = MagicMock()
     mock_response.status_code = 403
     mock_get.return_value = mock_response
-    
+
     res = await lookup_file_hash("f" * 64)
     assert res.status == "unauthorized"
 
@@ -122,7 +123,7 @@ async def test_unauthorized(mock_get, mock_vt_settings):
 @patch("httpx.AsyncClient.get")
 async def test_network_timeout(mock_get, mock_vt_settings):
     mock_get.side_effect = httpx.TimeoutException("Timeout")
-    
+
     res = await lookup_file_hash("1" * 64)
     assert res.status == "timeout"
     assert "Request timed out" in res.error_message
@@ -136,21 +137,21 @@ async def test_cache_behavior(mock_get, mock_vt_settings):
         "data": {"attributes": {"last_analysis_stats": {"malicious": 10, "suspicious": 0, "harmless": 0, "undetected": 0}}}
     }
     mock_get.return_value = mock_response
-    
+
     sha256 = "2" * 64
-    
+
     # First call hits API
     res1 = await lookup_file_hash(sha256)
     assert mock_get.call_count == 1
     assert res1.status == "malicious"
-    
+
     # Second call returns cached result
     res2 = await lookup_file_hash(sha256)
     assert mock_get.call_count == 1
     assert res2.status == "malicious"
     assert res1 is res2
-    
+
     # Different hash misses cache
-    res3 = await lookup_file_hash("3" * 64)
+    await lookup_file_hash("3" * 64)
     assert mock_get.call_count == 2
 

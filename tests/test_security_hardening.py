@@ -25,22 +25,17 @@ Tests all 20 non-negotiable security requirements:
 
 import hashlib
 import io
-import json
-import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
-from fastapi.testclient import TestClient
-from main import app
-from models import DatasetRecord, ScanReportRecord
 from services.av_providers import AVScanResult as ClamAVResult
-from scanner.content_checker import check_file, raw_bytes_scan
-from scanner.engine import _determine_verdict, run_scan
-from scanner.sanitizer import _remediate_formula_cell, _remediate_malware_cell, sanitize_file
 from services.file_service import FileService, _sanitize_filename, compute_sha256
-from services.llm_service import _build_compact_evidence, _validate_and_parse, analyse
+from services.llm_service import _validate_and_parse, analyse
 
+from scanner.content_checker import check_file
+from scanner.engine import run_scan
+from scanner.sanitizer import _remediate_malware_cell, sanitize_file
 
 # ─── 1. Malware Reference vs Artifact ─────────────────────────────────────────
 
@@ -133,7 +128,13 @@ def test_clamav_unavailable_yields_limited_verification(tmp_path: Path, monkeypa
     p.write_text("name,age,city\nAlice,30,New York\nBob,25,London\n", encoding="utf-8")
 
     # ClamAV on non-existent port
-    from services.av_providers.clamav import ClamAVRestProvider; monkeypatch.setattr("scanner.engine.get_av_provider", lambda: ClamAVRestProvider("http://localhost:9999", mock_mode=False)); result = run_scan(str(p))
+    from services.av_providers.clamav import ClamAVRestProvider
+
+    monkeypatch.setattr(
+        "scanner.engine.get_av_provider",
+        lambda: ClamAVRestProvider("http://localhost:9999", mock_mode=False),
+    )
+    result = run_scan(str(p))
     assert result.clamav_available is False
     assert result.verdict == "clean_with_limitations"
     assert "CLAMAV_UNAVAILABLE" in result.verification_limitations

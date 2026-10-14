@@ -2,6 +2,7 @@ import logging
 import os
 import threading
 import time
+
 import httpx
 
 from .base import AntivirusProvider, AVScanResult
@@ -83,7 +84,7 @@ class ClamAVRestProvider(AntivirusProvider):
                     filename = os.path.basename(path)
                     files = {"FILES": (filename, fh, "application/octet-stream")}
                     resp = client.post(f"{self.api_url}/api/v1/scan", files=files)
-                
+
                 resp.raise_for_status()
                 data = resp.json()
 
@@ -103,7 +104,7 @@ class ClamAVRestProvider(AntivirusProvider):
                 if is_infected:
                     virus_name = viruses[0] if viruses else "Unknown"
                     return AVScanResult(available=True, infected=True, virus_name=virus_name, raw_response=resp.text, error=None)
-                
+
                 return AVScanResult(available=True, infected=False, virus_name=None, raw_response=resp.text, error=None)
 
         except (httpx.RequestError, httpx.HTTPStatusError, OSError) as exc:

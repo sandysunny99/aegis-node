@@ -5,7 +5,9 @@ Evaluates detector accuracy on held-out dataset (tests/fixtures/prompt_injection
 
 import json
 from pathlib import Path
+
 import pytest
+
 from scanner.content_checker import _check_string_value
 
 
@@ -14,7 +16,7 @@ def benchmark_data():
     fixture_path = (
         Path(__file__).parent / "fixtures" / "prompt_injection_benchmark" / "benchmark_cases.json"
     )
-    with open(fixture_path, "r", encoding="utf-8") as f:
+    with open(fixture_path, encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -31,7 +33,6 @@ def test_prompt_injection_benchmark_metrics(benchmark_data):
     for case in benchmark_data:
         text = case["text"]
         expected_label = case["label"]
-        case_id = case["id"]
 
         findings = _check_string_value(text, column="test_field", row_idx="0")
         actionable_findings = [f for f in findings if f.category != "malware_reference"]
