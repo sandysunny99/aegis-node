@@ -54,3 +54,8 @@ volume (`/app/data`) and the SQLite database on `aegis_node_db` (`/app/db`). Nam
 live inside the Docker VM, so Windows Defender cannot rewrite EICAR/malware samples the way
 it does on a `./data` bind mount, and data survives container restarts (unlike tmpfs). The Render free-tier blueprint uses ephemeral `/tmp` storage;
 use a persistent disk and point `DATABASE_URL` and `DATA_DIR` at that disk for durable production data.
+
+## Documentation
+
+All project documents are indexed in [docs/README.md](docs/README.md). The current security
+state and fix log is [docs/AUDIT_2026-10.md](docs/AUDIT_2026-10.md).
