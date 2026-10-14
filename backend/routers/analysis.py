@@ -19,7 +19,7 @@ from database import get_db  # noqa: E402
 from fastapi import APIRouter, Depends, HTTPException, Request, Query  # noqa: E402
 from fastapi.concurrency import run_in_threadpool  # noqa: E402
 from limiter import limiter  # noqa: E402
-from models import DatasetRecord, LlmAnalysisRecord  # noqa: E402
+from models import LlmAnalysisRecord  # noqa: E402
 from schemas import AnalysisResponse  # noqa: E402
 from services.llm_service import analyse  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
@@ -44,9 +44,7 @@ async def analyse_dataset(
     db: Session = Depends(get_db),  # noqa: B008
     _auth: None = Depends(require_api_key),  # noqa: B008  # Guard - triggers paid AI calls
 ) -> AnalysisResponse:
-    record: DatasetRecord | None = get_dataset_by_public_id(db, dataset_id)
-    if not record:
-        raise HTTPException(status_code=404, detail="Resource not found.")
+    record = get_dataset_by_public_id(db, dataset_id)
 
     if not record.scan_reports:
         raise HTTPException(
@@ -154,9 +152,7 @@ def get_analysis(
     db: Session = Depends(get_db),  # noqa: B008
     _auth: None = Depends(require_api_key),  # noqa: B008
 ) -> AnalysisResponse:
-    record: DatasetRecord | None = get_dataset_by_public_id(db, dataset_id)
-    if not record:
-        raise HTTPException(status_code=404, detail="Resource not found.")
+    record = get_dataset_by_public_id(db, dataset_id)
 
     if not record.llm_analyses:
         raise HTTPException(status_code=404, detail="No AI analysis found. Run /analyse first.")

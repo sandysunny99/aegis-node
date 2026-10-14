@@ -4,6 +4,7 @@ Endpoints: upload, scan, status, report.
 """
 
 import json
+import logging
 import sys
 from pathlib import Path
 
@@ -24,8 +25,10 @@ from schemas import (  # noqa: E402
     DatasetUploadResponse,
     ScanResultResponse,
     ThreatFinding,
+    TIFusionReport,
 )
-from services.file_service import file_service, validate_magic_bytes  # noqa: E402
+from services.file_service import file_service  # noqa: E402
+from services.threat_intelligence.enrichment import enrich_scan_result  # noqa: E402
 from sqlalchemy import update  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 from utils.auth import require_api_key  # noqa: E402
@@ -33,6 +36,8 @@ from utils.datasets import get_dataset_by_public_id  # noqa: E402
 from utils.turnstile import verify_turnstile_token  # noqa: E402
 
 from scanner.engine import run_scan  # noqa: E402
+
+logger = logging.getLogger("aegis.datasets")
 
 router = APIRouter(prefix="/api/v1/datasets", tags=["datasets"])
 
@@ -84,11 +89,11 @@ async def upload_dataset(
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                 detail=msg,
-            )
+            ) from exc
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=msg,
-        )
+        ) from exc
 
     # 3. Persist to database
     record = DatasetRecord(
@@ -121,257 +126,21 @@ async def upload_dataset(
 
 # ─── Scan ─────────────────────────────────────────────────────────────────────
 
-@router.post(
-    "/{dataset_id}/scan",
-    response_model=ScanResultResponse,
-    summary="Execute multi-stage threat scan on an uploaded dataset",
+_REMEDIATED_STATUSES = ("remediated", "partial_remediated")
+_DISABLED_TI_JSON = (
+    '{"status":"disabled","evidence":[],"evidence_strength":"NONE",'
+    '"providers_checked":[],"limitations":[],"conflicts":[]}'
 )
-@limiter.limit("20/minute")    # Prevent CPU/ClamAV abuse — scans are compute-intensive
-async def scan_dataset(
-    request: Request,
-    dataset_id: str,
-    db: Session = Depends(get_db),  # noqa: B008
-    _auth: None = Depends(require_api_key),  # noqa: B008  # API key guard
-) -> ScanResultResponse:
-    # Retrieve dataset record
-    record: DatasetRecord | None = get_dataset_by_public_id(db, dataset_id)
-    if not record:
-        raise HTTPException(status_code=404, detail="Resource not found.")
 
-    if not file_service.sample_exists(record.stored_filename, record.object_key):
-        raise HTTPException(status_code=404, detail="Dataset file not found on disk or storage backend.")
 
-    # Guard against concurrent double-scan: atomic UPDATE WHERE status != 'scanning' (A-003)
-    updated = db.execute(
-        update(DatasetRecord)
-        .where(DatasetRecord.id == record.id, DatasetRecord.status != "scanning")
-        .values(status="scanning")
-    )
-    db.commit()
-    if updated.rowcount == 0:
-        raise HTTPException(status_code=409, detail="Scan already in progress for this dataset. Please wait.")
-
-    # FINDING-025: Guard against re-scanning already remediated datasets
-    db.refresh(record)
-    if record.status == "scanning" and (record.remediations or record.status in ("remediated", "partial_remediated")):
-        # Reset status since we set it to scanning atomically
-        record.status = "error"
-        db.commit()
-        raise HTTPException(
-            status_code=409,
-            detail="Dataset has already been remediated. Re-scanning original is not permitted.",
-        )
-
-    # FINDING-011: Wrap blocking scan in try/except; reset status to 'error' on failure
-    file_path = str(file_service.get_sample_path(record.stored_filename, record.object_key))
-    try:
-        result = await run_in_threadpool(run_scan, file_path)
-    except Exception as exc:
-        record.status = "error"
-        db.commit()
-        raise HTTPException(status_code=500, detail="Scan execution failed") from exc
-
-    # Phase 9.1: External Threat Intelligence (VirusTotal Hash-First)
-    try:
-        from services.threat_intelligence.virustotal import lookup_file_hash
-        from scanner.content_checker import ContentFinding
-
-        vt_intel = await lookup_file_hash(result.sha256_hash)
-
-        # Append VT result as a threat finding to preserve provenance and evidence without altering DB schema
-        severity = "low"
-        if vt_intel.status == "malicious":
-            severity = "critical"
-            # Flag conflict if local scanner thought it was clean
-            if result.verdict in ("clean_verified", "clean_with_limitations"):
-                result.verification_limitations.append("CONFLICT_VT_MALICIOUS")
-        elif vt_intel.status == "suspicious":
-            severity = "high"
-        elif vt_intel.status in ("timeout", "rate_limited", "provider_error"):
-            severity = "low"
-            result.verification_limitations.append(f"VT_UNAVAILABLE_{vt_intel.status.upper()}")
-
-        finding = ContentFinding(
-            rule_id=f"vt_{vt_intel.status}",
-            severity=severity,
-            category="threat_intel",
-            description=f"VirusTotal {vt_intel.status.upper()} (Confidence: {vt_intel.confidence or 'N/A'}) - {vt_intel.error_message or 'No errors'}",
-            location="virustotal",
-            sample=vt_intel.raw_reference or ""
-        )
-        result.content_findings.append(finding)
-
-        # We deliberately do NOT override result.verdict here.
-        # "Do not silently change the local scanner finding. The existing evidence-fusion/policy architecture must remain responsible for final interpretation."
-    except Exception as ti_exc:
-        import logging
-        logging.getLogger(__name__).warning(f"Threat intel integration failed: {ti_exc}")
-        result.verification_limitations.append("THREAT_INTEL_FAILURE")
-
-    # Phase 9.4: TI Evidence Normalization + Fusion
-    ti_evidence_list = []
-    providers_checked = ["urlhaus", "abuseipdb"]
-    try:
-        from services.threat_intelligence.urlhaus import lookup_url
-        from services.threat_intelligence.abuseipdb import lookup_ip
-        from schemas import NormalizedTIEvidence
-        from services.threat_intelligence.fusion import fuse_reports, evaluate_local_verdict_conflict
-        import re
-        from pathlib import Path
-
-        raw_bytes = Path(file_path).read_bytes()
-
-        # 1. URLhaus
-        url_pattern = re.compile(rb'https?://[a-zA-Z0-9.-]+(?:/[^\s\"\'<>]*)?', re.IGNORECASE)
-        extracted_urls = set()
-        for match in url_pattern.finditer(raw_bytes):
-            try:
-                extracted_urls.add(match.group().decode('utf-8'))
-            except Exception:
-                pass
-
-        for url in list(extracted_urls)[:5]:
-            uh_intel = await lookup_url(url)
-            if uh_intel.status == "unconfigured":
-                continue
-
-            error_status = None
-            if uh_intel.status in ("timeout", "rate_limited", "provider_error", "unauthorized", "forbidden"):
-                error_status = uh_intel.status
-                rep = "unknown"
-                sev = "informational"
-            elif uh_intel.status == "malicious":
-                rep = "malicious"
-                sev = "critical"
-            elif uh_intel.status == "clean" or uh_intel.status == "not_found":
-                rep = "benign"
-                sev = "informational"
-            else:
-                rep = "unknown"
-                sev = "low"
-
-            ti_evidence_list.append(NormalizedTIEvidence(
-                provider="urlhaus",
-                indicator_type="url",
-                indicator=url,
-                reputation=rep,
-                confidence=uh_intel.confidence,
-                severity=sev,
-                category=uh_intel.tags[0] if uh_intel.tags else None,
-                reference_url=uh_intel.raw_reference,
-                error_status=error_status
-            ))
-
-        # 2. AbuseIPDB
-        ip_pattern = re.compile(rb'\b(?:\d{1,3}\.){3}\d{1,3}\b')
-        extracted_ips = set()
-        for match in ip_pattern.finditer(raw_bytes):
-            try:
-                extracted_ips.add(match.group().decode('utf-8'))
-            except Exception:
-                pass
-
-        for ip in list(extracted_ips)[:5]:
-            ab_intel = await lookup_ip(ip)
-            if ab_intel.status in ("unconfigured", "invalid_ip"):
-                continue
-
-            error_status = None
-            if ab_intel.status in ("timeout", "rate_limited", "provider_error", "unauthorized", "forbidden"):
-                error_status = ab_intel.status
-                rep = "unknown"
-                sev = "informational"
-            elif ab_intel.status == "malicious":
-                rep = "malicious"
-                sev = "critical"
-            elif ab_intel.status == "suspicious":
-                rep = "suspicious"
-                sev = "high"
-            elif ab_intel.status == "clean":
-                rep = "benign"
-                sev = "informational"
-            else:
-                rep = "unknown"
-                sev = "low"
-
-            ti_evidence_list.append(NormalizedTIEvidence(
-                provider="abuseipdb",
-                indicator_type="ipv4",
-                indicator=ip,
-                reputation=rep,
-                confidence=ab_intel.confidence,
-                severity=sev,
-                category=None,
-                reference_url=ab_intel.raw_reference,
-                error_status=error_status
-            ))
-
-        ti_report = fuse_reports(ti_evidence_list, providers_checked)
-
-        # Apply deterministic fusion conflicts to local scan result
-        conflict = evaluate_local_verdict_conflict(result.verdict, ti_report)
-        if conflict:
-            result.verification_limitations.append(conflict)
-
-        for lim in ti_report.limitations:
-            result.verification_limitations.append(lim)
-
-        # We will attach the ti_report to the db record directly as json later
-        # We store it temporarily on result so we can access it
-        setattr(result, "threat_intel", ti_report)
-
-    except Exception as fusion_exc:
-        import logging
-        logging.getLogger(__name__).warning(f"TI Fusion failed: {fusion_exc}")
-        result.verification_limitations.append("THREAT_INTEL_FUSION_FAILURE")
-        setattr(result, "threat_intel", None)
-
-    # Update status
-    if result.verdict == "malicious":
-        record.status = "quarantined"
-        file_service.quarantine(record.stored_filename)
-    elif result.verdict == "suspicious":
-        record.status = "suspicious"
-    else:
-        record.status = "clean"
-    db.commit()
-
-    ti_json_val = '{"status":"disabled","evidence":[],"evidence_strength":"NONE","providers_checked":[],"limitations":[],"conflicts":[]}'
-    ti_report_obj = getattr(result, "threat_intel", None)
-    if ti_report_obj:
-        ti_json_val = ti_report_obj.model_dump_json()
-
-    # FINDING-018: Persist scan report including verdict, coverage, and limitations
-    report = ScanReportRecord(
-        dataset_id=record.id,
-        clamav_status=result.clamav_status,
-        clamav_virus_name=result.clamav_virus_name,
-        threats_found_count=result.threats_found_count,
-        risk_score=result.risk_score,
-        verdict=result.verdict,
-        rows_inspected=result.rows_inspected,
-        rows_total=result.rows_total,
-        coverage_percentage=result.coverage_percentage,
-        coverage_status=result.coverage_status,
-        scan_duration_ms=result.scan_duration_ms,
-        findings_json=json.dumps(result.to_findings_dicts()),
-        verification_limitations_json=json.dumps(result.verification_limitations),
-        threat_intel_json=ti_json_val,
-    )
-    db.add(report)
-    db.commit()
-    db.refresh(report)
-
-    findings = [ThreatFinding(**f) for f in report.findings]
-
-    from schemas import TIFusionReport
+def _scan_response(record: DatasetRecord, report: ScanReportRecord) -> ScanResultResponse:
+    """Build the API response for a persisted scan report."""
     ti_out = None
     try:
-        ti_dict = report.threat_intel
-        if ti_dict:
-            ti_out = TIFusionReport(**ti_dict)
-    except Exception:
-        pass
+        if report.threat_intel:
+            ti_out = TIFusionReport(**report.threat_intel)
+    except (TypeError, ValueError):
+        ti_out = None
 
     return ScanResultResponse(
         scan_id=report.id,
@@ -388,9 +157,94 @@ async def scan_dataset(
         coverage_percentage=report.coverage_percentage,
         coverage_status=report.coverage_status,
         verification_limitations=report.verification_limitations,
-        findings=findings,
+        findings=[ThreatFinding(**f) for f in report.findings],
         threat_intel=ti_out,
     )
+
+
+@router.post(
+    "/{dataset_id}/scan",
+    response_model=ScanResultResponse,
+    summary="Execute multi-stage threat scan on an uploaded dataset",
+)
+@limiter.limit("20/minute")    # Prevent CPU/ClamAV abuse — scans are compute-intensive
+async def scan_dataset(
+    request: Request,
+    dataset_id: str,
+    db: Session = Depends(get_db),  # noqa: B008
+    _auth: None = Depends(require_api_key),  # noqa: B008  # API key guard
+) -> ScanResultResponse:
+    record = get_dataset_by_public_id(db, dataset_id)
+
+    if not file_service.sample_exists(record.stored_filename, record.object_key):
+        raise HTTPException(status_code=404, detail="Dataset file not found on disk or storage backend.")
+
+    # C1 / FINDING-025: refuse to re-scan a remediated original *before* touching status,
+    # so the dataset keeps its remediated state.
+    if record.remediations or record.status in _REMEDIATED_STATUSES:
+        raise HTTPException(
+            status_code=409,
+            detail="Dataset has already been remediated. Re-scanning original is not permitted.",
+        )
+
+    # Guard against concurrent double-scan: atomic UPDATE WHERE status != 'scanning' (A-003)
+    previous_status = record.status
+    updated = db.execute(
+        update(DatasetRecord)
+        .where(DatasetRecord.id == record.id, DatasetRecord.status != "scanning")
+        .values(status="scanning")
+    )
+    db.commit()
+    if updated.rowcount == 0:
+        raise HTTPException(status_code=409, detail="Scan already in progress for this dataset. Please wait.")
+    db.refresh(record)
+
+    # C2: everything after the status flip is guarded, so a failure anywhere
+    # (scan, TI, quarantine move, DB write) can never leave the row in 'scanning'.
+    try:
+        # C3: quarantined files live in quarantine/, not samples/
+        file_path = str(file_service.get_existing_source_path(record.stored_filename, record.object_key))
+        result = await run_in_threadpool(run_scan, file_path)
+        ti_report = await enrich_scan_result(result, file_path)
+
+        if result.verdict == "malicious":
+            file_service.quarantine(record.stored_filename)
+            record.status = "quarantined"
+        elif result.verdict == "suspicious":
+            record.status = "suspicious"
+        else:
+            record.status = "clean"
+
+        # FINDING-018: Persist scan report including verdict, coverage, and limitations
+        report = ScanReportRecord(
+            dataset_id=record.id,
+            clamav_status=result.clamav_status,
+            clamav_virus_name=result.clamav_virus_name,
+            threats_found_count=result.threats_found_count,
+            risk_score=result.risk_score,
+            verdict=result.verdict,
+            rows_inspected=result.rows_inspected,
+            rows_total=result.rows_total,
+            coverage_percentage=result.coverage_percentage,
+            coverage_status=result.coverage_status,
+            scan_duration_ms=result.scan_duration_ms,
+            findings_json=json.dumps(result.to_findings_dicts()),
+            verification_limitations_json=json.dumps(result.verification_limitations),
+            threat_intel_json=ti_report.model_dump_json() if ti_report else _DISABLED_TI_JSON,
+        )
+        db.add(report)
+        db.commit()
+        db.refresh(report)
+    except Exception as exc:
+        db.rollback()
+        record = db.get(DatasetRecord, record.id)
+        # Keep the last good state if there was one; otherwise mark the failure.
+        record.status = previous_status if record.scan_reports else "error"
+        db.commit()
+        logger.exception("Scan failed for dataset %s", record.public_id)
+        raise HTTPException(status_code=500, detail="Scan execution failed") from exc
+
+    return _scan_response(record, report)
 
 
 # ─── Status ───────────────────────────────────────────────────────────────────
@@ -407,9 +261,7 @@ def get_dataset_status(
     db: Session = Depends(get_db),  # noqa: B008
     _auth: None = Depends(require_api_key),  # noqa: B008  # A-014
 ) -> DatasetStatusResponse:
-    record: DatasetRecord | None = get_dataset_by_public_id(db, dataset_id)
-    if not record:
-        raise HTTPException(status_code=404, detail="Resource not found.")
+    record = get_dataset_by_public_id(db, dataset_id)
     return DatasetStatusResponse(
         dataset_id=record.public_id,
         original_filename=record.original_filename,
@@ -434,48 +286,10 @@ def get_scan_report(
     db: Session = Depends(get_db),  # noqa: B008
     _auth: None = Depends(require_api_key),  # noqa: B008  # A-014
 ) -> ScanResultResponse:
-    record: DatasetRecord | None = get_dataset_by_public_id(db, dataset_id)
-    if not record:
-        raise HTTPException(status_code=404, detail="Resource not found.")
+    record = get_dataset_by_public_id(db, dataset_id)
 
     if not record.scan_reports:
         raise HTTPException(status_code=404, detail="No scan report found. Run /scan first.")
 
     report: ScanReportRecord = sorted(record.scan_reports, key=lambda r: r.scanned_at)[-1]
-    findings = [ThreatFinding(**f) for f in report.findings]
-
-    # FINDING-018: Use stored verdict from ScanReportRecord if available
-    verdict = getattr(report, "verdict", None)
-    if not verdict:
-        verdict_map = {"quarantined": "malicious", "suspicious": "suspicious", "clean": "clean_verified"}
-        verdict = verdict_map.get(record.status, "clean_verified")
-
-    from schemas import TIFusionReport
-    ti_out = None
-    try:
-        ti_dict = report.threat_intel
-        if ti_dict:
-            ti_out = TIFusionReport(**ti_dict)
-    except Exception:
-        pass
-
-    return ScanResultResponse(
-        scan_id=report.id,
-        dataset_id=record.public_id,
-        clamav_status=report.clamav_status,
-        clamav_virus_name=report.clamav_virus_name,
-        threats_found_count=report.threats_found_count,
-        risk_score=report.risk_score,
-        scan_duration_ms=report.scan_duration_ms,
-        scanned_at=report.scanned_at,
-        verdict=verdict,
-        rows_inspected=getattr(report, "rows_inspected", 0),
-        rows_total=getattr(report, "rows_total", None),
-        coverage_percentage=getattr(report, "coverage_percentage", 100.0),
-        coverage_status=getattr(report, "coverage_status", "FULL"),
-        verification_limitations=report.verification_limitations,
-        findings=findings,
-        threat_intel=ti_out,
-    )
-
-
+    return _scan_response(record, report)

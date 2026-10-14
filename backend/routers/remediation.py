@@ -25,7 +25,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, s
 from fastapi.concurrency import run_in_threadpool  # noqa: E402
 from fastapi.responses import FileResponse  # noqa: E402
 from limiter import limiter  # noqa: E402
-from models import DatasetRecord, RemediationRecord  # noqa: E402
+from models import RemediationRecord  # noqa: E402
 from schemas import RemediationActionSchema, RemediationResponse  # noqa: E402
 from services.file_service import file_service  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
@@ -79,9 +79,7 @@ async def remediate_dataset(
     _auth: None = Depends(require_api_key),  # noqa: B008  # API key guard
 ) -> RemediationResponse:
     # 1. Retrieve dataset record
-    record: DatasetRecord | None = get_dataset_by_public_id(db, dataset_id)
-    if not record:
-        raise HTTPException(status_code=404, detail="Resource not found.")
+    record = get_dataset_by_public_id(db, dataset_id)
 
     if not file_service.sample_exists(record.stored_filename, record.object_key):
         raise HTTPException(status_code=404, detail="Original dataset file not found on disk.")
@@ -249,9 +247,7 @@ def get_remediation_report(
     db: Session = Depends(get_db),  # noqa: B008
     _auth: None = Depends(require_api_key),  # noqa: B008  # A-014
 ) -> RemediationResponse:
-    record: DatasetRecord | None = get_dataset_by_public_id(db, dataset_id)
-    if not record:
-        raise HTTPException(status_code=404, detail="Resource not found.")
+    record = get_dataset_by_public_id(db, dataset_id)
 
     if not record.remediations:
         raise HTTPException(status_code=404, detail="No remediation report found. Run /remediate first.")
@@ -296,9 +292,7 @@ def download_sanitized_dataset(
     Serve the sanitized dataset artifact.
     Accepts token via 'Authorization: Bearer <token>' header OR '?token=...' query parameter.
     """
-    record: DatasetRecord | None = get_dataset_by_public_id(db, dataset_id)
-    if not record:
-        raise HTTPException(status_code=404, detail="Resource not found.")
+    record = get_dataset_by_public_id(db, dataset_id)
 
     if not record.remediations:
         raise HTTPException(status_code=404, detail="No sanitized artifact exists for this dataset.")
