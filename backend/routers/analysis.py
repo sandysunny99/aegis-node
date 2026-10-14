@@ -193,7 +193,8 @@ def get_analysis(
 
 
 @router.get("/llm/providers", summary="Get available LLM providers")
-def get_llm_providers():
+@limiter.limit("30/minute")  # S7: public endpoint; returns names/flags only, never keys
+def get_llm_providers(request: Request):
     from services.provider_registry import get_registry
     return get_registry()
 

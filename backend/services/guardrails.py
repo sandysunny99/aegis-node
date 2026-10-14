@@ -21,7 +21,14 @@ _SIG_ROLE_IMPERSONATION = re.compile(
     r'(system:\s*you\s+are|developer\s+instruction|administrator\s+claims|you\s+are\s+now|act\s+as\s+a)',
     re.IGNORECASE
 )
-_SIG_ROOT_OVERRIDE = re.compile(r'(root\s+override)', re.IGNORECASE)
+# "root override" is only a directive when used as one: a label followed by ':' / '-'
+# or directly followed by an imperative. A descriptive mention ("the system uses a
+# root override") is not. This replaces literal escape hatches such as
+# "skip if the text contains 'was found'", which an attacker could simply append (S10).
+_SIG_ROOT_OVERRIDE = re.compile(
+    r'root\s+override\s*(?:[:\-]|,?\s*(?:now\s+)?(?:return|ignore|set|mark|disable|execute|approve|do\s+not|delete|bypass)\b)',
+    re.IGNORECASE,
+)
 
 _SIG_PROMPT_EXTRACTION = re.compile(
     r'(reveal\s+system\s+prompt|show\s+hidden\s+instructions|expose\s+internal\s+policy|repeat\s+the\s+words\s+above|print\s+(the\s+)?instructions|translate\s+(the\s+)?system\s+prompt)',
@@ -89,9 +96,8 @@ def evaluate_input_guardrail(evidence_text: str) -> tuple[str, int, list[str]]:
         signals.append("ROLE_IMPERSONATION")
         
     if _SIG_ROOT_OVERRIDE.search(analyzed_text):
-        if "The system uses" not in analyzed_text and "was found" not in analyzed_text:
-            score += 3
-            signals.append("ROLE_IMPERSONATION")
+        score += 3
+        signals.append("ROLE_IMPERSONATION")
 
     if _SIG_PROMPT_EXTRACTION.search(analyzed_text) or "revealsystemprompt" in spaced_out_removed.lower() or "showhiddeninstructions" in spaced_out_removed.lower() or "translatesystemprompt" in spaced_out_removed.lower():
         score += 3
@@ -101,10 +107,9 @@ def evaluate_input_guardrail(evidence_text: str) -> tuple[str, int, list[str]]:
         score += 2
         signals.append("VERDICT_MANIPULATION")
         
-    if _SIG_ACTION_MANIPULATION.search(analyzed_text) or "disablescanning" in spaced_out_removed.lower() or "executecommand" in spaced_out_removed.lower() or "callshell" in spaced_out_removed.lower() or "tool_call" in spaced_out_removed.lower() or "donotremediate" in spaced_out_removed.lower():
-        if "was found" not in analyzed_text and "A suspicious" not in analyzed_text:
-            score += 3
-            signals.append("ACTION_MANIPULATION")
+    if _SIG_ACTION_MANIPULATION.search(analyzed_text) or "disablescanning" in spaced_out_removed.lower() or "executecommand" in spaced_out_removed.lower() or "callshell" in spaced_out_removed.lower() or "<tool_call>" in spaced_out_removed.lower() or "donotremediate" in spaced_out_removed.lower():
+        score += 3
+        signals.append("ACTION_MANIPULATION")
         
     if _SIG_SECRET_EXFILTRATION.search(analyzed_text) or "returnapikey" in spaced_out_removed.lower() or "outputpassword" in spaced_out_removed.lower() or "exposecredentials" in spaced_out_removed.lower():
         score += 3

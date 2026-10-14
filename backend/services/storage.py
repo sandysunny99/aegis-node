@@ -83,7 +83,7 @@ class LocalArtifactStorage(ArtifactStorage):
 
     def _get_path(self, object_key: str) -> Path:
         p = (self.base_dir / object_key).resolve()
-        if not str(p).startswith(str(self.base_dir.resolve())):
+        if not p.is_relative_to(self.base_dir.resolve()):
             raise ValueError("Path traversal attempt detected")
         p.parent.mkdir(parents=True, exist_ok=True)
         return p

@@ -5,15 +5,10 @@
 
 const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
-// Optional API key — set VITE_API_KEY in .env (local) or Render dashboard (production).
-// When set, sent as X-API-Key header on all write endpoints (upload, scan, remediate).
-// If not set (default), write endpoints are open (dev mode).
-const API_KEY = import.meta.env.VITE_API_KEY ?? '';
-
-/** Returns X-API-Key header object if key is configured, else empty object. */
-function authHeader() {
-  return API_KEY ? { 'X-API-Key': API_KEY } : {};
-}
+// S2: no API key in the browser. Anything read from import.meta.env.VITE_* is
+// compiled into the public bundle, so a key here would protect nothing. API_KEY
+// is for server-to-server/admin use; the public UI relies on Turnstile, rate
+// limits and unguessable dataset ids.
 
 /** Map HTTP status codes to user-friendly messages. */
 function friendlyError(status, fallback) {
@@ -23,7 +18,7 @@ function friendlyError(status, fallback) {
     if (fallback && fallback.toLowerCase().includes('download')) return 'Access denied: the sanitized download token may be invalid or expired.';
     return fallback || 'Access denied.';
   }
-  if (status === 401) return 'API key required. Configure VITE_API_KEY in your environment.';
+  if (status === 401) return 'This server requires an API key; the public web UI cannot use it.';
   if (status === 413) return 'File is too large. Maximum upload size is 50 MB.';
   if (status === 415) return 'Unsupported file type. Please upload a CSV, JSON, JSONL, Parquet, XLSX, or TXT file.';
   if (status === 404) return 'Resource not found. Please refresh and try again.';
@@ -34,7 +29,7 @@ function friendlyError(status, fallback) {
 async function request(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, {
     ...options,
-    headers: { ...authHeader(), ...(options.headers ?? {}) },
+    headers: { ...(options.headers ?? {}) },
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
@@ -59,8 +54,6 @@ export function uploadDataset(file, onProgress, turnstileToken = null) {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `${BASE}/api/v1/datasets/upload`);
 
-    // Include API key header if configured
-    if (API_KEY) xhr.setRequestHeader('X-API-Key', API_KEY);
     if (turnstileToken) xhr.setRequestHeader('X-Turnstile-Token', turnstileToken);
 
     xhr.upload.addEventListener('progress', (e) => {
@@ -139,9 +132,7 @@ export async function getRemediationReport(datasetId) {
  * @param {string} token - The download_token from remediation response
  */
 export async function downloadSanitized(datasetId, token) {
-  const headers = {
-    ...authHeader(),
-  };
+  const headers = {};
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }

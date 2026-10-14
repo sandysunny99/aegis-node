@@ -278,7 +278,7 @@ class FileService:
     def get_sample_path(self, stored_filename: str, object_key: str | None = None) -> Path:
         """Return the full path of a stored sample. Restores from storage backend if missing locally."""
         p = (_SAMPLES_DIR / Path(stored_filename).name).resolve()
-        if not str(p).startswith(str(_SAMPLES_DIR.resolve())):
+        if not p.is_relative_to(_SAMPLES_DIR.resolve()):
             raise ValueError("Path traversal attempt detected")
 
         # Restore from backend if missing
@@ -299,12 +299,12 @@ class FileService:
 
         # Check quarantine first
         quarantine_p = (_QUARANTINE_DIR / safe_name).resolve()
-        if quarantine_p.exists() and str(quarantine_p).startswith(str(_QUARANTINE_DIR.resolve())):
+        if quarantine_p.exists() and quarantine_p.is_relative_to(_QUARANTINE_DIR.resolve()):
             return quarantine_p
 
         # Then samples
         sample_p = (_SAMPLES_DIR / safe_name).resolve()
-        if sample_p.exists() and str(sample_p).startswith(str(_SAMPLES_DIR.resolve())):
+        if sample_p.exists() and sample_p.is_relative_to(_SAMPLES_DIR.resolve()):
             return sample_p
 
         # Restore from backend
@@ -321,7 +321,7 @@ class FileService:
     def get_sanitized_path(self, stored_sanitized_filename: str, object_key: str | None = None) -> Path:
         """Return the full path of a sanitized sample. Restores from backend if missing."""
         p = (_SANITIZED_DIR / Path(stored_sanitized_filename).name).resolve()
-        if not str(p).startswith(str(_SANITIZED_DIR.resolve())):
+        if not p.is_relative_to(_SANITIZED_DIR.resolve()):
             raise ValueError("Path traversal attempt detected")
 
         if not p.exists() and object_key:

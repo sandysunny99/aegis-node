@@ -59,6 +59,7 @@ class Settings(BaseSettings):
         env_file=(_LOCAL_ENV, _ROOT_ENV, ".env"),
         env_file_encoding="utf-8",
         extra="ignore",
+        hide_input_in_errors=True,  # validation errors must never echo secret values
     )
 
     # ─── Application ─────────────────────────────────────────────────────────
