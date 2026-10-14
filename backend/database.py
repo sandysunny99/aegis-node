@@ -51,4 +51,30 @@ def get_db():
 def create_all_tables() -> None:
     """Creates all tables if they do not exist. Called once at app startup."""
     Base.metadata.create_all(bind=engine)
+    _migrate_dataset_public_id()
+
+
+def _migrate_dataset_public_id() -> None:
+    """
+    Alembic-free migration for databases created before `datasets.public_id` existed:
+    add the column, backfill a uuid4 hex per row, then add the unique index.
+    Idempotent; a no-op on fresh databases created by create_all().
+    """
+    import uuid
+
+    from sqlalchemy import inspect, text
+
+    columns = {c["name"] for c in inspect(engine).get_columns("datasets")}
+    with engine.begin() as conn:
+        if "public_id" not in columns:
+            conn.execute(text("ALTER TABLE datasets ADD COLUMN public_id VARCHAR(32)"))
+        missing = conn.execute(text("SELECT id FROM datasets WHERE public_id IS NULL")).all()
+        for (row_id,) in missing:
+            conn.execute(
+                text("UPDATE datasets SET public_id = :pid WHERE id = :id"),
+                {"pid": uuid.uuid4().hex, "id": row_id},
+            )
+        conn.execute(
+            text("CREATE UNIQUE INDEX IF NOT EXISTS ix_datasets_public_id ON datasets (public_id)")
+        )
 

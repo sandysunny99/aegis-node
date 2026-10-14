@@ -4,6 +4,7 @@ Defines the core tables: DatasetRecord, ScanReportRecord, LlmAnalysisRecord, Rem
 """
 
 import json
+import uuid
 from datetime import UTC, datetime
 
 from database import Base
@@ -15,12 +16,21 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
+def new_public_id() -> str:
+    """Unguessable external identifier for a dataset (S1: no sequential IDs in the API)."""
+    return uuid.uuid4().hex
+
+
 class DatasetRecord(Base):
     """Represents a dataset file uploaded for scanning."""
 
     __tablename__ = "datasets"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    # Public identifier used in every API path/response; integer `id` stays internal.
+    public_id: Mapped[str] = mapped_column(
+        String(32), unique=True, index=True, nullable=False, default=new_public_id
+    )
     original_filename: Mapped[str] = mapped_column(String(512), nullable=False)
     stored_filename: Mapped[str] = mapped_column(String(512), unique=True, nullable=False)
     file_size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)

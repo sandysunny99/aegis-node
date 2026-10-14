@@ -4,6 +4,7 @@ Tests: allowed types, blocked types, size limit, SHA-256 integrity, DB persisten
 """
 
 import hashlib
+import re
 import sys
 from io import BytesIO
 from pathlib import Path
@@ -51,7 +52,8 @@ def test_upload_csv_success():
     )
     assert response.status_code == 201, response.text
     body = response.json()
-    assert body["dataset_id"] == 1
+    # S1: public ids are unguessable uuid4 hex, not sequential integers
+    assert re.fullmatch(r"[0-9a-f]{32}", body["dataset_id"])
     assert body["file_format"] == "csv"
     assert body["file_size_bytes"] == len(data)
     assert body["sha256_hash"] == _sha256(data)

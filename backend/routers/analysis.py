@@ -24,6 +24,7 @@ from schemas import AnalysisResponse  # noqa: E402
 from services.llm_service import analyse  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 from utils.auth import require_api_key  # noqa: E402
+from utils.datasets import get_dataset_by_public_id  # noqa: E402
 
 router = APIRouter(prefix="/api/v1/datasets", tags=["analysis"])
 
@@ -36,14 +37,14 @@ router = APIRouter(prefix="/api/v1/datasets", tags=["analysis"])
 @limiter.limit("20/minute")   # Cap at 20/min per IP
 async def analyse_dataset(
     request: Request,         # Required by slowapi for IP tracking
-    dataset_id: int,
+    dataset_id: str,
     llm_mode: str = Query(default="auto", pattern="^(auto|manual)$"),
     provider: str | None = Query(default=None),
     model: str | None = Query(default=None),
     db: Session = Depends(get_db),  # noqa: B008
     _auth: None = Depends(require_api_key),  # noqa: B008  # Guard - triggers paid AI calls
 ) -> AnalysisResponse:
-    record: DatasetRecord | None = db.get(DatasetRecord, dataset_id)
+    record: DatasetRecord | None = get_dataset_by_public_id(db, dataset_id)
     if not record:
         raise HTTPException(status_code=404, detail="Resource not found.")
 
@@ -110,7 +111,7 @@ async def analyse_dataset(
 
     return AnalysisResponse(
         analysis_id=db_record.id,
-        dataset_id=record.id,
+        dataset_id=record.public_id,
         model_name=db_record.model_name,
         status=db_record.status,
         verdict=db_record.verdict,
@@ -149,11 +150,11 @@ async def analyse_dataset(
 @limiter.limit("60/minute")
 def get_analysis(
     request: Request,
-    dataset_id: int,
+    dataset_id: str,
     db: Session = Depends(get_db),  # noqa: B008
     _auth: None = Depends(require_api_key),  # noqa: B008
 ) -> AnalysisResponse:
-    record: DatasetRecord | None = db.get(DatasetRecord, dataset_id)
+    record: DatasetRecord | None = get_dataset_by_public_id(db, dataset_id)
     if not record:
         raise HTTPException(status_code=404, detail="Resource not found.")
 
@@ -164,7 +165,7 @@ def get_analysis(
 
     return AnalysisResponse(
         analysis_id=latest.id,
-        dataset_id=latest.dataset_id,
+        dataset_id=record.public_id,
         model_name=latest.model_name,
         status=latest.status,
         verdict=latest.verdict,

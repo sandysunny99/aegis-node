@@ -29,6 +29,7 @@ from services.file_service import file_service, validate_magic_bytes  # noqa: E4
 from sqlalchemy import update  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 from utils.auth import require_api_key  # noqa: E402
+from utils.datasets import get_dataset_by_public_id  # noqa: E402
 from utils.turnstile import verify_turnstile_token  # noqa: E402
 
 from scanner.engine import run_scan  # noqa: E402
@@ -106,7 +107,7 @@ async def upload_dataset(
     db.refresh(record)
 
     return DatasetUploadResponse(
-        dataset_id=record.id,
+        dataset_id=record.public_id,
         original_filename=record.original_filename,
         stored_filename=record.stored_filename,
         file_size_bytes=record.file_size_bytes,
@@ -128,12 +129,12 @@ async def upload_dataset(
 @limiter.limit("20/minute")    # Prevent CPU/ClamAV abuse — scans are compute-intensive
 async def scan_dataset(
     request: Request,
-    dataset_id: int,
+    dataset_id: str,
     db: Session = Depends(get_db),  # noqa: B008
     _auth: None = Depends(require_api_key),  # noqa: B008  # API key guard
 ) -> ScanResultResponse:
     # Retrieve dataset record
-    record: DatasetRecord | None = db.get(DatasetRecord, dataset_id)
+    record: DatasetRecord | None = get_dataset_by_public_id(db, dataset_id)
     if not record:
         raise HTTPException(status_code=404, detail="Resource not found.")
 
@@ -143,7 +144,7 @@ async def scan_dataset(
     # Guard against concurrent double-scan: atomic UPDATE WHERE status != 'scanning' (A-003)
     updated = db.execute(
         update(DatasetRecord)
-        .where(DatasetRecord.id == dataset_id, DatasetRecord.status != "scanning")
+        .where(DatasetRecord.id == record.id, DatasetRecord.status != "scanning")
         .values(status="scanning")
     )
     db.commit()
@@ -374,7 +375,7 @@ async def scan_dataset(
 
     return ScanResultResponse(
         scan_id=report.id,
-        dataset_id=record.id,
+        dataset_id=record.public_id,
         clamav_status=report.clamav_status,
         clamav_virus_name=report.clamav_virus_name,
         threats_found_count=report.threats_found_count,
@@ -402,15 +403,15 @@ async def scan_dataset(
 @limiter.limit("60/minute")
 def get_dataset_status(
     request: Request,
-    dataset_id: int,
+    dataset_id: str,
     db: Session = Depends(get_db),  # noqa: B008
     _auth: None = Depends(require_api_key),  # noqa: B008  # A-014
 ) -> DatasetStatusResponse:
-    record: DatasetRecord | None = db.get(DatasetRecord, dataset_id)
+    record: DatasetRecord | None = get_dataset_by_public_id(db, dataset_id)
     if not record:
         raise HTTPException(status_code=404, detail="Resource not found.")
     return DatasetStatusResponse(
-        dataset_id=record.id,
+        dataset_id=record.public_id,
         original_filename=record.original_filename,
         file_size_bytes=record.file_size_bytes,
         sha256_hash=record.sha256_hash,
@@ -429,11 +430,11 @@ def get_dataset_status(
 @limiter.limit("60/minute")
 def get_scan_report(
     request: Request,
-    dataset_id: int,
+    dataset_id: str,
     db: Session = Depends(get_db),  # noqa: B008
     _auth: None = Depends(require_api_key),  # noqa: B008  # A-014
 ) -> ScanResultResponse:
-    record: DatasetRecord | None = db.get(DatasetRecord, dataset_id)
+    record: DatasetRecord | None = get_dataset_by_public_id(db, dataset_id)
     if not record:
         raise HTTPException(status_code=404, detail="Resource not found.")
 
@@ -460,7 +461,7 @@ def get_scan_report(
 
     return ScanResultResponse(
         scan_id=report.id,
-        dataset_id=record.id,
+        dataset_id=record.public_id,
         clamav_status=report.clamav_status,
         clamav_virus_name=report.clamav_virus_name,
         threats_found_count=report.threats_found_count,

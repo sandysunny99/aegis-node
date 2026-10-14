@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 
 class DatasetUploadResponse(BaseModel):
     """Returned after a successful dataset file upload."""
-    dataset_id: int
+    dataset_id: str = Field(..., description="Unguessable public dataset identifier (uuid4 hex)")
     original_filename: str
     stored_filename: str
     file_size_bytes: int
@@ -78,7 +78,7 @@ class ThreatFinding(BaseModel):
 class ScanResultResponse(BaseModel):
     """Returned after a scan is completed."""
     scan_id: int
-    dataset_id: int
+    dataset_id: str = Field(..., description="Unguessable public dataset identifier (uuid4 hex)")
     clamav_status: str
     clamav_virus_name: str | None
     threats_found_count: int
@@ -99,7 +99,7 @@ class ScanResultResponse(BaseModel):
 
 class DatasetStatusResponse(BaseModel):
     """Lightweight status check for a dataset."""
-    dataset_id: int
+    dataset_id: str = Field(..., description="Unguessable public dataset identifier (uuid4 hex)")
     original_filename: str
     file_size_bytes: int
     sha256_hash: str
@@ -111,7 +111,7 @@ class DatasetStatusResponse(BaseModel):
 
 class AnalysisResponse(BaseModel):
     analysis_id: int | None = None
-    dataset_id: int
+    dataset_id: str = Field(..., description="Unguessable public dataset identifier (uuid4 hex)")
     model_name: str
     status: str = Field(..., description="completed | failed | unavailable")
     verdict: str = Field(..., description="clean | suspicious | high_risk | inconclusive")
@@ -157,7 +157,7 @@ class RemediationActionSchema(BaseModel):
 
 class RemediationResponse(BaseModel):
     remediation_id: int
-    dataset_id: int
+    dataset_id: str = Field(..., description="Unguessable public dataset identifier (uuid4 hex)")
     original_sha256: str
     sanitized_sha256: str
     download_token: str | None = Field(default=None, description="One-time secure token required for downloading the sanitized file")

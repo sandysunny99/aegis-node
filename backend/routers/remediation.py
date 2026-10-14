@@ -30,6 +30,7 @@ from schemas import RemediationActionSchema, RemediationResponse  # noqa: E402
 from services.file_service import file_service  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 from utils.auth import require_api_key  # noqa: E402
+from utils.datasets import get_dataset_by_public_id  # noqa: E402
 
 from scanner.engine import run_scan  # noqa: E402
 from scanner.sanitizer import sanitize_file  # noqa: E402
@@ -73,12 +74,12 @@ router = APIRouter(prefix="/api/v1/datasets", tags=["remediation"])
 @limiter.limit("10/minute")
 async def remediate_dataset(
     request: Request,
-    dataset_id: int,
+    dataset_id: str,
     db: Session = Depends(get_db),  # noqa: B008
     _auth: None = Depends(require_api_key),  # noqa: B008  # API key guard
 ) -> RemediationResponse:
     # 1. Retrieve dataset record
-    record: DatasetRecord | None = db.get(DatasetRecord, dataset_id)
+    record: DatasetRecord | None = get_dataset_by_public_id(db, dataset_id)
     if not record:
         raise HTTPException(status_code=404, detail="Resource not found.")
 
@@ -103,11 +104,11 @@ async def remediate_dataset(
     try:
         san_result = await run_in_threadpool(sanitize_file, orig_source_path, record.file_format)
     except Exception as exc:
-        logger.exception("Unexpected exception during dataset remediation for dataset_id=%d", dataset_id)
+        logger.exception("Unexpected exception during dataset remediation for dataset_id=%s", dataset_id)
         raise HTTPException(status_code=500, detail="Internal server error during remediation execution.") from exc
 
     if san_result.error:
-        logger.error("Sanitization process failed for dataset %d: %s", dataset_id, san_result.error)
+        logger.error("Sanitization process failed for dataset %s: %s", dataset_id, san_result.error)
         raise HTTPException(status_code=500, detail="Sanitization failed. Check server logs for details.")
 
     # 4. Save sanitized file to data/sanitized/ (Original remains untouched)
@@ -120,7 +121,7 @@ async def remediate_dataset(
     try:
         rescan_result = await run_in_threadpool(run_scan, str(san_meta["file_path"]))
     except Exception as exc:
-        logger.exception("Re-scan failed during remediation for dataset_id=%d", dataset_id)
+        logger.exception("Re-scan failed during remediation for dataset_id=%s", dataset_id)
         raise HTTPException(status_code=500, detail="Verification re-scan failed during remediation.") from exc
 
     san_risk = rescan_result.risk_score
@@ -218,7 +219,7 @@ async def remediate_dataset(
 
     return RemediationResponse(
         remediation_id=db_record.id,
-        dataset_id=db_record.dataset_id,
+        dataset_id=record.public_id,
         original_sha256=db_record.original_sha256,
         sanitized_sha256=db_record.sanitized_sha256,
         download_token=db_record.download_token,
@@ -244,11 +245,11 @@ async def remediate_dataset(
 @limiter.limit("60/minute")
 def get_remediation_report(
     request: Request,
-    dataset_id: int,
+    dataset_id: str,
     db: Session = Depends(get_db),  # noqa: B008
     _auth: None = Depends(require_api_key),  # noqa: B008  # A-014
 ) -> RemediationResponse:
-    record: DatasetRecord | None = db.get(DatasetRecord, dataset_id)
+    record: DatasetRecord | None = get_dataset_by_public_id(db, dataset_id)
     if not record:
         raise HTTPException(status_code=404, detail="Resource not found.")
 
@@ -260,10 +261,11 @@ def get_remediation_report(
 
     return RemediationResponse(
         remediation_id=latest.id,
-        dataset_id=latest.dataset_id,
+        dataset_id=record.public_id,
         original_sha256=latest.original_sha256,
         sanitized_sha256=latest.sanitized_sha256,
-        download_token=latest.download_token if not latest.used else None,
+        # S1: the token is returned only once, by the POST that created it.
+        download_token=None,
         remediation_status=latest.remediation_status,
         original_risk_score=latest.original_risk_score,
         sanitized_risk_score=latest.sanitized_risk_score,
@@ -285,7 +287,7 @@ def get_remediation_report(
 @limiter.limit("60/minute")
 def download_sanitized_dataset(
     request: Request,
-    dataset_id: int,
+    dataset_id: str,
     token: str | None = Query(default=None, description="Download token from remediation response"),
     authorization: str | None = Header(default=None, alias="Authorization"),
     db: Session = Depends(get_db),  # noqa: B008
@@ -294,7 +296,7 @@ def download_sanitized_dataset(
     Serve the sanitized dataset artifact.
     Accepts token via 'Authorization: Bearer <token>' header OR '?token=...' query parameter.
     """
-    record: DatasetRecord | None = db.get(DatasetRecord, dataset_id)
+    record: DatasetRecord | None = get_dataset_by_public_id(db, dataset_id)
     if not record:
         raise HTTPException(status_code=404, detail="Resource not found.")
 

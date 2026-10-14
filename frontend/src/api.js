@@ -72,7 +72,9 @@ export function uploadDataset(file, onProgress, turnstileToken = null) {
     xhr.addEventListener('load', () => {
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
-          resolve(JSON.parse(xhr.responseText));
+          const body = JSON.parse(xhr.responseText);
+          rememberDataset(body.dataset_id);
+          resolve(body);
         } catch {
           reject(new Error('Invalid JSON response from server.'));
         }
@@ -133,7 +135,7 @@ export async function getRemediationReport(datasetId) {
 /**
  * Download a sanitized dataset file using Authorization header (A-002, A-018).
  * Token is sent via 'Authorization: Bearer <token>' to avoid URL exposure in access logs and browser history.
- * @param {number} datasetId
+ * @param {string} datasetId - public dataset id
  * @param {string} token - The download_token from remediation response
  */
 export async function downloadSanitized(datasetId, token) {
@@ -177,8 +179,35 @@ export function getSanitizedDownloadUrl(datasetId, token) {
   return token ? `${url}?token=${encodeURIComponent(token)}` : url;
 }
 
+// ─── Uploads made from this browser ──────────────────────────────────────────
+// Dataset ids are unguessable, so they double as access capabilities. History
+// lists only the ids this browser uploaded (a public deployment has no API key
+// to grant a global view). Wrapped in try/catch: storage can be unavailable.
+const MY_DATASETS_KEY = 'aegis.myDatasets';
+
+function myDatasetIds() {
+  try {
+    const ids = JSON.parse(window.localStorage.getItem(MY_DATASETS_KEY) || '[]');
+    return Array.isArray(ids) ? ids.filter((id) => /^[0-9a-f]{32}$/.test(id)) : [];
+  } catch {
+    return [];
+  }
+}
+
+function rememberDataset(id) {
+  if (!/^[0-9a-f]{32}$/.test(id || '')) return;
+  try {
+    const ids = [id, ...myDatasetIds().filter((x) => x !== id)].slice(0, 100);
+    window.localStorage.setItem(MY_DATASETS_KEY, JSON.stringify(ids));
+  } catch {
+    // storage unavailable (private mode); history just stays empty
+  }
+}
+
 export async function getHistory(page = 1, pageSize = 20) {
-  return request(`/api/v1/history?page=${page}&page_size=${pageSize}`);
+  const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
+  params.set('ids', myDatasetIds().join(','));
+  return request(`/api/v1/history?${params.toString()}`);
 }
 
 export async function healthCheck() {
