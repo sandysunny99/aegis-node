@@ -202,7 +202,8 @@ class Settings(BaseSettings):
     cloudflare_ai_gateway_log_payload: bool = False
 
     # 💾 Database
-    database_url: str = "sqlite:///./aegis_node.db"
+    # Empty → absolute SQLite path under DATA_DIR (R4: no longer depends on the CWD).
+    database_url: str = ""
     data_dir: Path = _ROOT_ENV.parent / "data"
 
     
@@ -302,6 +303,9 @@ class Settings(BaseSettings):
             self.fallback_groq_api_key = _read_secret_file("FALLBACK_GROQ_API_KEY")
         if not self.fallback_cloudflare_api_token:
             self.fallback_cloudflare_api_token = _read_secret_file("FALLBACK_CLOUDFLARE_API_TOKEN")
+
+        if not self.database_url.strip():
+            self.database_url = "sqlite:///" + (Path(self.data_dir).resolve() / "aegis_node.db").as_posix()
 
         if self.app_env.lower() == "production":
             problems = production_config_problems(self)

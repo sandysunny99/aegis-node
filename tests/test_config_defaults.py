@@ -72,3 +72,16 @@ def test_production_accepts_explicit_origins_with_turnstile():
 def test_development_is_not_blocked():
     cfg = _settings(app_env="development", allowed_origins=["*"])
     assert cfg.app_env == "development"
+
+
+def test_default_database_is_absolute_under_data_dir(tmp_path, monkeypatch):
+    """R4: the old default sqlite:///./aegis_node.db depended on the working directory."""
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    cfg = _settings(data_dir=tmp_path / "d")
+    expected = (tmp_path / "d").resolve() / "aegis_node.db"
+    assert cfg.database_url == f"sqlite:///{expected.as_posix()}"
+
+
+def test_explicit_database_url_is_kept(monkeypatch):
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    assert _settings(database_url="sqlite:////tmp/x.db").database_url == "sqlite:////tmp/x.db"
