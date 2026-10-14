@@ -8,14 +8,15 @@ need Sandeep's confirmation; `[DECISION NEEDED]` items are open.
 Product: Aegis Node scans uploaded datasets (CSV, JSON, JSONL, Parquet, XLSX, TXT) for
 malware, formula/script/SQL injection and prompt-injection payloads, explains the findings
 with a guarded LLM, and returns a sanitized copy that has been re-scanned before download.
-Audience (*inferred*): security engineers and data/ML engineers who vet datasets before use,
-plus researchers and examiners evaluating the M.Tech prototype.
+Audience (confirmed in the 14 Oct brief): security and ML engineers vetting datasets, plus
+academic examiners reviewing the project. Clarity beats spectacle.
 Personality: calm, exact, protective. Speaks in facts, never hype.
 Concept: the Bastion. The UI is a shield of hexagonal plates. Each plate = one real node.
-`[DECISION NEEDED]` Aegis Node has no network nodes or heartbeats. Proposed mapping: one
-plate per scanned dataset, state taken from the real scan/remediation status
-(clean → healthy, scanning → scanning, suspicious → degraded, quarantined → breached,
-remediated → restored).
+Plate mapping (confirmed): one plate per dataset. Aegis has no network nodes and no
+heartbeats; never introduce either concept. Brief status mapping:
+clean → healthy, scanning → scanning, suspicious → degraded, quarantined → breached.
+`[DECISION NEEDED]` the backend also has `uploaded`, `remediated`, `partial_remediated`
+and `error` (`backend/models.py`); the brief does not map them yet.
 
 ## Dial
 ENERGY 2 / RHYTHM 3 / MOTION 2
@@ -56,7 +57,7 @@ Shadows only mark elevation: 3 levels (resting, raised, pressed).
 Glow only on a breached plate. Glass/blur: none.
 
 ## Motion
-Plates breathe slowly only when the item is healthy and fresh data arrives.
+Plates breathe slowly (scale 1.00 to 1.01, 4s) only while that dataset is being scanned.
 A breached plate cracks and tilts out of the shield (the one dramatic moment).
 Buttons press down 4px with a 90ms ease-out, return in 140ms.
 Respect prefers-reduced-motion: freeze the scene, keep state colours.
@@ -64,8 +65,11 @@ Respect prefers-reduced-motion: freeze the scene, keep state colours.
 ## Voice
 CTAs name the action. Spec examples: "Inspect node", "Quarantine node",
 "Connect your first node", "Read the threat model". Never "Get started" or "Learn more".
-Adapted to this product (*inferred*): "Upload a dataset", "Scan dataset",
-"Inspect findings", "Remediate dataset", "Download sanitized copy", "Read the threat model".
+For this product (14 Oct brief): "Scan dataset", "Inspect dataset", "Quarantine dataset",
+"Release from quarantine", "Read the threat model". `[DECISION NEEDED]` the API has no
+quarantine/release endpoints (quarantine happens automatically on a malicious verdict),
+so those two buttons cannot have real behaviour yet. Existing actions also include
+upload, remediate and download the sanitized copy.
 Numbers only from the live API or marked [REAL DATA].
 
 ## Assets still needed
