@@ -1,8 +1,11 @@
 import js from "@eslint/js";
 import react from "eslint-plugin-react";
 import reactHooks from "eslint-plugin-react-hooks";
+import globals from "globals";
 
 export default [
+  // R7: never lint build output or dependencies (dist/ produced 89 errors from minified code)
+  { ignores: ["dist/**", "node_modules/**"] },
   js.configs.recommended,
   {
     files: ["**/*.{js,jsx}"],
@@ -11,24 +14,16 @@ export default [
       "react-hooks": reactHooks,
     },
     languageOptions: {
+      ecmaVersion: "latest",
+      sourceType: "module",
       parserOptions: {
         ecmaFeatures: {
           jsx: true,
         },
       },
       globals: {
-        alert: "readonly",
-        document: "readonly",
-        window: "readonly",
-        console: "readonly",
-        fetch: "readonly",
-        FormData: "readonly",
-        URL: "readonly",
-        URLSearchParams: "readonly",
-        XMLHttpRequest: "readonly",
-        setTimeout: "readonly",
-        clearTimeout: "readonly",
-      }
+        ...globals.browser,
+      },
     },
     rules: {
       "react/prop-types": "off",
