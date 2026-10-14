@@ -1,39 +1,29 @@
-# Aegis Node — Backend Requirements
-# Pinned to secure, tested versions.
+# Aegis Node — runtime dependencies (installed in the Docker image).
+# Test/lint tools live in requirements-dev.txt; the optional Cloudflare R2
+# backend needs requirements-r2.txt. Upper bounds stop unreviewed major upgrades.
 
 # ─── Web / API ────────────────────────────────────────────────────────────────
-fastapi>=0.115.0
-uvicorn[standard]>=0.30.0
-python-multipart>=0.0.12
-aiofiles>=23.2.0             # Required by FastAPI StaticFiles (serves React build)
-slowapi>=0.1.9             # Rate limiting (per-IP, in-memory)
+fastapi>=0.115.0,<1.0
+uvicorn[standard]>=0.30.0,<1.0
+python-multipart>=0.0.12,<1.0
+aiofiles>=23.2.0,<26          # Required by FastAPI StaticFiles (serves React build)
+slowapi>=0.1.9,<0.2           # Rate limiting (per-IP, in-memory)
 
 # ─── Data Processing & Threat Detection ───────────────────────────────────────
-pandas>=2.2.0
-pyarrow>=16.0.0           # Parquet streaming support (iter_batches)
-openpyxl>=3.1.0           # XLSX read/write (read_only mode for memory efficiency)
-python-magic==0.4.27      # Content-based MIME detection (A-017, A-023)
-yara-python>=4.5.0        # Stage 1.5 compiled pattern matcher (BSD-3-Clause)
+pandas>=2.2.0,<4
+pyarrow>=16.0.0,<27           # Parquet streaming support (iter_batches)
+openpyxl>=3.1.0,<4            # XLSX read/write (read_only mode for memory efficiency)
+python-magic==0.4.27          # Content-based MIME detection (A-017, A-023)
+yara-python>=4.5.0,<5         # Stage 1.5 compiled pattern matcher (BSD-3-Clause)
 
 # ─── Database ────────────────────────────────────────────────────────────────
-sqlalchemy>=2.0.31
+sqlalchemy>=2.0.31,<3
 
 # ─── AI / LLM ────────────────────────────────────────────────────────────────
-google-genai>=1.0.0       # Google Gemini (primary AI provider)
-httpx>=0.27.0             # HTTP client for Groq + Ollama API calls
+google-genai>=1.0.0,<3        # Google Gemini provider
+httpx>=0.27.0,<1.0            # HTTP client for Groq / NVIDIA / HF / Ollama / TI APIs
 
-# ─── Validation ──────────────────────────────────────────────────────────────
-pydantic>=2.7.0
-pydantic-settings>=2.3.0
-
-# ─── Environment Configuration ───────────────────────────────────────────────
-python-dotenv>=1.0.0
-
-# ─── Testing ─────────────────────────────────────────────────────────────────
-pytest>=8.2.0
-pytest-asyncio>=0.23.0
-httpx>=0.27.0             # Also used for FastAPI TestClient
-
-# ─── Code Quality ────────────────────────────────────────────────────────────
-ruff>=0.5.0
-boto3>=1.34.0
+# ─── Validation & configuration ──────────────────────────────────────────────
+pydantic>=2.7.0,<3
+pydantic-settings>=2.3.0,<3
+python-dotenv>=1.0.0,<2

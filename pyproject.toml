@@ -11,3 +11,7 @@ ignore = ["E501"]
 testpaths = ["tests"]
 pythonpath = ["backend"]
 asyncio_mode = "auto"
+filterwarnings = [
+    # Starlette's TestClient warns about its httpx transport; tracked in docs/AUDIT_2026-10.md (R9).
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated:starlette.exceptions.StarletteDeprecationWarning",
+]

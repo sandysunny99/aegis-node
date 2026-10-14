@@ -3,9 +3,19 @@ import hashlib
 import logging
 from pathlib import Path
 
-import boto3
-from botocore.exceptions import ClientError, EndpointConnectionError
 from config import settings
+
+try:  # boto3 is only needed for the optional R2 backend (requirements-r2.txt)
+    import boto3
+    from botocore.exceptions import ClientError, EndpointConnectionError
+except ImportError:  # pragma: no cover - exercised only in slim runtime images
+    boto3 = None
+
+    class ClientError(Exception):  # type: ignore[no-redef]
+        pass
+
+    class EndpointConnectionError(Exception):  # type: ignore[no-redef]
+        pass
 
 logger = logging.getLogger(__name__)
 
@@ -137,6 +147,9 @@ class R2ArtifactStorage(ArtifactStorage):
             raise ValueError("R2_BUCKET must be configured when R2 is enabled")
         if not settings.r2_endpoint_url:
             raise ValueError("R2_ENDPOINT_URL or R2_ACCOUNT_ID must be configured")
+
+        if boto3 is None:
+            raise ValueError("R2_ENABLED=true requires boto3: pip install -r requirements-r2.txt")
 
         self.bucket_name = settings.r2_bucket
         self.s3 = boto3.client(
