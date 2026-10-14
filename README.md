@@ -49,6 +49,8 @@ For validating the local ClamAV integration on a Windows machine:
 5. Upload safe_dataset.csv to verify full E2E pipeline.
 **WARNING:** Do not upload the EICAR file to public threat intelligence services (e.g. VirusTotal).
 
-Docker Compose stores the SQLite database and uploaded/sanitized artifacts under `./data`
-through the `/app/data` mount. The Render free-tier blueprint uses ephemeral `/tmp` storage;
+Docker Compose stores uploaded/sanitized artifacts on the `aegis_node_artifacts` named
+volume (`/app/data`) and the SQLite database on `aegis_node_db` (`/app/db`). Named volumes
+live inside the Docker VM, so Windows Defender cannot rewrite EICAR/malware samples the way
+it does on a `./data` bind mount, and data survives container restarts (unlike tmpfs). The Render free-tier blueprint uses ephemeral `/tmp` storage;
 use a persistent disk and point `DATABASE_URL` and `DATA_DIR` at that disk for durable production data.

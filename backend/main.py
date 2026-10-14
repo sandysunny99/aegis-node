@@ -3,12 +3,13 @@ Aegis Node — Backend Entry Point
 FastAPI application with dataset scanning API, rate limiting, and rich health check.
 """
 
-import os
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from config import settings
 from database import create_all_tables
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -23,6 +24,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 from utils.auth import require_api_key
+from version import APP_VERSION
 
 
 @asynccontextmanager
@@ -59,7 +61,7 @@ _is_production = settings.app_env.lower() == "production"
 app = FastAPI(
     title="Aegis Node API",
     description="AI-Assisted Dataset Threat Detection and Remediation",
-    version="0.1.0",
+    version=APP_VERSION,
     lifespan=lifespan,
     docs_url=None if _is_production else "/docs",
     redoc_url=None if _is_production else "/redoc",
@@ -94,56 +96,79 @@ app.include_router(remediation_router)
 
 # ─── Health Check ─────────────────────────────────────────────────────────────
 
-@app.get("/health", tags=["system"])
-@limiter.limit("60/minute")
-async def health(request: Request) -> dict:
-    """Public health probe with UI status fields."""
+_AV_STATUS_TTL_SECONDS = 300
+_av_status_cache: dict = {"checked_at": None, "value": None}
+
+
+def _probe_av() -> dict:
+    """Actively query the AV provider (network call for ClamAV-REST / MetaDefender)."""
     from services.av_providers import get_av_provider
+
+    provider = None
     try:
         provider = get_av_provider()
-        av_provider_name = provider.provider_name
-        av_authority = provider.provider_authority
-        av_available = provider.ping()
-        av_version = provider.get_version() if av_available else "Unavailable"
-    except Exception:
-        av_provider_name = "unknown"
-        av_authority = "unknown"
-        av_available = False
-        av_version = "Unavailable"
-    # AI availability check
+        available = provider.ping()
+        return {
+            "av_provider": provider.provider_name,
+            "av_authority": provider.provider_authority,
+            "av_available": available,
+            "av_version": provider.get_version() if available else "Unavailable",
+            "av_mock_mode": getattr(provider, "mock_mode", False),
+        }
+    except Exception:  # noqa: BLE001 — health must never raise
+        return {
+            "av_provider": getattr(provider, "provider_name", "unknown"),
+            "av_authority": getattr(provider, "provider_authority", "unknown"),
+            "av_available": False,
+            "av_version": "Unavailable",
+            "av_mock_mode": getattr(provider, "mock_mode", False),
+        }
+
+
+def _cached_av_status() -> dict:
+    """
+    S8: the public /health probe reuses an AV status at most _AV_STATUS_TTL_SECONDS old,
+    so anonymous callers cannot turn it into MetaDefender/ClamAV traffic or quota burn.
+    """
+    now = time.monotonic()
+    checked_at = _av_status_cache["checked_at"]
+    if checked_at is None or now - checked_at > _AV_STATUS_TTL_SECONDS:
+        _av_status_cache["value"] = _probe_av()
+        _av_status_cache["checked_at"] = now
+    return _av_status_cache["value"]
+
+
+def _is_ai_provider_configured(provider: str) -> bool:
+    p = provider.strip().lower()
+    keys = {
+        "gemini": settings.gemini_api_key,
+        "groq": settings.groq_api_key,
+        "xai": settings.xai_api_key,
+        "cloudflare": settings.cloudflare_api_token,
+        "nvidia": settings.nvidia_api_key,
+        "huggingface": settings.hf_token,
+    }
+    if p in keys:
+        return bool((keys[p] or "").strip())
+    if p == "freellmapi":
+        return bool(settings.freellmapi_enabled) and bool(settings.freellmapi_api_key.strip())
+    return p == "ollama"
+
+
+def _health_payload(av_status: dict) -> dict:
     ai_provider = settings.ai_provider.strip().lower()
-    
-    def _is_configured(provider):
-        p = provider.strip().lower()
-        if p == "gemini": return bool(settings.gemini_api_key.strip())
-        if p == "groq": return bool(settings.groq_api_key.strip())
-        if p == "xai": return bool(settings.xai_api_key.strip())
-        if p == "cloudflare": return bool(settings.cloudflare_api_token.strip())
-        if p == "nvidia": return bool(settings.nvidia_api_key.strip())
-        if p == "huggingface": return bool(settings.hf_token.strip())
-        if p == "freellmapi": return bool(settings.freellmapi_enabled) and bool(settings.freellmapi_api_key.strip())
-        if p == "ollama": return True
-        return False
-
-    ai_configured = _is_configured(ai_provider)
-    
     ai_fallback_chain = [
-        p.strip().lower() for p in (settings.ai_fallback_chain or "").split(",") 
-        if p.strip()
+        p.strip().lower() for p in (settings.ai_fallback_chain or "").split(",") if p.strip()
     ]
-
-    turnstile_enabled = bool(settings.cloudflare_turnstile_site_key.strip() and settings.cloudflare_turnstile_secret_key.strip())
-
+    turnstile_enabled = bool(
+        settings.cloudflare_turnstile_site_key.strip()
+        and settings.cloudflare_turnstile_secret_key.strip()
+    )
     return {
         "status": "ok",
-        "version": "1.0.0",
-        "av_available": av_available,
-        "av_authority": av_authority,
-        
-        "av_provider": av_provider_name,
-        "av_mock_mode": getattr(provider, "mock_mode", False) if 'provider' in locals() else False,
-        "av_version": av_version,
-        "ai_configured": ai_configured,
+        "version": APP_VERSION,
+        **av_status,
+        "ai_configured": _is_ai_provider_configured(ai_provider),
         "ai_provider": ai_provider,
         "ai_fallback_chain": ai_fallback_chain,
         "turnstile_enabled": turnstile_enabled,
@@ -153,6 +178,12 @@ async def health(request: Request) -> dict:
     }
 
 
+@app.get("/health", tags=["system"])
+@limiter.limit("60/minute")
+async def health(request: Request) -> dict:
+    """Public health probe with UI status fields (AV status cached, see S8)."""
+    return _health_payload(await run_in_threadpool(_cached_av_status))
+
 
 @app.get("/health/diagnostics", tags=["system"])
 @limiter.limit("30/minute")
@@ -160,8 +191,10 @@ async def health_diagnostics(
     request: Request,
     _auth: None = Depends(require_api_key),
 ) -> dict:
-    """Protected extended health probe — actively checks ClamAV and AI configuration."""
-    return await health(request)
+    """Protected extended health probe — actively re-checks the AV provider."""
+    av_status = await run_in_threadpool(_probe_av)
+    _av_status_cache.update(value=av_status, checked_at=time.monotonic())
+    return _health_payload(av_status)
 
 
 # ─── Frontend Static Files (React SPA) ───────────────────────────────────────
@@ -189,13 +222,3 @@ else:
     @app.get("/", tags=["system"])
     async def root() -> dict:
         return {"message": "Aegis Node API — see /docs for usage. Frontend not bundled in dev mode."}
-
-
-
-
-
-
-
-
-
-

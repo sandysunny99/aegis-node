@@ -11,13 +11,16 @@ Security rules enforced here:
 """
 
 import hashlib
+import logging
 import mimetypes
 import re
 import uuid
 from pathlib import Path
 
 from config import settings
-from services.storage import get_data_directory, storage_backend, StorageError
+from services.storage import StorageError, get_data_directory, storage_backend
+
+logger = logging.getLogger(__name__)
 
 def _ensure_dir(d: Path) -> Path:
     """Ensure the configured data directory exists, surfacing permission errors."""
@@ -207,8 +210,8 @@ class FileService:
             try:
                 object_key, backend_sha256 = storage_backend.save_original(scan_id, safe_orig, temp_path.read_bytes())
             except StorageError as e:
-                logger.error(f"Storage backend failed: {e}")
-                raise ValueError(f"STORAGE_UPLOAD_FAILED: {e}")
+                logger.error("Storage backend failed: %s", e)
+                raise ValueError(f"STORAGE_UPLOAD_FAILED: {e}") from e
 
             # Atomic finalize
             temp_path.replace(dest_path)
@@ -249,8 +252,8 @@ class FileService:
         try:
             object_key, sha256 = storage_backend.save_sanitized(scan_id, safe_name, content)
         except StorageError as e:
-            logger.error(f"Storage backend failed for sanitized: {e}")
-            raise ValueError(f"STORAGE_UPLOAD_FAILED: {e}")
+            logger.error("Storage backend failed for sanitized: %s", e)
+            raise ValueError(f"STORAGE_UPLOAD_FAILED: {e}") from e
 
         sanitized_name = f"{scan_id}_sanitized{ext}"
         dest_path = _SANITIZED_DIR / sanitized_name

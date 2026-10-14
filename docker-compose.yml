@@ -64,7 +64,8 @@ services:
       - CLOUDFLARE_ACCOUNT_ID=${CLOUDFLARE_ACCOUNT_ID:-}
       - HF_TOKEN=${HF_TOKEN:-}
       - FREELLMAPI_API_KEY=${FREELLMAPI_API_KEY:-}
-      - FREELLMAPI_ENABLED=${FREELLMAPI_ENABLED:-true}
+      # Off by default: the default base URL (localhost:3001) is unreachable from inside this container
+      - FREELLMAPI_ENABLED=${FREELLMAPI_ENABLED:-false}
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       # AI Fallback
       - AI_FALLBACK_CHAIN=${AI_FALLBACK_CHAIN:-nvidia,cloudflare,huggingface,freellmapi}
@@ -80,12 +81,16 @@ services:
       # App
       - APP_ENV=development
       - MAX_UPLOAD_SIZE_MB=50
+      # Artifacts and DB live on named volumes (inside the Docker VM), not on a
+      # Windows bind mount: Defender rewrites EICAR/malware samples on bind mounts
+      # (see d499b8d/39b0621) and SQLite WAL locking is unreliable there.
       - DATA_DIR=/app/data
-      - DATABASE_URL=sqlite:////app/data/aegis_node.db
+      - DATABASE_URL=sqlite:////app/db/aegis_node.db
       - ALLOWED_ORIGINS=["http://localhost:5173","http://localhost:8000"]
     volumes:
       # Persist uploaded/sanitized artifacts and the SQLite database across restarts
-      - ./data:/app/data
+      - aegis_artifacts:/app/data
+      - aegis_db:/app/db
     depends_on:
       clamav-rest:
         condition: service_healthy
@@ -102,5 +107,5 @@ volumes:
     name: aegis_clamav_data
   aegis_db:
     name: aegis_node_db
-
-
+  aegis_artifacts:
+    name: aegis_node_artifacts

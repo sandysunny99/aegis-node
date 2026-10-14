@@ -18,7 +18,7 @@ from config import settings  # noqa: E402
 from database import get_db  # noqa: E402
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status  # noqa: E402
 from fastapi.concurrency import run_in_threadpool  # noqa: E402
-from limiter import limiter  # noqa: E402
+from limiter import get_client_ip, limiter  # noqa: E402
 from models import DatasetRecord, ScanReportRecord  # noqa: E402
 from schemas import (  # noqa: E402
     DatasetStatusResponse,
@@ -63,7 +63,7 @@ async def upload_dataset(
 ) -> DatasetUploadResponse:
     # 0. Cloudflare Turnstile Bot Challenge Verification
     turnstile_token = request.headers.get("x-turnstile-token") or request.headers.get("cf-turnstile-token")
-    client_ip = request.headers.get("cf-connecting-ip") or (request.client.host if request.client else None)
+    client_ip = get_client_ip(request)  # S6: proxy headers only from trusted proxies
     if not await verify_turnstile_token(turnstile_token, remote_ip=client_ip):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
