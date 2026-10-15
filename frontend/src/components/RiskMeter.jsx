@@ -1,5 +1,3 @@
-import React from 'react';
-
 export default function RiskMeter({ score = 0, verdict = 'clean' }) {
   const clampedScore = Math.min(10, Math.max(0, score));
 
@@ -98,4 +96,3 @@ export default function RiskMeter({ score = 0, verdict = 'clean' }) {
     </div>
   );
 }
-

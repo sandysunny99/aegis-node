@@ -39,7 +39,7 @@ COPY --from=frontend-builder /frontend/dist ./static/
 
 # Runtime data directories — use /tmp for Render free tier (ephemeral, no disk required)
 # On paid plans with a disk mounted at /app/data, change DATABASE_URL back to /app/data/aegis_node.db
-RUN mkdir -p /tmp/samples /tmp/quarantine /tmp/sanitized /tmp/reports
+RUN mkdir -p /app/data /tmp/samples /tmp/quarantine /tmp/sanitized /tmp/reports
 
 # ─── Security: run as non-root user (A-001) ───────────────────────────────────
 # /tmp is world-writable so the non-root user can still write to it

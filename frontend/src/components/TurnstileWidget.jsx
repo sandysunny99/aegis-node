@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 
 /**
  * Cloudflare Turnstile Widget Component.
@@ -31,8 +31,8 @@ export default function TurnstileWidget({ siteKey, onVerify, onExpire, onError }
               if (onError) onError();
             },
           });
-        } catch (e) {
-          console.warn('Turnstile render warning:', e);
+        } catch {
+          console.warn('Turnstile render warning.');
         }
       }
     };

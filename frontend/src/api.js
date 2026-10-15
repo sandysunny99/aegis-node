@@ -134,7 +134,7 @@ export async function getRemediationReport(datasetId) {
 export async function downloadSanitized(datasetId, token) {
   const headers = {};
   if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+    headers.Authorization = 'Bearer ' + token;
   }
 
   const res = await fetch(`${BASE}/api/v1/datasets/${datasetId}/download-sanitized`, {
@@ -204,4 +204,3 @@ export async function getHistory(page = 1, pageSize = 20) {
 export async function healthCheck() {
   return request('/health');
 }
-

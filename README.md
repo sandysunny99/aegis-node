@@ -41,19 +41,52 @@ Please review `docs/LIMITATIONS.md` for information regarding guardrail holdout 
 
 
 ## Local Docker Validation
-For validating the local ClamAV integration on a Windows machine:
-1. Install **Docker Desktop** and ensure docker compose is available.
-2. Run .\scripts\final_runtime_validation.ps1 from PowerShell.
-3. Open http://localhost:8000 in your browser.
-4. Follow the script instructions to upload the generated harmless eicar.txt test artifact.
-5. Upload safe_dataset.csv to verify full E2E pipeline.
-**WARNING:** Do not upload the EICAR file to public threat intelligence services (e.g. VirusTotal).
+To validate the local ClamAV integration on Windows, install and start **Docker Desktop**, then run
+`.\scripts\final_runtime_validation.ps1` from PowerShell. The script starts the Compose `app`
+service and its declared dependencies, waits for ClamAV REST and Aegis readiness, then submits a
+harmless CSV and the standard EICAR test signature from memory through Aegis's upload and scan
+endpoints. It fails unless Aegis reports an actual ClamAV clean result for the harmless file and a
+ClamAV EICAR detection for the test signature. No EICAR file is written to the Windows filesystem,
+and host security protection should remain enabled. Artifacts use the
+`aegis_node_artifacts` volume at `/app/data` and SQLite uses `aegis_node_db` at `/app/db`. Do not send the EICAR fixture to public threat
+intelligence services (for example, VirusTotal).
 
 Docker Compose stores uploaded/sanitized artifacts on the `aegis_node_artifacts` named
 volume (`/app/data`) and the SQLite database on `aegis_node_db` (`/app/db`). Named volumes
 live inside the Docker VM, so Windows Defender cannot rewrite EICAR/malware samples the way
 it does on a `./data` bind mount, and data survives container restarts (unlike tmpfs). The Render free-tier blueprint uses ephemeral `/tmp` storage;
 use a persistent disk and point `DATABASE_URL` and `DATA_DIR` at that disk for durable production data.
+
+### Migrating an existing local `./data` directory
+
+The Compose configuration uses named volumes (`aegis_node_artifacts` for artifacts, `aegis_node_db` for
+SQLite) so the non-root container can write them reliably. If an older installation used `./data:/app/data`, the
+host directory is not copied automatically: the named volume masks it at `/app/data`. Before
+switching, stop the application and make a separate backup of `./data`. After reviewing that
+backup, copy its contents into the named volume with Docker Desktop running:
+
+```powershell
+docker compose stop app
+docker run --rm `
+  -v "${PWD}\data:/from:ro" `
+  -v aegis_node_artifacts:/to `
+  alpine sh -c "cp -a /from/. /to/"
+docker compose up -d app
+```
+
+Only perform this copy when the named volume is the intended destination and its existing
+contents have been backed up; it can overwrite files with matching names. Do not use
+`down -v`, `docker volume rm`, or another destructive volume command as part of migration.
+Render's `/tmp/aegis_data` and `/tmp/aegis_node.db` remain ephemeral unless persistent storage is
+configured separately. Application-container recreation has been verified against the named
+volume; recovery after Docker-volume loss or host failure requires a separate backup/restore
+drill and is not implied by that persistence check.
+
+The server-side `API_KEY` is a privileged machine-client credential and is never exposed through
+the Vite frontend. The browser client does not read or embed `VITE_API_KEY`; if `API_KEY` is
+enabled for a deployment, browser write access requires a separately authenticated gateway or
+user-session design. Do not place a production API key in any `VITE_*` variable, because Vite
+embeds those values in public browser assets.
 
 ## Documentation
 
