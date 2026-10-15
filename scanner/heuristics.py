@@ -383,6 +383,12 @@ def _compute_risk_score(findings: list[ContentFinding]) -> float:
     return round(min(total, 1.0), 4)
 
 
+def heuristics_enabled() -> bool:
+    """True unless ENABLE_HEURISTICS=false (or 0 / no) is set in the environment."""
+    import os
+    return os.getenv("ENABLE_HEURISTICS", "true").lower() not in ("false", "0", "no")
+
+
 def heuristic_scan(file_path: str) -> tuple[list[ContentFinding], float]:
     """
     Stage 0.5 — Signature-less heuristic analysis.
@@ -393,8 +399,7 @@ def heuristic_scan(file_path: str) -> tuple[list[ContentFinding], float]:
     If heuristics are disabled via ENABLE_HEURISTICS=false in the environment,
     returns ([], 0.0) immediately.
     """
-    import os
-    if os.getenv("ENABLE_HEURISTICS", "true").lower() in ("false", "0", "no"):
+    if not heuristics_enabled():
         return [], 0.0
 
     path = Path(file_path)

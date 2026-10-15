@@ -53,7 +53,12 @@ class _UnreachableAV(_AvailableCleanAV):
 
 @pytest.fixture
 def av_available(monkeypatch):
+    """ClamAV reachable and every local detector loaded (libmagic and pefile may be
+    missing on a developer machine; #16 below tests what happens then)."""
     monkeypatch.setattr("scanner.engine.get_av_provider", lambda: _AvailableCleanAV())
+    monkeypatch.setattr("scanner.engine.yara_scanner.is_available", True)
+    monkeypatch.setattr("scanner.heuristics._HAS_MAGIC", True)
+    monkeypatch.setattr("scanner.heuristics._HAS_PEFILE", True)
 
 
 @pytest.fixture
@@ -202,3 +207,31 @@ def test_clean_csv_with_trailing_newline_is_clean_verified(av_available):
     res = client.post(f"/api/v1/datasets/{ds_id}/scan").json()
     assert res["coverage_status"] == "FULL"
     assert res["verdict"] == "clean_verified", res["verification_limitations"]
+
+
+# ─── #16 a detector that fails to load blocks clean_verified ─────────────────
+
+@pytest.mark.parametrize(
+    ("target", "value", "gap"),
+    [
+        ("scanner.engine.yara_scanner.rules", None, "DETECTOR_UNAVAILABLE:yara"),
+        ("scanner.engine.yara_scanner.is_available", False, "DETECTOR_UNAVAILABLE:yara"),
+        ("scanner.heuristics._HAS_MAGIC", False, "DETECTOR_UNAVAILABLE:libmagic"),
+        ("scanner.heuristics._HAS_PEFILE", False, "DETECTOR_UNAVAILABLE:pefile"),
+    ],
+)
+def test_missing_detector_blocks_clean_verified(av_available, monkeypatch, target, value, gap):
+    monkeypatch.setattr(target, value)
+    ds_id = _upload(CLEAN_CSV)
+    res = client.post(f"/api/v1/datasets/{ds_id}/scan").json()
+    assert gap in res["verification_limitations"]
+    assert res["verdict"] == "clean_with_limitations"
+    assert _status(ds_id) == "clean_limited"
+
+
+def test_disabled_heuristics_do_not_report_their_libraries_missing(av_available, monkeypatch):
+    monkeypatch.setenv("ENABLE_HEURISTICS", "false")
+    monkeypatch.setattr("scanner.heuristics._HAS_PEFILE", False)
+    from scanner.engine import detector_gaps
+
+    assert "DETECTOR_UNAVAILABLE:pefile" not in detector_gaps()

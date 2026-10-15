@@ -15,6 +15,7 @@ pyarrow>=16.0.0,<27           # Parquet streaming support (iter_batches)
 openpyxl>=3.1.0,<4            # XLSX read/write (read_only mode for memory efficiency)
 python-magic==0.4.27          # Content-based MIME detection (A-017, A-023)
 yara-python>=4.5.0,<5         # Stage 1.5 compiled pattern matcher (BSD-3-Clause)
+pefile==2024.8.26             # HEUR-003 PE import heuristic (MIT); see docs/DEPENDENCIES.md
 
 # ─── Database ────────────────────────────────────────────────────────────────
 sqlalchemy>=2.0.31,<3
