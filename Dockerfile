@@ -37,9 +37,10 @@ COPY backend/ .
 # Copy built React app — FastAPI will serve it as static files
 COPY --from=frontend-builder /frontend/dist ./static/
 
-# Runtime data directories — use /tmp for Render free tier (ephemeral, no disk required)
-# On paid plans with a disk mounted at /app/data, change DATABASE_URL back to /app/data/aegis_node.db
-RUN mkdir -p /app/data /tmp/samples /tmp/quarantine /tmp/sanitized /tmp/reports
+# Runtime data directories. Compose mounts named volumes at /app/data (artifacts) and
+# /app/db (SQLite); both must exist in the image so the volumes inherit aegis ownership.
+# Render free tier uses /tmp (ephemeral, no disk required).
+RUN mkdir -p /app/data /app/db /tmp/samples /tmp/quarantine /tmp/sanitized /tmp/reports
 
 # ─── Security: run as non-root user (A-001) ───────────────────────────────────
 # /tmp is world-writable so the non-root user can still write to it
