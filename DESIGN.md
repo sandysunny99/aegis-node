@@ -13,10 +13,29 @@ academic examiners reviewing the project. Clarity beats spectacle.
 Personality: calm, exact, protective. Speaks in facts, never hype.
 Concept: the Bastion. The UI is a shield of hexagonal plates. Each plate = one real node.
 Plate mapping (confirmed): one plate per dataset. Aegis has no network nodes and no
-heartbeats; never introduce either concept. Brief status mapping:
-clean → healthy, scanning → scanning, suspicious → degraded, quarantined → breached.
-`[DECISION NEEDED]` the backend also has `uploaded`, `remediated`, `partial_remediated`
-and `error` (`backend/models.py`); the brief does not map them yet.
+heartbeats; never introduce either concept.
+
+Status mapping (one shared `statusToPlate` map used by the shield, chip and table; unit
+tested so every backend status has an entry). Source: Sandeep's 4a decisions, plus three
+defaults for statuses added by the core baseline (marked *default*, Sandeep can override):
+
+| Backend status | Plate state | Word shown |
+|---|---|---|
+| uploaded | unscanned (slate, thin --ash outline, hoverable, focusable) | Not scanned |
+| scanning | scanning (bronze edge sweep + breathe) | Scanning |
+| clean | healthy (resting bronze) | Clean |
+| remediated | healthy + mended seam line | Remediated |
+| clean_limited *default* | degraded | Clean, limited scan |
+| incomplete *default* | degraded | Scan incomplete |
+| remediated_unverified *default* | degraded | Remediation unverified |
+| partial_remediated | degraded | Partly remediated |
+| suspicious | degraded | Suspicious |
+| error | degraded + dashed --ash outline | Scan failed |
+| quarantined | breached (tilt out, crack, --breach bloom) | Quarantined |
+
+`clean` now means a `clean_verified` verdict only; older rows may still say `clean` for a
+limited scan, so the latest report verdict wins when the two disagree. None of the three
+default statuses may ever render as healthy.
 
 ## Dial
 ENERGY 2 / RHYTHM 3 / MOTION 2
