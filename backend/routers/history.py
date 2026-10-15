@@ -96,7 +96,13 @@ def get_history(
         scans_count = len(scans)
         latest = sorted(scans, key=lambda r: r.scanned_at)[-1] if scans else None
 
-        verdict_map = {"quarantined": "malicious", "suspicious": "suspicious", "clean": "clean"}
+        verdict_map = {
+            "quarantined": "malicious",
+            "suspicious": "suspicious",
+            "clean": "clean",  # legacy rows: "clean" predates clean_limited/incomplete
+            "clean_limited": "clean_with_limitations",
+            "incomplete": "scan_incomplete",
+        }
         verdict = getattr(latest, "verdict", None) if latest else None
         if not verdict:
             verdict = verdict_map.get(rec.status) if latest else None

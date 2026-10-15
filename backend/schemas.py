@@ -103,7 +103,13 @@ class DatasetStatusResponse(BaseModel):
     original_filename: str
     file_size_bytes: int
     sha256_hash: str
-    status: str
+    status: str = Field(
+        ...,
+        description=(
+            "uploaded | scanning | clean | clean_limited | incomplete | quarantined | suspicious"
+            " | remediated | partial_remediated | remediated_unverified | error"
+        ),
+    )
     uploaded_at: datetime
 
 

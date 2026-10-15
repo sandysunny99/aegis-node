@@ -40,7 +40,8 @@ class DatasetRecord(Base):
     object_key: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     storage_backend: Mapped[str] = mapped_column(String(32), nullable=False, default="local")
     uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, server_default=func.now())
-    # status: uploaded | scanning | clean | quarantined | suspicious | remediated | partial_remediated | error
+    # status: uploaded | scanning | clean | clean_limited | incomplete | quarantined | suspicious
+    #         | remediated | partial_remediated | remediated_unverified | error
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="uploaded")
 
     scan_reports: Mapped[list["ScanReportRecord"]] = relationship(
