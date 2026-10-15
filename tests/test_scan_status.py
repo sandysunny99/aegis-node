@@ -56,8 +56,11 @@ def test_failure_after_scan_does_not_leave_dataset_stuck_scanning(monkeypatch):
     assert _status(ds_id) == "error"
 
     monkeypatch.undo()
-    assert client.post(f"/api/v1/datasets/{ds_id}/scan").status_code == 200
-    assert _status(ds_id) == "clean"
+    second = client.post(f"/api/v1/datasets/{ds_id}/scan")
+    assert second.status_code == 200
+    # monkeypatch.undo() also drops conftest's ClamAV mock, so this rescan runs with
+    # ClamAV unreachable: the honest stored status is clean_limited, not clean.
+    assert _status(ds_id) == "clean_limited", second.json()["verification_limitations"]
 
 
 def test_failed_rescan_keeps_last_good_status(monkeypatch):

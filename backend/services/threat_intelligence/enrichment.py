@@ -2,7 +2,7 @@
 Aegis Node — Threat-intelligence enrichment of a completed local scan.
 
 Extracted from the scan endpoint (C5). Order of operations:
-  1. VirusTotal hash lookup (only the SHA-256 leaves the server).
+  1. VirusTotal hash lookup (only the SHA-256 leaves the server), kept as TI evidence.
   2. Indicator extraction from the file: public URLs and IPv4 addresses, read in
      bounded chunks in a worker thread (C4) so a 50 MB upload never blocks the
      event loop or gets loaded into memory at once.
@@ -18,10 +18,10 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from config import settings
 from fastapi.concurrency import run_in_threadpool
 from schemas import NormalizedTIEvidence, TIFusionReport
 
-from scanner.content_checker import ContentFinding
 from services.threat_intelligence.abuseipdb import lookup_ip
 from services.threat_intelligence.fusion import evaluate_local_verdict_conflict, fuse_reports
 from services.threat_intelligence.urlhaus import lookup_url
@@ -125,35 +125,62 @@ def _ip_evidence(ip: str, intel) -> NormalizedTIEvidence:
     )
 
 
-async def _apply_virustotal(result) -> None:
-    """Append the VirusTotal hash verdict as a finding; never changes result.verdict."""
+def configured_providers() -> list[str]:
+    """Providers that are both enabled and have a key; only these count as checked."""
+    providers = []
+    if settings.enable_virustotal and (settings.virustotal_api_key or "").strip():
+        providers.append("virustotal")
+    if settings.enable_urlhaus and (settings.urlhaus_auth_key or "").strip():
+        providers.append("urlhaus")
+    if settings.enable_abuseipdb and (settings.abuseipdb_api_key or "").strip():
+        providers.append("abuseipdb")
+    return providers
+
+
+async def _virustotal_evidence(result) -> NormalizedTIEvidence | None:
+    """
+    VirusTotal hash verdict as TI evidence (Phase A gap #9). It used to be appended
+    as a local finding; it is external evidence and never changes result.verdict.
+    """
     vt_intel = await lookup_file_hash(result.sha256_hash)
-    severity = "low"
-    if vt_intel.status == "malicious":
-        severity = "critical"
+    status = vt_intel.status
+    if status in ("unconfigured", "invalid_hash"):
+        return None
+
+    error_status = status if status in _UNAVAILABLE else None
+    if status in ("unauthorized", "forbidden"):
+        result.verification_limitations.append("VT_UNAVAILABLE_AUTH")
+    elif error_status:
+        result.verification_limitations.append(f"VT_UNAVAILABLE_{status.upper()}")
+
+    if error_status:
+        rep, sev = "unknown", "informational"
+    elif status == "malicious":
+        rep, sev = "malicious", "critical"
         if result.verdict in ("clean_verified", "clean_with_limitations"):
             result.verification_limitations.append("CONFLICT_VT_MALICIOUS")
-    elif vt_intel.status == "suspicious":
-        severity = "high"
-    elif vt_intel.status in ("timeout", "rate_limited", "provider_error"):
-        result.verification_limitations.append(f"VT_UNAVAILABLE_{vt_intel.status.upper()}")
+    elif status == "suspicious":
+        rep, sev = "suspicious", "high"
+    elif status == "clean":
+        rep, sev = "benign", "informational"
+    else:  # not_found and anything unexpected: the hash is unknown, not clean
+        rep, sev = "unknown", "informational"
 
-    result.content_findings.append(ContentFinding(
-        rule_id=f"vt_{vt_intel.status}",
-        severity=severity,
-        category="threat_intel",
-        description=(
-            f"VirusTotal {vt_intel.status.upper()} (Confidence: {vt_intel.confidence or 'N/A'})"
-            f" - {vt_intel.error_message or 'No errors'}"
-        ),
-        location="virustotal",
-        sample=vt_intel.raw_reference or "",
-    ))
+    return NormalizedTIEvidence(
+        provider="virustotal",
+        indicator_type="sha256",
+        indicator=result.sha256_hash,
+        reputation=rep,
+        confidence=vt_intel.confidence,
+        severity=sev,
+        category=vt_intel.tags[0] if vt_intel.tags else None,
+        reference_url=vt_intel.raw_reference,
+        error_status=error_status,
+    )
 
 
-async def _fused_report(result, file_path: str) -> TIFusionReport:
+async def _fused_report(result, file_path: str, evidence: list[NormalizedTIEvidence]) -> TIFusionReport:
     indicators = await run_in_threadpool(extract_indicators, file_path)
-    evidence: list[NormalizedTIEvidence] = []
 
     for url in indicators.urls:
         intel = await lookup_url(url)
@@ -165,7 +192,7 @@ async def _fused_report(result, file_path: str) -> TIFusionReport:
         if intel.status not in ("unconfigured", "invalid_ip"):
             evidence.append(_ip_evidence(ip, intel))
 
-    report = fuse_reports(evidence, ["urlhaus", "abuseipdb"])
+    report = fuse_reports(evidence, configured_providers())
     conflict = evaluate_local_verdict_conflict(result.verdict, report)
     if conflict:
         result.verification_limitations.append(conflict)
@@ -179,14 +206,17 @@ async def enrich_scan_result(result, file_path: str) -> TIFusionReport | None:
     report (None if fusion failed). Provider failures degrade to limitations; this
     function does not raise for provider or network errors.
     """
+    evidence: list[NormalizedTIEvidence] = []
     try:
-        await _apply_virustotal(result)
+        vt_evidence = await _virustotal_evidence(result)
+        if vt_evidence:
+            evidence.append(vt_evidence)
     except Exception as exc:  # noqa: BLE001 — enrichment is best-effort
         logger.warning("Threat intel integration failed: %s", exc)
         result.verification_limitations.append("THREAT_INTEL_FAILURE")
 
     try:
-        return await _fused_report(result, file_path)
+        return await _fused_report(result, file_path, evidence)
     except Exception as exc:  # noqa: BLE001 — enrichment is best-effort
         logger.warning("TI fusion failed: %s", exc)
         result.verification_limitations.append("THREAT_INTEL_FUSION_FAILURE")

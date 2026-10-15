@@ -21,21 +21,14 @@ logger = logging.getLogger(__name__)
 
 
 def get_data_directory() -> Path:
-    """Resolve the configured local artifact directory, with a logged writable fallback."""
-    data_dir = settings.data_dir
-    try:
-        data_dir.mkdir(parents=True, exist_ok=True)
-        return data_dir
-    except OSError as exc:
-        fallback = Path("/tmp/aegis_data")
-        fallback.mkdir(parents=True, exist_ok=True)
-        logger.warning(
-            "Cannot create configured data directory %s (%s); using %s",
-            data_dir,
-            exc,
-            fallback,
-        )
-        return fallback
+    """Resolve and create the configured local artifact directory.
+
+    A directory that cannot be created raises instead of falling back to a temporary
+    path, so artifacts never land somewhere that does not persist without anyone knowing.
+    """
+    data_dir = Path(settings.data_dir)
+    data_dir.mkdir(parents=True, exist_ok=True)
+    return data_dir
 
 
 class StorageError(Exception):

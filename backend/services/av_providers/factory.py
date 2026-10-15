@@ -41,7 +41,8 @@ def get_av_provider() -> AntivirusProvider:
     if provider == "metadefender":
         return MetaDefenderProvider(
             api_key=settings.metadefender_api_key,
-            base_url=settings.metadefender_base_url
+            base_url=settings.metadefender_base_url,
+            timeout_seconds=float(settings.metadefender_timeout_seconds),
         )
     elif provider == "clamav_rest":
         return ClamAVRestProvider(

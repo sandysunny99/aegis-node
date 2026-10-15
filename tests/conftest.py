@@ -116,6 +116,22 @@ def mock_turnstile(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def local_detectors_loaded(monkeypatch):
+    """Treat libmagic and pefile as loaded, as in the Docker image.
+
+    A developer machine may lack them; the scan then (correctly) carries
+    DETECTOR_UNAVAILABLE limitations. tests/test_core_status_truth.py covers that
+    case explicitly, so the rest of the suite runs against the full detector set.
+    """
+    try:
+        import scanner.heuristics as heuristics
+        monkeypatch.setattr(heuristics, "_HAS_MAGIC", True)
+        monkeypatch.setattr(heuristics, "_HAS_PEFILE", True)
+    except ImportError:
+        pass
+
+
+@pytest.fixture(autouse=True)
 def enable_mock_av(monkeypatch):
     try:
         from config import settings

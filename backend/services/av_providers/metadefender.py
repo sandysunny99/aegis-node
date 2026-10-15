@@ -1,6 +1,15 @@
+"""
+MetaDefender Cloud as a hash-only antivirus provider.
+
+Only the file's SHA-256 leaves the server (GET /v4/hash/{sha256}); the file is never
+uploaded (Phase A gap #17, AGENTS.md). A hash MetaDefender has never seen returns
+available=False with METADEFENDER_HASH_NOT_FOUND, so a scan can never pass as
+verified because of it. Most user datasets are unique files, so "not found" is the
+expected answer for them.
+"""
+
+import hashlib
 import logging
-import os
-import time
 
 import httpx
 
@@ -8,13 +17,47 @@ from .base import AntivirusProvider, AVScanResult
 
 logger = logging.getLogger(__name__)
 
+# scan_all_result_i codes that mean MetaDefender has no usable verdict for the file
+_NO_VERDICT_CODES = {
+    3: "METADEFENDER_SCAN_FAILED",
+    7: "METADEFENDER_SKIPPED_CLEAN",
+    8: "METADEFENDER_SKIPPED_INFECTED",
+    9: "METADEFENDER_EXCEEDED_ARCHIVE_DEPTH",
+    10: "METADEFENDER_NOT_SCANNED",
+    11: "METADEFENDER_ABORTED",
+    12: "METADEFENDER_ENCRYPTED",
+    13: "METADEFENDER_EXCEEDED_ARCHIVE_SIZE",
+}
+
+
+def _sha256(path: str) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for block in iter(lambda: fh.read(65536), b""):
+            h.update(block)
+    return h.hexdigest()
+
+
+def _unavailable(error: str, raw: str = "") -> AVScanResult:
+    return AVScanResult(available=False, infected=False, virus_name=None, raw_response=raw, error=error)
+
+
 class MetaDefenderProvider(AntivirusProvider):
-    def __init__(self, api_key: str, base_url: str = "https://api.metadefender.com/v4"):
+    def __init__(
+        self,
+        api_key: str,
+        base_url: str = "https://api.metadefender.com/v4",
+        timeout_seconds: float = 15.0,
+        transport: httpx.BaseTransport | None = None,
+    ):
         self.api_key = api_key
         self.base_url = base_url.rstrip("/")
-        self.headers = {
-            "apikey": self.api_key
-        }
+        self.timeout_seconds = timeout_seconds
+        self.headers = {"apikey": self.api_key}
+        self._transport = transport  # tests inject httpx.MockTransport
+
+    def _client(self) -> httpx.Client:
+        return httpx.Client(timeout=self.timeout_seconds, transport=self._transport)
 
     @property
     def provider_name(self) -> str:
@@ -28,104 +71,49 @@ class MetaDefenderProvider(AntivirusProvider):
         if not self.api_key:
             return False
         try:
-            with httpx.Client(timeout=5.0) as client:
+            with self._client() as client:
                 resp = client.get(f"{self.base_url}/apikey/", headers=self.headers)
                 return resp.status_code == 200
-        except Exception:
-            pass
-        return False
+        except httpx.HTTPError:
+            return False
 
     def get_version(self) -> str:
-        return "MetaDefender Cloud"
+        return "MetaDefender Cloud (hash lookup only)"
 
     def scan_file(self, path: str) -> AVScanResult:
         if not self.api_key:
-            return AVScanResult(available=False, infected=False, virus_name=None, raw_response="", error="Missing MetaDefender API key")
+            return _unavailable("Missing MetaDefender API key")
 
         try:
-            file_size = os.path.getsize(path)
-            with httpx.Client(timeout=60.0) as client:
-                # 1. Upload file
-                with open(path, "rb") as fh:
-                    upload_headers = self.headers.copy()
-                    upload_headers["Content-Type"] = "application/octet-stream"
-                    upload_headers["Content-Length"] = str(file_size)
-                    upload_headers["filename"] = os.path.basename(path)
+            sha256 = _sha256(path)
+            with self._client() as client:
+                resp = client.get(f"{self.base_url}/hash/{sha256}", headers=self.headers)
+        except (httpx.HTTPError, OSError) as exc:
+            logger.warning("MetaDefender hash lookup unavailable: %s", exc)
+            return _unavailable(str(exc))
 
-                    resp = client.post(f"{self.base_url}/file", headers=upload_headers, content=fh)
+        if resp.status_code == 404:
+            return _unavailable("METADEFENDER_HASH_NOT_FOUND", resp.text)
+        if resp.status_code == 429:
+            return _unavailable("MetaDefender API rate limit exceeded (429)", resp.text)
+        if resp.status_code in (401, 403):
+            return _unavailable(f"MetaDefender auth error ({resp.status_code})", resp.text)
+        if resp.status_code != 200:
+            return _unavailable(f"MetaDefender HTTP {resp.status_code}", resp.text)
 
-                if resp.status_code == 429:
-                    return AVScanResult(available=False, infected=False, virus_name=None, raw_response=resp.text, error="MetaDefender API rate limit exceeded (429)")
+        try:
+            scan_results = resp.json().get("scan_results", {})
+            code = scan_results.get("scan_all_result_i")
+        except (ValueError, AttributeError):
+            return _unavailable("Invalid MetaDefender response", resp.text)
 
-                resp.raise_for_status()
-                data = resp.json()
-
-                data_id = data.get("data_id")
-                if not data_id:
-                    return AVScanResult(available=False, infected=False, virus_name=None, raw_response=resp.text, error="No data_id returned from upload")
-
-                # 2. Poll for report
-                max_retries = 30
-                retry_delay = 2.0
-
-                for _attempt in range(max_retries):
-                    time.sleep(retry_delay)
-                    poll_resp = client.get(f"{self.base_url}/file/{data_id}", headers=self.headers)
-
-                    if poll_resp.status_code == 429:
-                        retry_after = int(poll_resp.headers.get("Retry-After", 5))
-                        # Cap retry after
-                        retry_after = min(retry_after, 30)
-                        time.sleep(retry_after)
-                        continue
-
-                    poll_resp.raise_for_status()
-                    report_data = poll_resp.json()
-
-                    progress_pct = report_data.get("scan_results", {}).get("progress_percentage", 0)
-
-                    if progress_pct == 100:
-                        scan_results = report_data.get("scan_results", {})
-                        scan_all_result_i = scan_results.get("scan_all_result_i", 0)
-
-                        if scan_all_result_i == 0:
-                            return AVScanResult(available=True, infected=False, virus_name=None, raw_response=poll_resp.text, error=None)
-                        elif scan_all_result_i in [1, 2]:
-                            virus_name = "Unknown Threat"
-                            details = scan_results.get("scan_details", {})
-                            for _engine, result in details.items():
-                                if result.get("threat_found"):
-                                    virus_name = result.get("threat_found")
-                                    break
-                            return AVScanResult(available=True, infected=True, virus_name=virus_name, raw_response=poll_resp.text, error=None)
-                        elif scan_all_result_i == 3:
-                            return AVScanResult(available=False, infected=False, virus_name=None, raw_response=poll_resp.text, error="METADEFENDER_SCAN_FAILED")
-                        elif scan_all_result_i == 7:
-                            return AVScanResult(available=False, infected=False, virus_name=None, raw_response=poll_resp.text, error="METADEFENDER_SKIPPED_CLEAN")
-                        elif scan_all_result_i == 8:
-                            return AVScanResult(available=False, infected=False, virus_name=None, raw_response=poll_resp.text, error="METADEFENDER_SKIPPED_INFECTED")
-                        elif scan_all_result_i == 9:
-                            return AVScanResult(available=False, infected=False, virus_name=None, raw_response=poll_resp.text, error="METADEFENDER_EXCEEDED_ARCHIVE_DEPTH")
-                        elif scan_all_result_i == 10:
-                            return AVScanResult(available=False, infected=False, virus_name=None, raw_response=poll_resp.text, error="METADEFENDER_NOT_SCANNED")
-                        elif scan_all_result_i == 11:
-                            return AVScanResult(available=False, infected=False, virus_name=None, raw_response=poll_resp.text, error="METADEFENDER_ABORTED")
-                        elif scan_all_result_i == 12:
-                            return AVScanResult(available=False, infected=False, virus_name=None, raw_response=poll_resp.text, error="METADEFENDER_ENCRYPTED")
-                        elif scan_all_result_i == 13:
-                            return AVScanResult(available=False, infected=False, virus_name=None, raw_response=poll_resp.text, error="METADEFENDER_EXCEEDED_ARCHIVE_SIZE")
-                        else:
-                            return AVScanResult(available=False, infected=False, virus_name=None, raw_response=poll_resp.text, error=f"METADEFENDER_UNKNOWN_RESULT_{scan_all_result_i}")
-
-                return AVScanResult(available=False, infected=False, virus_name=None, raw_response="", error="MetaDefender scan timeout (polling limit exceeded)")
-
-        except (httpx.RequestError, httpx.HTTPStatusError, OSError) as exc:
-            logger.warning(f"MetaDefender API unavailable - {exc}")
-            return AVScanResult(
-                available=False,
-                infected=False,
-                virus_name=None,
-                raw_response="",
-                error=str(exc),
+        if code == 0:
+            return AVScanResult(available=True, infected=False, virus_name=None, raw_response=resp.text, error=None)
+        if code in (1, 2):
+            virus_name = next(
+                (r.get("threat_found") for r in scan_results.get("scan_details", {}).values()
+                 if isinstance(r, dict) and r.get("threat_found")),
+                "Unknown Threat",
             )
-
+            return AVScanResult(available=True, infected=True, virus_name=virus_name, raw_response=resp.text, error=None)
+        return _unavailable(_NO_VERDICT_CODES.get(code, f"METADEFENDER_UNKNOWN_RESULT_{code}"), resp.text)

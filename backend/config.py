@@ -206,6 +206,13 @@ class Settings(BaseSettings):
     database_url: str = ""
     data_dir: Path = _ROOT_ENV.parent / "data"
 
+    @field_validator("data_dir", mode="before")
+    @classmethod
+    def resolve_data_dir(cls, value: str | Path) -> Path:
+        path = Path(value).expanduser()
+        if not path.is_absolute():
+            path = _ROOT_ENV.parent / path
+        return path.resolve()
 
     @field_validator("trusted_proxies", mode="before")
     @classmethod
@@ -320,8 +327,6 @@ class Settings(BaseSettings):
 
 # Singleton — import this from anywhere in the backend.
 settings = Settings()
-
-
 
 
 

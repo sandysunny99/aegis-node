@@ -40,7 +40,8 @@ class DatasetRecord(Base):
     object_key: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     storage_backend: Mapped[str] = mapped_column(String(32), nullable=False, default="local")
     uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, server_default=func.now())
-    # status: uploaded | scanning | clean | quarantined | suspicious | remediated | partial_remediated | error
+    # status: uploaded | scanning | clean | clean_limited | incomplete | quarantined | suspicious
+    #         | remediated | partial_remediated | remediated_unverified | error
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="uploaded")
 
     scan_reports: Mapped[list["ScanReportRecord"]] = relationship(
@@ -52,6 +53,18 @@ class DatasetRecord(Base):
     remediations: Mapped[list["RemediationRecord"]] = relationship(
         "RemediationRecord", back_populates="dataset", cascade="all, delete-orphan"
     )
+
+    @property
+    def original_scan_reports(self) -> list["ScanReportRecord"]:
+        """Scans of the uploaded file, oldest first; excludes remediation re-scans."""
+        reports = [r for r in self.scan_reports if r.scan_target == "original"]
+        return sorted(reports, key=lambda r: r.scanned_at)
+
+    @property
+    def latest_scan_report(self) -> "ScanReportRecord | None":
+        """Most recent scan of the uploaded file, or None if it was never scanned."""
+        reports = self.original_scan_reports
+        return reports[-1] if reports else None
 
     def __repr__(self) -> str:
         return f"<DatasetRecord id={self.id} file={self.original_filename!r} status={self.status!r}>"
@@ -86,6 +99,11 @@ class ScanReportRecord(Base):
     findings_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
     verification_limitations_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
     threat_intel_json: Mapped[str] = mapped_column(Text, nullable=False, default='{"status":"disabled","evidence":[],"evidence_strength":"NONE","providers_checked":[],"limitations":[],"conflicts":[]}')
+    # "original" = scan of the uploaded file; "sanitized" = verification re-scan of a
+    # remediated copy (linked from RemediationRecord.rescan_report_id).
+    scan_target: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="original", server_default="original"
+    )
 
     dataset: Mapped["DatasetRecord"] = relationship("DatasetRecord", back_populates="scan_reports")
 
@@ -218,7 +236,7 @@ class RemediationRecord(Base):
     token_created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
     used: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
-    remediation_status: Mapped[str] = mapped_column(String(32), nullable=False, default="completed")  # completed | partial | failed
+    remediation_status: Mapped[str] = mapped_column(String(32), nullable=False, default="completed")  # completed | partial | unverified | failed
 
     original_risk_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     sanitized_risk_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
@@ -235,6 +253,9 @@ class RemediationRecord(Base):
     # C11: "exact_rows" or "estimated_rows" — how the field count behind the score was obtained
     integrity_method: Mapped[str] = mapped_column(String(16), nullable=False, default="estimated_rows")
     remediation_actions_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    # Verification re-scan of the sanitized copy (a ScanReportRecord with scan_target="sanitized")
+    rescan_report_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("scan_reports.id"), nullable=True)
+    rescan_report: Mapped["ScanReportRecord | None"] = relationship("ScanReportRecord")
 
     remediated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, server_default=func.now())
 

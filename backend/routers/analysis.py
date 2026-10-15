@@ -46,14 +46,14 @@ async def analyse_dataset(
 ) -> AnalysisResponse:
     record = get_dataset_by_public_id(db, dataset_id)
 
-    if not record.scan_reports:
+    if record.latest_scan_report is None:
         raise HTTPException(
             status_code=400,
             detail="Run /scan before requesting AI analysis.",
         )
 
     # Use latest scan report findings
-    latest_report = sorted(record.scan_reports, key=lambda r: r.scanned_at)[-1]
+    latest_report = record.latest_scan_report
     findings = latest_report.findings
 
     # F1: Run blocking LLM network call in threadpool - keeps event loop free

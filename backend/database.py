@@ -53,6 +53,7 @@ def create_all_tables() -> None:
     Base.metadata.create_all(bind=engine)
     _migrate_dataset_public_id()
     _migrate_remediation_integrity_method()
+    _migrate_remediation_rescan_report()
 
 
 def _migrate_dataset_public_id() -> None:
@@ -90,4 +91,24 @@ def _migrate_remediation_integrity_method() -> None:
             conn.execute(text(
                 "ALTER TABLE remediations ADD COLUMN integrity_method VARCHAR(16) "
                 "NOT NULL DEFAULT 'estimated_rows'"
+            ))
+
+
+def _migrate_remediation_rescan_report() -> None:
+    """Add scan_reports.scan_target and remediations.rescan_report_id to older databases."""
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(engine)
+    scan_columns = {c["name"] for c in inspector.get_columns("scan_reports")}
+    remediation_columns = {c["name"] for c in inspector.get_columns("remediations")}
+    with engine.begin() as conn:
+        if "scan_target" not in scan_columns:
+            conn.execute(text(
+                "ALTER TABLE scan_reports ADD COLUMN scan_target VARCHAR(16) "
+                "NOT NULL DEFAULT 'original'"
+            ))
+        if "rescan_report_id" not in remediation_columns:
+            conn.execute(text(
+                "ALTER TABLE remediations ADD COLUMN rescan_report_id INTEGER "
+                "REFERENCES scan_reports(id)"
             ))

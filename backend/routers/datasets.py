@@ -126,7 +126,24 @@ async def upload_dataset(
 
 # ─── Scan ─────────────────────────────────────────────────────────────────────
 
-_REMEDIATED_STATUSES = ("remediated", "partial_remediated")
+_REMEDIATED_STATUSES = ("remediated", "partial_remediated", "remediated_unverified")
+
+# Only a scan that proved the file clean is stored as "clean". A scan with
+# limitations or one that could not finish keeps its own status, so it is never
+# shown as clean (Phase A gap #1). Rows written before this change may still say
+# "clean" for those verdicts; their stored report verdict is authoritative.
+_DATASET_STATUS_BY_VERDICT = {
+    "malicious": "quarantined",
+    "suspicious": "suspicious",
+    "clean_verified": "clean",
+    "clean_with_limitations": "clean_limited",
+    "scan_incomplete": "incomplete",
+}
+
+
+def dataset_status_for_verdict(verdict: str) -> str:
+    """Map a scan verdict to the stored dataset status; unknown verdicts are incomplete."""
+    return _DATASET_STATUS_BY_VERDICT.get(verdict, "incomplete")
 _DISABLED_TI_JSON = (
     '{"status":"disabled","evidence":[],"evidence_strength":"NONE",'
     '"providers_checked":[],"limitations":[],"conflicts":[]}'
@@ -209,11 +226,7 @@ async def scan_dataset(
 
         if result.verdict == "malicious":
             file_service.quarantine(record.stored_filename)
-            record.status = "quarantined"
-        elif result.verdict == "suspicious":
-            record.status = "suspicious"
-        else:
-            record.status = "clean"
+        record.status = dataset_status_for_verdict(result.verdict)
 
         # FINDING-018: Persist scan report including verdict, coverage, and limitations
         report = ScanReportRecord(
@@ -239,7 +252,7 @@ async def scan_dataset(
         db.rollback()
         record = db.get(DatasetRecord, record.id)
         # Keep the last good state if there was one; otherwise mark the failure.
-        record.status = previous_status if record.scan_reports else "error"
+        record.status = previous_status if record.latest_scan_report else "error"
         db.commit()
         logger.exception("Scan failed for dataset %s", record.public_id)
         raise HTTPException(status_code=500, detail="Scan execution failed") from exc
@@ -288,8 +301,8 @@ def get_scan_report(
 ) -> ScanResultResponse:
     record = get_dataset_by_public_id(db, dataset_id)
 
-    if not record.scan_reports:
+    if record.latest_scan_report is None:
         raise HTTPException(status_code=404, detail="No scan report found. Run /scan first.")
 
-    report: ScanReportRecord = sorted(record.scan_reports, key=lambda r: r.scanned_at)[-1]
+    report: ScanReportRecord = record.latest_scan_report
     return _scan_response(record, report)

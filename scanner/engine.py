@@ -20,10 +20,12 @@ try:
     from services.av_providers import AVScanResult as ClamAVResult
     from services.av_providers import get_av_provider
 
+    from scanner import heuristics as _heuristics
     from scanner.content_checker import ContentCheckResult, ContentFinding, check_file
     from scanner.heuristics import heuristic_scan
     from scanner.yara_scanner import yara_scanner
 except ImportError:
+    import heuristics as _heuristics  # type: ignore[no-redef]
     from content_checker import (  # type: ignore[no-redef]
         ContentCheckResult,
         ContentFinding,
@@ -33,6 +35,8 @@ except ImportError:
     from services.av_providers import AVScanResult as ClamAVResult  # type: ignore[no-redef]
     from services.av_providers import get_av_provider
     from yara_scanner import yara_scanner  # type: ignore[no-redef]
+
+from config import settings  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -135,12 +139,43 @@ def _compute_sha256(path: Path) -> str:
     return h.hexdigest()
 
 
+def _yara_enabled() -> bool:
+    return bool(settings.enable_yara)
+
+
+def detector_gaps() -> list[str]:
+    """
+    Limitations for local detectors that did not run (Phase A gaps #16 and #18).
+
+    DETECTOR_DISABLED:<name> when a flag switched the layer off, and
+    DETECTOR_UNAVAILABLE:<name> when it should run but could not load. Without these a
+    scan could pass as clean_verified while YARA, libmagic (HEUR-007 MIME mismatch),
+    pefile (PE import heuristic) or the encoding normalizer did nothing.
+    """
+    gaps: list[str] = []
+    if not _yara_enabled():
+        gaps.append("DETECTOR_DISABLED:yara")
+    elif not yara_scanner.is_available or yara_scanner.rules is None:
+        gaps.append("DETECTOR_UNAVAILABLE:yara")
+    if not _heuristics.heuristics_enabled():
+        gaps.append("DETECTOR_DISABLED:heuristics")
+    else:
+        if not _heuristics._HAS_MAGIC:
+            gaps.append("DETECTOR_UNAVAILABLE:libmagic")
+        if not _heuristics._HAS_PEFILE:
+            gaps.append("DETECTOR_UNAVAILABLE:pefile")
+    if not settings.enable_encoding_normalization:
+        gaps.append("DETECTOR_DISABLED:encoding_normalization")
+    return gaps
+
+
 def _determine_verdict(
     clamav_result: ClamAVResult,
     content_result: ContentCheckResult,
     heur_findings: list[ContentFinding],
     heur_risk: float,
     yara_findings: list[ContentFinding] | None = None,
+    detector_limitations: list[str] | None = None,
 ) -> tuple[str, float, list[str]]:
     """
     Determine final verdict, composite risk score, and verification limitations.
@@ -167,6 +202,10 @@ def _determine_verdict(
     if content_result.error:
         if "PARSER_LIMITATION" not in limitations:
             limitations.append("PARSER_LIMITATION")
+
+    for gap in detector_limitations or []:
+        if gap not in limitations:
+            limitations.append(gap)
 
     base_score = content_result.risk_score
     heur_contribution = heur_risk * 3.0
@@ -245,8 +284,8 @@ def run_scan(file_path: str) -> ScanEngineResult:
 
     # ─── Stage 1.5: YARA Pattern Scan ────────────────────────────────────────
     yara_findings: list[ContentFinding] = []
-    result.yara_available = yara_scanner.is_available
-    if yara_scanner.is_available:
+    result.yara_available = yara_scanner.is_available and _yara_enabled()
+    if result.yara_available:
         logger.info("Stage 1.5: YARA pattern scan for %s", path.name)
         raw_yara = yara_scanner.scan_file(file_path)
         for yf in raw_yara:
@@ -278,7 +317,7 @@ def run_scan(file_path: str) -> ScanEngineResult:
 
     # ─── Aggregate ────────────────────────────────────────────────────────────
     result.verdict, result.risk_score, result.verification_limitations = _determine_verdict(
-        clam, content, heur_findings, heur_risk, yara_findings
+        clam, content, heur_findings, heur_risk, yara_findings, detector_gaps()
     )
     result.threats_found_count = (
         content.threat_count
