@@ -230,8 +230,69 @@ def test_missing_detector_blocks_clean_verified(av_available, monkeypatch, targe
 
 
 def test_disabled_heuristics_do_not_report_their_libraries_missing(av_available, monkeypatch):
-    monkeypatch.setenv("ENABLE_HEURISTICS", "false")
+    from config import settings
+
+    monkeypatch.setattr(settings, "enable_heuristics", False)
     monkeypatch.setattr("scanner.heuristics._HAS_PEFILE", False)
     from scanner.engine import detector_gaps
 
     assert "DETECTOR_UNAVAILABLE:pefile" not in detector_gaps()
+
+
+# ─── #18 detector flags are read from settings and a disabled layer is reported ─
+
+@pytest.mark.parametrize(
+    ("flag", "gap"),
+    [
+        ("enable_yara", "DETECTOR_DISABLED:yara"),
+        ("enable_heuristics", "DETECTOR_DISABLED:heuristics"),
+        ("enable_encoding_normalization", "DETECTOR_DISABLED:encoding_normalization"),
+    ],
+)
+def test_disabled_detector_is_reported_and_blocks_clean_verified(av_available, monkeypatch, flag, gap):
+    from config import settings
+
+    monkeypatch.setattr(settings, flag, False)
+    ds_id = _upload(CLEAN_CSV)
+    res = client.post(f"/api/v1/datasets/{ds_id}/scan").json()
+    assert gap in res["verification_limitations"]
+    assert res["verdict"] == "clean_with_limitations"
+
+
+def test_disabled_yara_does_not_run(av_available, monkeypatch):
+    from config import settings
+
+    def must_not_run(*_args, **_kwargs):
+        raise AssertionError("YARA ran while ENABLE_YARA=false")
+
+    monkeypatch.setattr(settings, "enable_yara", False)
+    monkeypatch.setattr("scanner.engine.yara_scanner.scan_file", must_not_run)
+    ds_id = _upload(CLEAN_CSV)
+    assert client.post(f"/api/v1/datasets/{ds_id}/scan").status_code == 200
+
+
+def test_disabled_normalization_skips_the_normalizer(monkeypatch):
+    from config import settings
+
+    from scanner import content_checker
+
+    calls = []
+    monkeypatch.setattr(content_checker, "normalize_text", lambda v: calls.append(v) or (v, []))
+
+    monkeypatch.setattr(settings, "enable_encoding_normalization", False)
+    content_checker._deobfuscate("plain value")
+    assert calls == []
+
+    monkeypatch.setattr(settings, "enable_encoding_normalization", True)
+    content_checker._deobfuscate("plain value")
+    assert calls == ["plain value"]
+
+
+def test_heuristics_flag_comes_from_settings(monkeypatch):
+    from config import settings
+
+    from scanner.heuristics import heuristics_enabled
+
+    monkeypatch.delenv("ENABLE_HEURISTICS", raising=False)
+    monkeypatch.setattr(settings, "enable_heuristics", False)
+    assert heuristics_enabled() is False

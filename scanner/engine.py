@@ -36,6 +36,8 @@ except ImportError:
     from services.av_providers import get_av_provider
     from yara_scanner import yara_scanner  # type: ignore[no-redef]
 
+from config import settings  # noqa: E402
+
 logger = logging.getLogger(__name__)
 
 _CLAMAV_HOST = "127.0.0.1"
@@ -137,21 +139,33 @@ def _compute_sha256(path: Path) -> str:
     return h.hexdigest()
 
 
+def _yara_enabled() -> bool:
+    return bool(settings.enable_yara)
+
+
 def detector_gaps() -> list[str]:
     """
-    Limitations for local detectors that should run but could not load (Phase A gap #16).
+    Limitations for local detectors that did not run (Phase A gaps #16 and #18).
 
-    Without these a scan could pass as clean_verified while YARA, libmagic (HEUR-007
-    MIME mismatch) or pefile (PE import heuristic) silently did nothing.
+    DETECTOR_DISABLED:<name> when a flag switched the layer off, and
+    DETECTOR_UNAVAILABLE:<name> when it should run but could not load. Without these a
+    scan could pass as clean_verified while YARA, libmagic (HEUR-007 MIME mismatch),
+    pefile (PE import heuristic) or the encoding normalizer did nothing.
     """
     gaps: list[str] = []
-    if not yara_scanner.is_available or yara_scanner.rules is None:
+    if not _yara_enabled():
+        gaps.append("DETECTOR_DISABLED:yara")
+    elif not yara_scanner.is_available or yara_scanner.rules is None:
         gaps.append("DETECTOR_UNAVAILABLE:yara")
-    if _heuristics.heuristics_enabled():
+    if not _heuristics.heuristics_enabled():
+        gaps.append("DETECTOR_DISABLED:heuristics")
+    else:
         if not _heuristics._HAS_MAGIC:
             gaps.append("DETECTOR_UNAVAILABLE:libmagic")
         if not _heuristics._HAS_PEFILE:
             gaps.append("DETECTOR_UNAVAILABLE:pefile")
+    if not settings.enable_encoding_normalization:
+        gaps.append("DETECTOR_DISABLED:encoding_normalization")
     return gaps
 
 
@@ -270,8 +284,8 @@ def run_scan(file_path: str) -> ScanEngineResult:
 
     # ─── Stage 1.5: YARA Pattern Scan ────────────────────────────────────────
     yara_findings: list[ContentFinding] = []
-    result.yara_available = yara_scanner.is_available
-    if yara_scanner.is_available:
+    result.yara_available = yara_scanner.is_available and _yara_enabled()
+    if result.yara_available:
         logger.info("Stage 1.5: YARA pattern scan for %s", path.name)
         raw_yara = yara_scanner.scan_file(file_path)
         for yf in raw_yara:

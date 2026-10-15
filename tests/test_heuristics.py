@@ -477,7 +477,9 @@ class TestHeuristicsDisableFlag:
     def test_heuristics_disabled_returns_empty(self, monkeypatch):
         """Setting ENABLE_HEURISTICS=false must return no findings."""
         import os as _os
-        monkeypatch.setenv("ENABLE_HEURISTICS", "false")
+
+        from config import settings
+        monkeypatch.setattr(settings, "enable_heuristics", False)
         data = _os.urandom(4096)
         path = _tmp(data, suffix=".bin")
         try:
@@ -486,12 +488,13 @@ class TestHeuristicsDisableFlag:
             assert score == 0.0
         finally:
             _cleanup(path)
-            monkeypatch.delenv("ENABLE_HEURISTICS", raising=False)
 
     def test_heuristics_re_enabled_after_env_reset(self, monkeypatch):
         """After removing ENABLE_HEURISTICS=false, heuristics must work again."""
         import os as _os
-        monkeypatch.setenv("ENABLE_HEURISTICS", "true")
+
+        from config import settings
+        monkeypatch.setattr(settings, "enable_heuristics", True)
         data = _os.urandom(4096)
         path = _tmp(data, suffix=".bin")
         try:

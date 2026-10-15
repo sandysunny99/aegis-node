@@ -384,9 +384,9 @@ def _compute_risk_score(findings: list[ContentFinding]) -> float:
 
 
 def heuristics_enabled() -> bool:
-    """True unless ENABLE_HEURISTICS=false (or 0 / no) is set in the environment."""
-    import os
-    return os.getenv("ENABLE_HEURISTICS", "true").lower() not in ("false", "0", "no")
+    """ENABLE_HEURISTICS read through settings, so a value in .env applies too."""
+    from config import settings
+    return bool(settings.enable_heuristics)
 
 
 def heuristic_scan(file_path: str) -> tuple[list[ContentFinding], float]:
@@ -396,8 +396,8 @@ def heuristic_scan(file_path: str) -> tuple[list[ContentFinding], float]:
     Reads up to 1 MB of the file and runs 8 heuristic checks.
     Returns (findings, risk_score_0_to_1).
 
-    If heuristics are disabled via ENABLE_HEURISTICS=false in the environment,
-    returns ([], 0.0) immediately.
+    If heuristics are disabled via ENABLE_HEURISTICS=false, returns ([], 0.0)
+    immediately; the engine then reports DETECTOR_DISABLED:heuristics.
     """
     if not heuristics_enabled():
         return [], 0.0

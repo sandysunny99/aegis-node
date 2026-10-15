@@ -242,11 +242,14 @@ def _deobfuscate(value: str) -> str:
     Normalises common encoding tricks used to evade regex detection.
     Security: only decodes – never executes any content.
     """
-    try:
-        norm, _ = normalize_text(value)
-        value = norm
-    except Exception:  # noqa: BLE001
-        pass
+    from config import settings  # ENABLE_ENCODING_NORMALIZATION; the engine reports it when off
+
+    if settings.enable_encoding_normalization:
+        try:
+            norm, _ = normalize_text(value)
+            value = norm
+        except Exception:  # noqa: BLE001
+            pass
     # Strip SQL inline comments /* ... */
     value = re.sub(r'/\*.*?\*/', '', value, flags=re.DOTALL)
     # Remove common hex/unicode escape prefixes (evasion tricks)
