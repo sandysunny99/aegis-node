@@ -169,3 +169,36 @@ def test_verification_rescan_is_stored_but_not_reported_as_the_dataset_scan(av_u
     row = next(i for i in client.get("/api/v1/history").json()["items"] if i["dataset_id"] == ds_id)
     assert row["scans_count"] == 1
     assert row["verdict"] == "suspicious"
+
+
+# ─── #4 CSV rows are counted by the same parser that inspects them ───────────
+
+def _coverage(tmp_path, payload: bytes):
+    from scanner.content_checker import check_file
+
+    f = tmp_path / "rows.csv"
+    f.write_bytes(payload)
+    res = check_file(str(f))
+    return res.coverage_status, res.rows_inspected, res.rows_total
+
+
+def test_trailing_blank_lines_do_not_make_a_csv_partial(tmp_path):
+    assert _coverage(tmp_path, b"id,name\r\n1,Alice\r\n2,Bob\r\n\r\n\r\n") == ("FULL", 2, 2)
+
+
+def test_quoted_multiline_cells_do_not_make_a_csv_partial(tmp_path):
+    payload = b'id,note\n1,"line one\nline two\nline three"\n2,plain\n'
+    assert _coverage(tmp_path, payload) == ("FULL", 2, 2)
+
+
+def test_csv_over_the_row_cap_reports_exact_partial_coverage(tmp_path, monkeypatch):
+    monkeypatch.setattr("scanner.content_checker._MAX_ROWS", 10)
+    payload = b"id,note\n" + b"".join(b'%d,"a\nb"\n' % i for i in range(25)) + b"\n"
+    assert _coverage(tmp_path, payload) == ("PARTIAL", 10, 25)
+
+
+def test_clean_csv_with_trailing_newline_is_clean_verified(av_available):
+    ds_id = _upload(b"id,name,age\r\n1,Alice,25\r\n2,Bob,31\r\n\r\n")
+    res = client.post(f"/api/v1/datasets/{ds_id}/scan").json()
+    assert res["coverage_status"] == "FULL"
+    assert res["verdict"] == "clean_verified", res["verification_limitations"]

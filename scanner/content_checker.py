@@ -283,6 +283,27 @@ def _check_string_value(value: str, column: str, row_idx: str) -> list[ContentFi
     return findings
 
 
+def _count_csv_rows(path: Path) -> int | None:
+    """Count data rows with pandas' CSV parser (header excluded, blank lines skipped)."""
+    try:
+        total = 0
+        for chunk in pd.read_csv(path, dtype=str, usecols=[0], chunksize=50_000):
+            total += len(chunk)
+        return total
+    except Exception:  # noqa: BLE001
+        return _count_nonblank_lines(path)
+
+
+def _count_nonblank_lines(path: Path) -> int | None:
+    """Non-blank physical lines minus the header; None if the file cannot be read."""
+    try:
+        with path.open("rb") as fh:
+            count = sum(1 for line in fh if line.strip())
+        return max(0, count - 1)
+    except OSError:
+        return None
+
+
 def _load_dataframe(path: Path) -> tuple[pd.DataFrame | None, int | None, str, str | None]:
     """
     Load dataset into DataFrame with accurate row/element totals.
@@ -295,17 +316,17 @@ def _load_dataframe(path: Path) -> tuple[pd.DataFrame | None, int | None, str, s
 
     try:
         if suffix == ".csv":
-            # 1. Quickly count total lines for coverage calculation
-            try:
-                with path.open("rb") as fh:
-                    line_count = sum(1 for _ in fh)
-                rows_total = max(0, line_count - 1) if line_count > 0 else 0
-            except Exception:
-                rows_total = None
-
+            # Rows are counted by the same parser that inspects them, so blank lines and
+            # quoted multi-line cells never look like unscanned rows (Phase A gap #4).
             try:
                 df = pd.read_csv(path, nrows=_MAX_ROWS, low_memory=False, dtype=str)
+                rows_total = (
+                    _count_csv_rows(path) if len(df) >= _MAX_ROWS else len(df)
+                )
             except Exception:
+                # Lenient parsers can drop malformed lines, so count non-blank physical
+                # lines instead: an over-count shows as PARTIAL, never as false FULL.
+                rows_total = _count_nonblank_lines(path)
                 try:
                     df = pd.read_csv(path, nrows=_MAX_ROWS, engine="python", on_bad_lines="skip", dtype=str)
                 except Exception:
