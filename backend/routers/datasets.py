@@ -252,7 +252,7 @@ async def scan_dataset(
         db.rollback()
         record = db.get(DatasetRecord, record.id)
         # Keep the last good state if there was one; otherwise mark the failure.
-        record.status = previous_status if record.scan_reports else "error"
+        record.status = previous_status if record.latest_scan_report else "error"
         db.commit()
         logger.exception("Scan failed for dataset %s", record.public_id)
         raise HTTPException(status_code=500, detail="Scan execution failed") from exc
@@ -301,8 +301,8 @@ def get_scan_report(
 ) -> ScanResultResponse:
     record = get_dataset_by_public_id(db, dataset_id)
 
-    if not record.scan_reports:
+    if record.latest_scan_report is None:
         raise HTTPException(status_code=404, detail="No scan report found. Run /scan first.")
 
-    report: ScanReportRecord = sorted(record.scan_reports, key=lambda r: r.scanned_at)[-1]
+    report: ScanReportRecord = record.latest_scan_report
     return _scan_response(record, report)

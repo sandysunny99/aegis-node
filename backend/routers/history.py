@@ -92,7 +92,7 @@ def get_history(
     items = []
     for rec in records:
         # Get latest scan report for dataset
-        scans = rec.scan_reports
+        scans = rec.original_scan_reports  # remediation re-scans are not dataset scans
         scans_count = len(scans)
         latest = sorted(scans, key=lambda r: r.scanned_at)[-1] if scans else None
 

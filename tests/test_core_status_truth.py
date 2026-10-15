@@ -104,3 +104,68 @@ def test_history_reports_the_new_status(av_unavailable):
     row = next(i for i in items if i["dataset_id"] == ds_id)
     assert row["status"] == "clean_limited"
     assert row["verdict"] == "clean_with_limitations"
+
+
+# ─── #2 remediated re-scan (audit C1, kept through the merge) ────────────────
+# Covered by tests/test_scan_status.py::test_rescan_of_remediated_dataset_is_rejected_without_changing_status;
+# the unverified variant is below.
+
+
+# ─── #3 remediation is only "completed" when the re-scan verifies it ─────────
+
+FORMULA_CSV = b'name,val\nalice,=CMD("calc.exe")\nbob,2\n'
+
+
+def _scan_and_remediate(payload: bytes = FORMULA_CSV) -> tuple[str, dict]:
+    ds_id = _upload(payload)
+    assert client.post(f"/api/v1/datasets/{ds_id}/scan").json()["verdict"] == "suspicious"
+    res = client.post(f"/api/v1/datasets/{ds_id}/remediate")
+    assert res.status_code == 200, res.text
+    return ds_id, res.json()
+
+
+def test_remediation_verified_by_full_rescan_is_completed(av_available):
+    ds_id, rem = _scan_and_remediate()
+    assert rem["remediation_status"] == "completed", rem
+    assert rem["rescan_verdict"] == "clean_verified"
+    assert _status(ds_id) == "remediated"
+
+
+def test_remediation_without_clamav_is_unverified(av_unavailable):
+    ds_id, rem = _scan_and_remediate()
+    assert rem["remaining_findings_count"] == 0
+    assert rem["remediation_status"] == "unverified"
+    assert rem["rescan_verdict"] == "clean_with_limitations"
+    assert "CLAMAV_UNAVAILABLE" in rem["rescan_limitations"]
+    assert _status(ds_id) == "remediated_unverified"
+
+    again = client.get(f"/api/v1/datasets/{ds_id}/remediation").json()
+    assert again["remediation_status"] == "unverified"
+    assert again["rescan_verdict"] == "clean_with_limitations"
+
+
+def test_rescan_of_unverified_remediation_is_rejected_without_changing_status(av_unavailable):
+    ds_id, _ = _scan_and_remediate()
+    assert client.post(f"/api/v1/datasets/{ds_id}/scan").status_code == 409
+    assert _status(ds_id) == "remediated_unverified"
+
+
+def test_verification_rescan_is_stored_but_not_reported_as_the_dataset_scan(av_unavailable):
+    from database import SessionLocal
+    from models import DatasetRecord
+
+    ds_id, rem = _scan_and_remediate()
+    report = client.get(f"/api/v1/datasets/{ds_id}/report").json()
+    assert report["verdict"] == "suspicious"  # still the original file's scan
+
+    with SessionLocal() as db:
+        record = db.query(DatasetRecord).filter_by(public_id=ds_id).one()
+        targets = sorted(r.scan_target for r in record.scan_reports)
+        assert targets == ["original", "sanitized"]
+        rescan = next(r for r in record.scan_reports if r.scan_target == "sanitized")
+        assert record.remediations[0].rescan_report_id == rescan.id
+        assert rescan.verdict == rem["rescan_verdict"]
+
+    row = next(i for i in client.get("/api/v1/history").json()["items"] if i["dataset_id"] == ds_id)
+    assert row["scans_count"] == 1
+    assert row["verdict"] == "suspicious"

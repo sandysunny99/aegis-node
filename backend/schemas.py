@@ -167,7 +167,13 @@ class RemediationResponse(BaseModel):
     original_sha256: str
     sanitized_sha256: str
     download_token: str | None = Field(default=None, description="One-time secure token required for downloading the sanitized file")
-    remediation_status: str = Field(..., description="completed | partial | failed")
+    remediation_status: str = Field(
+        ...,
+        description=(
+            "completed (re-scan clean_verified, full coverage, AV available) | partial (findings"
+            " above low remain) | unverified (re-scan could not prove the copy clean) | failed"
+        ),
+    )
     original_risk_score: float
     sanitized_risk_score: float
     original_findings_count: int
@@ -182,6 +188,12 @@ class RemediationResponse(BaseModel):
     changes_count: int
     remediated_at: datetime
     actions: list[RemediationActionSchema] = Field(default_factory=list)
+    rescan_verdict: str | None = Field(
+        default=None, description="Verdict of the verification re-scan of the sanitized copy"
+    )
+    rescan_limitations: list[str] = Field(
+        default_factory=list, description="Limitations of the verification re-scan"
+    )
     error: str | None = None
 
 

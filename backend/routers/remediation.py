@@ -26,7 +26,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, s
 from fastapi.concurrency import run_in_threadpool  # noqa: E402
 from fastapi.responses import FileResponse  # noqa: E402
 from limiter import limiter  # noqa: E402
-from models import RemediationRecord  # noqa: E402
+from models import RemediationRecord, ScanReportRecord  # noqa: E402
 from schemas import RemediationActionSchema, RemediationResponse  # noqa: E402
 from services.file_service import file_service  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
@@ -41,6 +41,34 @@ logger = logging.getLogger("aegis.remediation")
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
 _SAFE_FILENAME_RE = re.compile(r'[^\w.\-]')   # Allow only word chars, dots, hyphens
+
+# A re-scan that carries any of these could not prove the sanitized copy clean.
+_UNVERIFIED_LIMITATION_PREFIXES = ("CLAMAV_UNAVAILABLE", "PARSER_LIMITATION", "DETECTOR_UNAVAILABLE")
+
+
+def remediation_outcome(rescan, remaining_actionable: int) -> tuple[str, str]:
+    """
+    Return (remediation_status, dataset_status) for a verification re-scan.
+
+    completed / remediated: no actionable findings remain and the re-scan is
+      clean_verified with full coverage and no detector or AV gaps.
+    partial / partial_remediated: findings above low remain (unchanged meaning).
+    unverified / remediated_unverified: nothing actionable remains, but the re-scan
+      could not prove it (limited or incomplete scan, AV unavailable, partial coverage).
+    """
+    if remaining_actionable:
+        return "partial", "partial_remediated"
+    gaps = [
+        lim for lim in rescan.verification_limitations
+        if lim.startswith(_UNVERIFIED_LIMITATION_PREFIXES)
+    ]
+    verified = (
+        rescan.verdict == "clean_verified"
+        and rescan.coverage_status == "FULL"
+        and rescan.clamav_available
+        and not gaps
+    )
+    return ("completed", "remediated") if verified else ("unverified", "remediated_unverified")
 
 
 def _read_sample_df(path: str, fmt: str):  # type: ignore[return]
@@ -103,10 +131,10 @@ async def remediate_dataset(
         raise HTTPException(status_code=404, detail="Original dataset file not found on disk.")
 
     # 2. Check if dataset has been scanned first
-    if not record.scan_reports:
+    if record.latest_scan_report is None:
         raise HTTPException(status_code=400, detail="Dataset must be scanned (/scan) before requesting remediation.")
 
-    latest_report = sorted(record.scan_reports, key=lambda r: r.scanned_at)[-1]
+    latest_report = record.latest_scan_report
     orig_risk = latest_report.risk_score
     orig_findings_count = latest_report.threats_found_count
 
@@ -180,12 +208,28 @@ async def remediate_dataset(
         file_bytes=Path(orig_source_path).stat().st_size,
     )
 
-    # Determine status: "completed" if 0 remaining actionable threats, else "partial"
-    rem_status = "completed" if len(remaining_actionable) == 0 else "partial"
+    # Phase A gap #3: "completed" only when the re-scan verifies the copy
+    rem_status, record.status = remediation_outcome(rescan_result, len(remaining_actionable))
 
-    # Update dataset status in DB
-    record.status = "remediated" if rem_status == "completed" else "partial_remediated"
-    db.commit()
+    # Persist the verification re-scan as its own report, separate from the dataset's scans
+    rescan_report = ScanReportRecord(
+        dataset_id=record.id,
+        scan_target="sanitized",
+        clamav_status=rescan_result.clamav_status,
+        clamav_virus_name=rescan_result.clamav_virus_name,
+        threats_found_count=rescan_result.threats_found_count,
+        risk_score=rescan_result.risk_score,
+        verdict=rescan_result.verdict,
+        rows_inspected=rescan_result.rows_inspected,
+        rows_total=rescan_result.rows_total,
+        coverage_percentage=rescan_result.coverage_percentage,
+        coverage_status=rescan_result.coverage_status,
+        scan_duration_ms=rescan_result.scan_duration_ms,
+        findings_json=json.dumps(rescan_result.to_findings_dicts()),
+        verification_limitations_json=json.dumps(rescan_result.verification_limitations),
+    )
+    db.add(rescan_report)
+    db.flush()
 
     # Build action dicts
     action_dicts = [
@@ -225,6 +269,7 @@ async def remediate_dataset(
         integrity_preserved=integrity_preserved,
         integrity_method=integrity_method,
         remediation_actions_json=json.dumps(action_dicts),
+        rescan_report_id=rescan_report.id,
     )
     db.add(db_record)
     db.commit()
@@ -250,6 +295,8 @@ async def remediate_dataset(
         changes_count=db_record.changes_count,
         remediated_at=db_record.remediated_at,
         actions=action_schemas,
+        rescan_verdict=rescan_report.verdict,
+        rescan_limitations=rescan_report.verification_limitations,
     )
 
 
@@ -292,6 +339,8 @@ def get_remediation_report(
         changes_count=latest.changes_count,
         remediated_at=latest.remediated_at,
         actions=action_schemas,
+        rescan_verdict=latest.rescan_report.verdict if latest.rescan_report else None,
+        rescan_limitations=latest.rescan_report.verification_limitations if latest.rescan_report else [],
     )
 
 
