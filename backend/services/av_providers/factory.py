@@ -47,7 +47,8 @@ def get_av_provider() -> AntivirusProvider:
     elif provider == "clamav_rest":
         return ClamAVRestProvider(
             api_url=settings.clamav_api_url,
-            mock_mode=settings.clamav_mock_mode
+            mock_mode=settings.clamav_mock_mode,
+            api_token=settings.clamav_api_token,
         )
     elif provider == "none":
         return InvalidProvider("none")

@@ -64,6 +64,10 @@ class Settings(BaseSettings):
 
     # ─── Application ─────────────────────────────────────────────────────────
     app_env: str = "development"
+    # Deployment profile reported by /health/detectors: "full" (ClamAV in the same
+    # Compose stack or a reachable scan gateway) or "lite" (Render free tier, 512 MB;
+    # ClamAV only through the remote gateway, otherwise reported as unavailable).
+    aegis_profile: str = "full"
     app_host: str = "0.0.0.0"
     app_port: int = 8000
     # secret_key removed (A-004): was defined but never used anywhere in the app.
@@ -158,6 +162,9 @@ class Settings(BaseSettings):
     av_provider: str = "clamav_rest"
     clamav_api_url: str = "http://localhost:3000"
     clamav_mock_mode: bool = False
+    # Bearer token for the authenticated HTTPS ClamAV gateway on the owner's VM.
+    # Leave empty for the in-network clamav-rest of the local Compose stack.
+    clamav_api_token: str = ""
     metadefender_api_key: str = ""
     metadefender_base_url: str = "https://api.metadefender.com/v4"
     metadefender_timeout_seconds: int = 60
@@ -213,6 +220,14 @@ class Settings(BaseSettings):
         if not path.is_absolute():
             path = _ROOT_ENV.parent / path
         return path.resolve()
+
+    @field_validator("aegis_profile")
+    @classmethod
+    def validate_profile(cls, value: str) -> str:
+        profile = (value or "").strip().lower()
+        if profile not in ("lite", "full"):
+            raise ValueError("AEGIS_PROFILE must be 'lite' or 'full'")
+        return profile
 
     @field_validator("trusted_proxies", mode="before")
     @classmethod
@@ -302,6 +317,8 @@ class Settings(BaseSettings):
             self.abuseipdb_api_key = _read_secret_file("ABUSEIPDB_API_KEY")
         if not self.api_key:
             self.api_key = _read_secret_file("API_KEY")
+        if not self.clamav_api_token:
+            self.clamav_api_token = _read_secret_file("CLAMAV_API_TOKEN")
         if not self.fallback_gemini_api_key:
             self.fallback_gemini_api_key = _read_secret_file("FALLBACK_GEMINI_API_KEY")
         if not self.fallback_xai_api_key:

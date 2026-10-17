@@ -35,11 +35,23 @@ def _extract_version(payload: Any) -> str | None:
 
 
 class ClamAVRestProvider(AntivirusProvider):
-    def __init__(self, api_url: str, mock_mode: bool = False):
+    """
+    ClamAV through clamav-rest, either in the same Compose network (no token, plain
+    HTTP inside the private network) or through the authenticated HTTPS scan gateway
+    on the owner's VM (CLAMAV_API_TOKEN set). A token is only ever sent over HTTPS.
+    """
+
+    def __init__(self, api_url: str, mock_mode: bool = False, api_token: str = ""):
         self.api_url = api_url.rstrip("/")
         if not self.api_url.startswith("http"):
             self.api_url = f"http://{self.api_url}"
         self.mock_mode = mock_mode
+        self.api_token = (api_token or "").strip()
+        self._headers = {"Authorization": f"Bearer {self.api_token}"} if self.api_token else {}
+
+    def _insecure_token_use(self) -> bool:
+        """True when a token would travel over plain HTTP; such calls are refused."""
+        return bool(self.api_token) and not self.api_url.lower().startswith("https://")
 
     @property
     def provider_name(self) -> str:
@@ -52,9 +64,12 @@ class ClamAVRestProvider(AntivirusProvider):
     def ping(self) -> bool:
         if self.mock_mode:
             return True
+        if self._insecure_token_use():
+            logger.error("CLAMAV_API_TOKEN is set but CLAMAV_API_URL is not HTTPS; refusing to send it")
+            return False
         try:
             with httpx.Client(timeout=3.0) as client:
-                resp = client.get(f"{self.api_url}/api/v1/version")
+                resp = client.get(f"{self.api_url}/api/v1/version", headers=self._headers)
                 resp.raise_for_status()
                 return _extract_version(resp.json()) is not None
         except (httpx.HTTPError, ValueError, TypeError) as exc:
@@ -64,9 +79,11 @@ class ClamAVRestProvider(AntivirusProvider):
     def get_version(self) -> str:
         if self.mock_mode:
             return "ClamAV (Mock)"
+        if self._insecure_token_use():
+            return "Unavailable"
         try:
             with httpx.Client(timeout=3.0) as client:
-                resp = client.get(f"{self.api_url}/api/v1/version")
+                resp = client.get(f"{self.api_url}/api/v1/version", headers=self._headers)
                 resp.raise_for_status()
                 version = _extract_version(resp.json())
                 if version is not None:
@@ -81,6 +98,15 @@ class ClamAVRestProvider(AntivirusProvider):
             return AVScanResult(available=True, infected=False, virus_name=None, raw_response='{"success":true,"data":{"result":[{"is_infected":false}]}} (Mock)', error=None)
 
         global _last_failed_check
+
+        if self._insecure_token_use():
+            return AVScanResult(
+                available=False,
+                infected=False,
+                virus_name=None,
+                raw_response="",
+                error="CLAMAV_API_TOKEN requires an HTTPS CLAMAV_API_URL; scan not sent",
+            )
 
         with _offline_lock:
             if time.time() - _last_failed_check < _OFFLINE_CACHE_TTL:
@@ -97,7 +123,7 @@ class ClamAVRestProvider(AntivirusProvider):
                 with open(path, "rb") as fh:
                     filename = os.path.basename(path)
                     files = {"FILES": (filename, fh, "application/octet-stream")}
-                    resp = client.post(f"{self.api_url}/api/v1/scan", files=files)
+                    resp = client.post(f"{self.api_url}/api/v1/scan", files=files, headers=self._headers)
 
                 resp.raise_for_status()
                 data = resp.json()

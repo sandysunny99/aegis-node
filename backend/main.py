@@ -185,6 +185,18 @@ async def health(request: Request) -> dict:
     return _health_payload(await run_in_threadpool(_cached_av_status))
 
 
+@app.get("/health/detectors", tags=["system"])
+@limiter.limit("30/minute")
+async def health_detectors(request: Request) -> dict:
+    """
+    Active profile (lite | full) and, per detector, enabled / available / version /
+    last error. Public; reuses the cached AV status (S8) and returns no secrets.
+    """
+    from services.detector_status import detector_report
+
+    return detector_report(await run_in_threadpool(_cached_av_status))
+
+
 @app.get("/health/diagnostics", tags=["system"])
 @limiter.limit("30/minute")
 async def health_diagnostics(
