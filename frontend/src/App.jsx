@@ -48,7 +48,7 @@ function AppRoutes({ route, theme, onThemeChange }) {
   }
 
   return (
-    <AppShell route={route} crumbs={crumbs} datasets={datasets.items} theme={theme} onThemeChange={onThemeChange}>
+    <AppShell route={route} crumbs={crumbs} datasets={datasets.items} datasetsState={datasets.state} theme={theme} onThemeChange={onThemeChange}>
       {page}
     </AppShell>
   );

@@ -224,6 +224,34 @@
 
 .settings { display: grid; gap: var(--space-6); max-width: 760px; }
 
+/* ── Result layers: local scan / threat intel / AI, kept visibly separate ── */
+.layers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-6); }
+.layer { display: grid; align-content: start; gap: var(--space-3); min-width: 0; }
+.layer + .layer { padding-left: var(--space-6); border-left: 1px solid var(--line); }
+.layer__title { font-size: var(--step-0); }
+.layer__title .muted { display: block; font-weight: 400; margin-top: 2px; }
+.layer__text { font-size: 0.9375rem; color: var(--text-secondary); }
+.layer__facts, .layer__providers { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); font-size: 0.9375rem; }
+.layer__facts .is-risk { color: var(--status-risk); }
+.layer__providers li { display: grid; gap: 2px; }
+.layer__state { color: var(--text-secondary); font-size: var(--step--1); }
+.layer__state--breach { color: var(--status-breach); }
+.layer__state--risk { color: var(--status-risk); }
+.provider-list { list-style: none; margin: 0 0 var(--space-4); padding: 0; display: grid; gap: var(--space-3); }
+.provider-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: var(--space-2) var(--space-4);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--line);
+}
+.provider-list li:last-child { border-bottom: 0; }
+@media (max-width: 1100px) {
+  .layers { grid-template-columns: 1fr; }
+  .layer + .layer { padding-left: 0; border-left: 0; padding-top: var(--space-4); border-top: 1px solid var(--line); }
+  .provider-list li { grid-template-columns: 1fr; }
+}
+
 /* ── Responsive ────────────────────────────────────────────────────────── */
 @media (max-width: 1100px) {
   .overview__grid, .detail__grid { grid-template-columns: 1fr; }

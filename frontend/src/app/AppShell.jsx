@@ -13,7 +13,7 @@ const NAV = [
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
 /** Ctrl/Cmd+K dataset search: a modal list filtered by name, Enter opens, Escape closes. */
-function SearchDialog({ open, onClose, datasets }) {
+function SearchDialog({ open, onClose, datasets, state }) {
   const [q, setQ] = useState('');
   const [index, setIndex] = useState(0);
   const input = useRef(null);
@@ -56,7 +56,13 @@ function SearchDialog({ open, onClose, datasets }) {
         <button type="button" className="icon-btn" onClick={onClose} aria-label="Close search"><Icon name="X" size={18} /></button>
       </div>
       <ul id="search-results" className="search__results" role="listbox" aria-label="Matching datasets">
-        {results.length === 0 && <li className="muted search__empty">{datasets.length ? 'No dataset matches that name.' : 'No datasets uploaded from this browser yet.'}</li>}
+        {results.length === 0 && (
+          <li className="muted search__empty">
+            {state === 'error' ? 'Datasets could not be loaded, so search has nothing to look through. Reload the page to retry.'
+              : state === 'loading' ? 'Loading datasets.'
+              : datasets.length ? 'No dataset matches that name.' : 'No datasets uploaded from this browser yet.'}
+          </li>
+        )}
         {results.map((d, i) => (
           <li
             key={d.dataset_id}
@@ -76,7 +82,7 @@ function SearchDialog({ open, onClose, datasets }) {
   );
 }
 
-export default function AppShell({ route, crumbs, datasets, theme, onThemeChange, children }) {
+export default function AppShell({ route, crumbs, datasets, datasetsState, theme, onThemeChange, children }) {
   const [collapsed, setCollapsed] = useState(() => {
     try { return window.localStorage.getItem('aegis.sidebar') === 'collapsed'; } catch { return false; }
   });
@@ -157,7 +163,7 @@ export default function AppShell({ route, crumbs, datasets, theme, onThemeChange
           {children}
         </main>
       </div>
-      <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} datasets={datasets} />
+      <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} datasets={datasets} state={datasetsState} />
     </div>
   );
 }

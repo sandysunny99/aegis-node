@@ -8,14 +8,21 @@ import Skeleton from '../ui/Skeleton';
 /** "Resource not found" is how api.js reports a 404: here it means "no analysis yet". */
 const isNotFound = (err) => /not found|404/i.test(err?.message ?? '');
 
-export default function AiSummary({ datasetId }) {
+export default function AiSummary({ datasetId, onAnalysis }) {
   const [data, setData] = useState(null);
   const [state, setState] = useState('loading'); // loading | empty | ready | error
   const [error, setError] = useState('');
   const [providers, setProviders] = useState([]);
+  const [providersError, setProvidersError] = useState(false);
   const [llmMode, setLlmMode] = useState('auto');
   const [selectedProvider, setSelectedProvider] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
+
+  // Tell the parent what exists (null = no analysis yet) so the result layers stay in sync.
+  useEffect(() => {
+    if (state === 'ready') onAnalysis?.(data);
+    if (state === 'empty') onAnalysis?.(null);
+  }, [state, data, onAnalysis]);
 
   const load = useCallback(() => {
     setState('loading');
@@ -35,7 +42,7 @@ export default function AiSummary({ datasetId }) {
         setProviders(configured);
         if (configured.length > 0) setSelectedProvider(configured[0].id);
       })
-      .catch(() => setProviders([]));
+      .catch(() => { setProviders([]); setProvidersError(true); });
   }, [load]);
 
   const handleAnalyze = async () => {
@@ -78,6 +85,9 @@ export default function AiSummary({ datasetId }) {
           {data ? 'Analyse again' : 'Analyse findings'}
         </Button>
       </div>
+      {providersError && (
+        <p className="muted">The provider list could not be loaded, so only the automatic chain is available.</p>
+      )}
 
       {state === 'loading' && (
         <div className="stack-sm" aria-label="Loading AI analysis">

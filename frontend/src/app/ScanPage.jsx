@@ -3,6 +3,7 @@ import { scanDataset, uploadDataset } from '../api';
 import AiSummary from '../components/AiSummary';
 import FindingsList from '../components/FindingsList';
 import RemediationCard from '../components/RemediationCard';
+import ResultLayers from '../components/ResultLayers';
 import ThreatIntelligence from '../components/ThreatIntelligence';
 import TurnstileWidget from '../components/TurnstileWidget';
 import UploadZone from '../components/UploadZone';
@@ -86,8 +87,10 @@ export default function ScanPage({ health, onScanned }) {
   const [scanResult, setScanResult] = useState(null);
   const [error, setError] = useState('');
   const [turnstileToken, setTurnstileToken] = useState(null);
+  const [analysis, setAnalysis] = useState(undefined);
 
   const reset = useCallback(() => {
+    setAnalysis(undefined);
     setFile(null); setPhase('idle'); setUploadProgress(null);
     setUploadResult(null); setScanResult(null); setError(''); setTurnstileToken(null);
   }, []);
@@ -124,6 +127,12 @@ export default function ScanPage({ health, onScanned }) {
 
   return (
     <div className="panel">
+      {health?.status === 'error' && (
+        <div className="error-banner" role="alert">
+          <Icon name="CircleAlert" />
+          <span>The API is not answering, so uploads and scans will fail. Check that the backend is running, then reload.</span>
+        </div>
+      )}
       {health?.av_mock_mode && (
         <div className="notice notice--risk" role="note">
           <Icon name="CircleAlert" className="notice__icon" />
@@ -200,10 +209,11 @@ export default function ScanPage({ health, onScanned }) {
         <section aria-label="Scan report" className="report">
           <h2>Scan report: {uploadResult?.original_filename}</h2>
           <ScanSummary result={scanResult} />
+          <ResultLayers report={scanResult} analysis={analysis} />
           <Limitations codes={scanResult.verification_limitations} />
           <LocalDetection result={scanResult} />
           <ThreatIntelligence tiReport={scanResult.threat_intel} />
-          <AiSummary datasetId={scanResult.dataset_id} />
+          <AiSummary datasetId={scanResult.dataset_id} onAnalysis={setAnalysis} />
           <RemediationCard datasetId={scanResult.dataset_id} scanResult={scanResult} />
         </section>
       )}

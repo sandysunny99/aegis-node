@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { getDatasetStatus, getRemediationReport, getScanReport, scanDataset } from '../api';
 import AiSummary from '../components/AiSummary';
 import RemediationCard from '../components/RemediationCard';
+import ResultLayers from '../components/ResultLayers';
 import ThreatIntelligence from '../components/ThreatIntelligence';
 import { formatBytes, formatTime } from '../data/useDatasets';
 import { describeLimitation, detectorGaps } from '../status/limitations';
@@ -70,6 +71,7 @@ export default function DatasetDetail({ id, onChanged }) {
   const [dataset, setDataset] = useState(null);
   const [report, setReport] = useState(null);
   const [remediation, setRemediation] = useState(null);
+  const [analysis, setAnalysis] = useState(undefined); // undefined = loading, null = none
   const [state, setState] = useState('loading'); // loading | ready | missing | error
   const [error, setError] = useState('');
   const [scanning, setScanning] = useState(false);
@@ -181,11 +183,12 @@ export default function DatasetDetail({ id, onChanged }) {
 
       <div className="detail__grid">
         <div className="detail__main">
+          {report && <ResultLayers report={report} analysis={analysis} />}
           <Card title="Findings" id="detail-findings">
             {report ? <FindingsBySeverity findings={report.findings} /> : <p className="empty">This dataset has not been scanned yet.</p>}
           </Card>
           {report && <ThreatIntelligence tiReport={report.threat_intel} />}
-          {report && <AiSummary datasetId={id} />}
+          {report && <AiSummary datasetId={id} onAnalysis={setAnalysis} />}
           {report && <RemediationCard datasetId={id} scanResult={report} />}
         </div>
         <aside className="detail__side">
