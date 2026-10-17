@@ -152,6 +152,8 @@ export default function AppShell({ route, crumbs, datasets, theme, onThemeChange
           <ThemeToggle theme={theme} onChange={onThemeChange} />
         </header>
         <main id="app-main" className="shell__main" tabIndex={-1}>
+          {/* Every page gets an h1; the dataset page shows its own visible one */}
+          {!route.startsWith('/app/datasets/') && <h1 className="visually-hidden">{crumbs[crumbs.length - 1].label}</h1>}
           {children}
         </main>
       </div>

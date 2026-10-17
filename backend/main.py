@@ -12,6 +12,7 @@ from database import create_all_tables
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from limiter import limiter
@@ -77,6 +78,10 @@ app.add_middleware(SlowAPIMiddleware)
 
 # ─── Security Headers (A-006) ───────────────────────────────────────────────────
 app.add_middleware(SecurityHeadersMiddleware)
+
+# ─── Compression ─────────────────────────────────────────────────────────────
+# The built UI ships ~360 KB of JavaScript; gzip brings the landing bundle to ~116 KB.
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 # ─── CORS ────────────────────────────────────────────────────────────────────
 # Configured via settings.allowed_origins ("*" in dev, domain list in production)

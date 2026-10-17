@@ -69,6 +69,26 @@ All **no**:
 - R-30: not a clone of any product.
 - R-31: reasons are in docs/DECISIONS.md.
 
+## P5: performance and accessibility pass (17 Oct, after the gate above)
+
+Measured in Chromium against the local server, without network throttling (not a Lighthouse run; see below).
+
+| Check | Result | Budget |
+|---|---|---|
+| Landing JS on the wire | 113 KB gzipped | < 250 KB |
+| 3D shield chunk (lazy, desktop only) | 215 KB gzipped; not downloaded on phones | < 250 KB |
+| CSS | 8 KB gzipped | none set |
+| LCP, landing, 1440px | 224 ms | < 2.5 s |
+| LCP, landing, 390px | 172 ms | < 2.5 s |
+| CLS, landing | 0 | < 0.05 |
+| Reduced motion | The pinned chapter becomes a static list and the shield stops moving | required |
+| Focusable elements without an accessible name (landing) | 0 of 22 | 0 |
+| One h1 per page | yes; app pages have a visually hidden h1 with the page name | required |
+
+Fixed in this pass: the server sent the UI uncompressed (359 KB of JavaScript per visit); FastAPI now gzips responses over 1 KB (`backend/main.py`, `tests/test_static_delivery.py`). App pages had no h1; added.
+
+Not done: a real Lighthouse report. The `lighthouse` package is not on the approved package list, so these figures come from the browser's own PerformanceObserver. They are local, unthrottled numbers, not mid-range-phone numbers.
+
 ## Open items
 
 - `[LOGO]`: a real logo mark is still needed. The wordmark plus hex is the placeholder.
