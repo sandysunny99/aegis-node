@@ -20,8 +20,10 @@ import pandas as pd
 
 try:
     from scanner.normalizer import normalize_text
+    from scanner.pe_detect import find_embedded_pe
 except ImportError:
     from normalizer import normalize_text
+    from pe_detect import find_embedded_pe
 
 logger = logging.getLogger(__name__)
 
@@ -464,15 +466,32 @@ def raw_bytes_scan(path: Path) -> list[ContentFinding]:
             sample="X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR...",
         ))
 
-    # ── Windows PE / MZ executable header ────────────────────────────────────
-    if raw[:2] == b"MZ" or b"MZ\x90\x00" in raw[:4096] or b"MZP\x00" in raw[:4096]:
+    # ── Windows PE header ─────────────────────────────────────────────────────
+    # "MZ" alone is not evidence (country codes, IDs, binary columns). High severity
+    # needs a validated DOS header -> e_lfanew -> "PE\0\0" + machine (scanner/pe_detect.py).
+    embedded_pe = find_embedded_pe(raw, start=0)
+    if embedded_pe is not None:
+        where = "at the start of the file" if embedded_pe == 0 else f"at offset {embedded_pe} (polyglot file)"
         findings.append(ContentFinding(
             rule_id="MAL-002",
             severity="high",
             category="executable_artifact",
-            description="Windows PE/MZ executable header found in raw file bytes (executable format)",
-            location="raw_bytes:offset=0",
-            sample="MZ (PE executable header)",
+            description=f"Validated Windows PE executable header {where}",
+            location=f"raw_bytes:offset={embedded_pe}",
+            sample="MZ + e_lfanew -> PE\\0\\0 (validated_embedded_pe)",
+        ))
+    elif (
+        (raw[:2] == b"MZ" and any(b < 0x09 or 0x0D < b < 0x20 or b > 0x7E for b in raw[2:64]))
+        or b"MZ\x90\x00" in raw[:4096]
+        or b"MZP\x00" in raw[:4096]
+    ):
+        findings.append(ContentFinding(
+            rule_id="MAL-002",
+            severity="low",
+            category="possible_executable_marker",
+            description="DOS 'MZ' marker without a valid PE header (not treated as an executable)",
+            location="raw_bytes:offset=0" if raw[:2] == b"MZ" else "raw_bytes:first_4096",
+            sample="MZ marker only",
         ))
 
     # ── ELF Linux executable header ───────────────────────────────────────────
@@ -484,18 +503,6 @@ def raw_bytes_scan(path: Path) -> list[ContentFinding]:
             description="ELF Linux/Unix executable binary format detected in raw file bytes",
             location="raw_bytes:offset=0",
             sample="\\x7fELF (ELF binary header)",
-        ))
-
-    # ── Embedded PE header anywhere in file (polyglot files) ─────────────────
-    mz_offset = raw.find(b"MZ", 512)   # A-010: .find() returns -1, never raises ValueError
-    if raw[:2] != b"MZ" and mz_offset != -1:
-        findings.append(ContentFinding(
-            rule_id="MAL-002",
-            severity="high",
-            category="executable_artifact",
-            description=f"Embedded Windows PE/MZ executable found at offset {mz_offset} (polyglot file)",
-            location=f"raw_bytes:offset={mz_offset}",
-            sample=f"MZ header at byte {mz_offset}",
         ))
 
     # ── Shellcode NOP sled pattern (repeated 0x90 bytes) ─────────────────────

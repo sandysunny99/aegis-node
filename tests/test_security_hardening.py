@@ -99,13 +99,22 @@ def test_executable_format_detection_context(tmp_path: Path):
     PE/ELF header format is detected as 'executable_artifact' (high severity anomaly in dataset),
     not an automatic 'malware' assumption without other evidence.
     """
+    from test_pe_detection import synthetic_pe_header
+
     p = tmp_path / "embedded_pe.csv"
-    p.write_bytes(b"data_header\nMZ\x90\x00\x03\x00\x00\x00\x04\x00\x00\x00")
+    p.write_bytes(b"data_header\n" + synthetic_pe_header())
 
     result = run_scan(str(p))
     pe_findings = [f for f in result.all_findings if f.rule_id in ("MAL-002", "MAL-003")]
     assert len(pe_findings) > 0
     assert all(f.category == "executable_artifact" for f in pe_findings)
+
+    # Since B1 a bare DOS stub with no PE header is only a raw-byte marker (it used to be "high").
+    stub = tmp_path / "stub.csv"
+    stub.write_bytes(b"data_header\nMZ\x90\x00\x03\x00\x00\x00\x04\x00\x00\x00")
+    raw = [f for f in run_scan(str(stub)).all_findings if f.location.startswith("raw_bytes")
+           and f.rule_id == "MAL-002"]
+    assert raw and all(f.category == "possible_executable_marker" for f in raw)
 
 
 # ─── 5. ClamAV Unavailable Semantics ─────────────────────────────────────────

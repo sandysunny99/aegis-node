@@ -19,6 +19,7 @@ from pathlib import Path
 
 from config import settings
 
+from scanner.pe_detect import pe_header_at
 from services.storage import StorageError, get_data_directory, storage_backend
 
 logger = logging.getLogger(__name__)
@@ -90,9 +91,11 @@ def _detect_format(filename: str) -> str:
     return _map.get(ext, "unknown")
 
 
-# A-008: Complete binary magic byte block list (PE/MZ, ELF, all Mach-O variants)
+# A-008: binary executable headers (ELF, all Mach-O variants). PE/DOS ("MZ") is handled
+# in _looks_like_dos_executable: a CSV whose first cell is the country code "MZ" is data.
+_UPLOAD_HEADER_BYTES = 4096
+_PRINTABLE = set(range(0x20, 0x7F)) | {0x09, 0x0A, 0x0D}
 _BINARY_MAGIC: list[bytes] = [
-    b"MZ",             # Windows PE/DOS executable
     b"\x7fELF",        # ELF binary (Linux/Unix)
     b"\xfe\xed\xfa",   # Mach-O big-endian 32-bit
     b"\xcf\xfa\xed\xfe",  # Mach-O 64-bit little-endian
@@ -100,16 +103,26 @@ _BINARY_MAGIC: list[bytes] = [
 ]
 
 
+def _looks_like_dos_executable(header: bytes) -> bool:
+    """A validated PE header, or "MZ" followed by a binary (non-text) DOS header."""
+    if header[:2] != b"MZ":
+        return False
+    if pe_header_at(header, 0):
+        return True
+    return any(b not in _PRINTABLE for b in header[2:64])
+
+
 def validate_magic_bytes(content: bytes, filename: str) -> bool:
     """
-    Verify magic byte headers to reject executable binary anomalies (PE/MZ, ELF, MACH-O)
-    disguised under allowed dataset extensions.
+    Verify magic byte headers to reject executable binary anomalies (PE/DOS, ELF, MACH-O)
+    disguised under allowed dataset extensions. `content` is the first
+    _UPLOAD_HEADER_BYTES of the upload.
     """
     if not content:
         return True
 
     # Block all known binary executable headers (A-008)
-    if any(content.startswith(m) for m in _BINARY_MAGIC):
+    if _looks_like_dos_executable(content) or any(content.startswith(m) for m in _BINARY_MAGIC):
         return False
 
     ext = Path(filename).suffix.lower()
@@ -196,8 +209,8 @@ class FileService:
                     if bytes_written > max_bytes:
                         raise ValueError(f"File exceeds maximum allowed size ({max_bytes // (1024 * 1024)} MB).")
 
-                    if len(header_bytes) < 32:
-                        needed = 32 - len(header_bytes)
+                    if len(header_bytes) < _UPLOAD_HEADER_BYTES:
+                        needed = _UPLOAD_HEADER_BYTES - len(header_bytes)
                         header_bytes.extend(chunk[:needed])
 
                     hasher.update(chunk)
