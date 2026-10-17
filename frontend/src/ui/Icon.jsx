@@ -1,12 +1,14 @@
 import {
-  Circle, CircleAlert, CircleDashed, CircleHelp, FileText, LoaderCircle, Moon, ShieldAlert,
-  ShieldCheck, ShieldHalf, ShieldMinus, ShieldQuestion, ShieldX, Sun, Upload, X,
+  ArrowDown, ArrowUp, ArrowUpDown, Circle, CircleAlert, CircleDashed, CircleHelp, FileText, LayoutGrid,
+  LoaderCircle, Menu, Moon, PanelLeftClose, PanelLeftOpen, RefreshCw, Search, ShieldAlert, ShieldCheck,
+  ShieldHalf, ShieldMinus, ShieldQuestion, ShieldX, SlidersHorizontal, Sun, Table2, Upload, X,
 } from 'lucide-react';
 
 // Only icons the UI actually uses are imported, so the bundle stays small.
 const ICONS = {
-  Circle, CircleAlert, CircleDashed, CircleHelp, FileText, LoaderCircle, Moon, ShieldAlert,
-  ShieldCheck, ShieldHalf, ShieldMinus, ShieldQuestion, ShieldX, Sun, Upload, X,
+  ArrowDown, ArrowUp, ArrowUpDown, Circle, CircleAlert, CircleDashed, CircleHelp, FileText, LayoutGrid,
+  LoaderCircle, Menu, Moon, PanelLeftClose, PanelLeftOpen, RefreshCw, Search, ShieldAlert, ShieldCheck,
+  ShieldHalf, ShieldMinus, ShieldQuestion, ShieldX, SlidersHorizontal, Sun, Table2, Upload, X,
 };
 
 /** Decorative by default: the text next to an icon always carries the meaning. */

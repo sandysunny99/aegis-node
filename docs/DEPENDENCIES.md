@@ -6,6 +6,21 @@ Every runtime dependency added from Phase A.5 onwards gets an entry here: name, 
 |---|---|---|---|---|---|---|
 | pefile | 2024.8.26 | MIT | Ero Carrera | 2024-08-26 | HEUR-003 PE import heuristic in `scanner/heuristics.py` was silently skipped because pefile was never installed (Phase A gap #16) | https://pypi.org/pypi/pefile/json, 15 Oct 2026 |
 
+## Frontend (Bastion redesign, brief of 17 Oct 2026)
+
+Only the packages the brief names. Each is MIT or ISC; `npm audit` reports 0 issues after install.
+
+| Name | Pinned version | Licence | Released | Reason | Checked |
+|---|---|---|---|---|---|
+| lucide-react | 0.454.0 | ISC | 2024-10-28 | Outline icon set replacing emoji icons (P0 #16); only the icons used are imported | `npm view`, 17 Oct 2026 |
+| three | 0.169.0 | MIT | 2024-09-26 | WebGL engine for the shield (instanced hex plates) | `npm view`, 17 Oct 2026 |
+| @react-three/fiber | 8.17.10 | MIT | 2024-10-09 | React renderer for three; v8 is the line that supports React 18 | `npm view`, 17 Oct 2026 |
+| @react-three/drei | 9.122.0 | MIT | 2025-02-19 | Helpers (AdaptiveDpr). 9.114.0 pulled a uuid version with a moderate advisory, so pinned to 9.122.0 | `npm view`, `npm audit`, 17 Oct 2026 |
+| framer-motion | 11.11.9 | MIT | 2024-10-15 | `useScroll` for the pinned "how a scan works" chapter; chosen over GSAP so there is one motion library | `npm view`, 17 Oct 2026 |
+| lenis | 1.1.14 | MIT | 2024-10-10 | Smooth scroll on the landing page only, never in the app | `npm view`, 17 Oct 2026 |
+
+The 3D packages load in a lazy chunk, so they are not part of the initial landing JavaScript.
+
 ## Notes
 
 - **pefile is past the 12-month rule.** Its last release is 26 months old. It was added because the owner's Phase A.5 decision named it explicitly. It is a pure-Python parser with no network access, used only on files that contain a PE header. If a maintained alternative is preferred, the PE checks can move to the planned capa / LIEF layer in Phase C.

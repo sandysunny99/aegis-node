@@ -20,7 +20,17 @@ export function describeLimitation(code) {
   }
   if (code === 'VT_UNAVAILABLE_AUTH') return 'VirusTotal rejected the API key, so no hash reputation was checked.';
   if (String(code).startsWith('VT_UNAVAILABLE_')) return `VirusTotal was unavailable (${detail ?? code.slice(15).toLowerCase()}).`;
+  if (code === 'CLAMAV_UNAVAILABLE') return 'The antivirus engine was not reachable, so no signature scan ran on this file.';
+  if (code === 'PARTIAL_DATASET_SCAN') return 'Only part of the dataset was inspected, so findings may be incomplete.';
+  if (code === 'PARSER_LIMITATION') return 'The file could not be fully parsed, so some values were not checked cell by cell.';
+  if (code === 'MALWARE_REFERENCE_ONLY') return 'The data mentions malware names (for example in research notes) but contains no malware artifact.';
+  if (code === 'CONFLICT_TI_MALICIOUS') return 'Threat intelligence marks an indicator in this file as malicious although the local scan found it clean.';
+  if (code === 'TI_EVIDENCE_DISAGREEMENT') return 'Threat-intelligence providers disagree about this file.';
   if (code === 'CONFLICT_VT_MALICIOUS') return 'VirusTotal reports this file hash as malicious although the local scan found it clean.';
+  if (String(code).includes('_UNAVAILABLE_')) {
+    const [provider, , ...rest] = String(code).split('_');
+    return `${provider.charAt(0)}${provider.slice(1).toLowerCase()} was unavailable (${rest.join(' ').toLowerCase()}).`;
+  }
   if (code === 'THREAT_INTEL_FAILURE' || code === 'THREAT_INTEL_FUSION_FAILURE') return 'External threat-intelligence enrichment failed for this scan.';
   return code;
 }

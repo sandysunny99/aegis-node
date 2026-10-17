@@ -204,10 +204,14 @@ _STATIC_DIR = Path(__file__).parent / "static"
 if _STATIC_DIR.exists():
     app.mount("/assets", StaticFiles(directory=str(_STATIC_DIR / "assets")), name="assets")
 
+    # index.html must be revalidated on every visit, or browsers keep showing an old UI after a
+    # rebuild; the hashed /assets files can be cached as usual.
+    _INDEX_HEADERS = {"Cache-Control": "no-cache"}
+
     @app.get("/", include_in_schema=False)
     async def serve_root():
         """Serve React index.html at root."""
-        return FileResponse(str(_STATIC_DIR / "index.html"))
+        return FileResponse(str(_STATIC_DIR / "index.html"), headers=_INDEX_HEADERS)
 
     @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_spa(full_path: str):
@@ -218,7 +222,7 @@ if _STATIC_DIR.exists():
         # Don't intercept API, documentation, or static asset routes (case-insensitive)
         if full_path.lower().startswith(("api/", "health", "docs", "openapi", "redoc", "assets")):
             raise HTTPException(status_code=404, detail="Not found")
-        return FileResponse(str(_STATIC_DIR / "index.html"))
+        return FileResponse(str(_STATIC_DIR / "index.html"), headers=_INDEX_HEADERS)
 else:
     # Development mode — just return API info at root
     @app.get("/", tags=["system"])

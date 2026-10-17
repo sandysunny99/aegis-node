@@ -6,6 +6,9 @@ import './styles/base.css';
 import './styles/ui.css';
 import './styles/styleguide.css';
 import './index.css';
+import './styles/shield.css';
+import './styles/landing.css';
+import './styles/app.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
