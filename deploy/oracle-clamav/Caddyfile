@@ -1,0 +1,30 @@
+# HTTPS front for the Aegis scan gateway. Caddy gets and renews the certificate for
+# SCAN_DOMAIN automatically (or uses its internal CA when CADDY_TLS_DIRECTIVE is
+# "tls internal", for local tests). Authentication, size and rate limits are enforced
+# by the gateway; Caddy adds a body cap and refuses every path the gateway does not serve.
+{$SCAN_DOMAIN} {
+	{$CADDY_TLS_DIRECTIVE}
+
+	request_body {
+		max_size 55MiB
+	}
+
+	@allowed path /healthz /api/v1/version /api/v1/scan
+	handle @allowed {
+		reverse_proxy scan-gateway:8080 {
+			transport http {
+				read_timeout 120s
+				write_timeout 120s
+			}
+		}
+	}
+	handle {
+		respond 404
+	}
+
+	# Caddy redacts the Authorization header in access logs by default; bodies are never logged.
+	log {
+		output stdout
+		format json
+	}
+}

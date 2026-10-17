@@ -20,3 +20,11 @@
 
 6. **Render Ephemeral Storage**
    - The free tier of Render utilizes ephemeral `/tmp` storage. Databases and uploaded files are lost upon application restarts.
+
+## Remote ClamAV on the owner's Oracle VM (added October 2026)
+
+- On Render, ClamAV runs on a separate Oracle Cloud VM owned by the project author. Each uploaded file is sent over HTTPS, with a bearer token, to that VM for scanning. It is not sent to any third party, and the gateway does not keep it after the scan.
+- If the VM is unreachable, rejects the token or is busy, the scan says `CLAMAV_UNAVAILABLE` and can be at best "Clean, with limitations". Aegis never substitutes a mock scanner or another service.
+- ClamAV's EICAR signature only matches at the start of a file. EICAR embedded in a CSV cell is caught by Aegis' YARA and raw-byte rules, not by ClamAV.
+- Oracle may reclaim an idle Always Free VM (official rule: 7 days below 20 % CPU, network and memory). Scans then report ClamAV as unavailable until the VM is recreated.
+- Render free tier: 512 MB memory (lite uploads capped at 25 MB, from measurement), sleeps when idle, and has no persistent disk unless R2 and an external database are configured. `/health/detectors` reports whether storage and the database persist.

@@ -1,0 +1,90 @@
+# Aegis Node — authenticated ClamAV service for an Oracle Cloud Always Free Arm VM.
+#
+#   Render (Aegis backend) --HTTPS + bearer token--> Caddy :443
+#        --> scan-gateway (auth, size cap, rate limit) --> clamav-rest --> clamd
+#
+# Only Caddy publishes ports (80 for the ACME challenge and redirect, 443 for TLS).
+# clamd (3310) and clamav-rest (3000) are reachable only on the private "scan"
+# network. All images are pinned and multi-arch (linux/arm64 and amd64).
+# Guide: docs/ORACLE_CLAMAV_DEPLOYMENT.md
+
+name: aegis-clamav
+
+services:
+  clamav:
+    image: clamav/clamav-debian:1.5.4
+    volumes:
+      - clamav_db:/var/lib/clamav               # signatures survive container recreation
+      - ./clamav/clamd.conf:/etc/clamav/clamd.conf:ro
+    environment:
+      - CLAMAV_NO_MILTERD=true                    # the image's own freshclam keeps signatures current
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 60s
+      timeout: 10s
+      retries: 5
+      start_period: 300s                          # first signature download on a fresh VM
+    mem_limit: 3g
+    restart: unless-stopped
+    networks: [scan]
+
+  clamav-rest:
+    image: benzino77/clamav-rest-api:1.6.15
+    environment:
+      - NODE_ENV=production
+      - CLAMD_IP=clamav
+      - CLAMD_PORT=3310
+      - APP_PORT=3000
+      - APP_FORM_KEY=FILES                        # multipart field Aegis' ClamAVRestProvider sends
+      - APP_MAX_FILE_SIZE=52428800
+    depends_on:
+      clamav:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/v1/version', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    mem_limit: 256m
+    restart: unless-stopped                       # retries if it starts before clamd is listening
+    networks: [scan]
+
+  scan-gateway:
+    build: ./gateway
+    environment:
+      - SCAN_GATEWAY_TOKEN=${SCAN_GATEWAY_TOKEN:?set SCAN_GATEWAY_TOKEN in .env}
+      - CLAMAV_REST_URL=http://clamav-rest:3000
+      - MAX_UPLOAD_MB=${MAX_UPLOAD_MB:-50}
+      - RATE_LIMIT_PER_MINUTE=${RATE_LIMIT_PER_MINUTE:-30}
+      - MAX_CONCURRENT_SCANS=${MAX_CONCURRENT_SCANS:-2}
+    depends_on:
+      clamav-rest:
+        condition: service_healthy
+    mem_limit: 256m
+    restart: unless-stopped
+    networks: [scan]
+
+  caddy:
+    image: caddy:2.10.2
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - SCAN_DOMAIN=${SCAN_DOMAIN:?set SCAN_DOMAIN in .env}
+      - CADDY_TLS_DIRECTIVE=${CADDY_TLS_DIRECTIVE:-}  # empty = public Let's Encrypt cert; "tls internal" for local tests
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data                          # certificates
+      - caddy_config:/config
+    depends_on: [scan-gateway]
+    mem_limit: 128m
+    restart: unless-stopped
+    networks: [scan]
+
+networks:
+  scan: {}
+
+volumes:
+  clamav_db: {}
+  caddy_data: {}
+  caddy_config: {}
