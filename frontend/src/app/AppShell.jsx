@@ -49,6 +49,8 @@ function SearchDialog({ open, onClose, datasets }) {
             if (e.key === 'ArrowDown') { e.preventDefault(); setIndex((i) => Math.min(i + 1, results.length - 1)); }
             if (e.key === 'ArrowUp') { e.preventDefault(); setIndex((i) => Math.max(i - 1, 0)); }
             if (e.key === 'Enter' && results[index]) openDataset(results[index]);
+            // A search input swallows the first Escape to clear itself; close the dialog instead.
+            if (e.key === 'Escape') { e.preventDefault(); onClose(); }
           }}
         />
         <button type="button" className="icon-btn" onClick={onClose} aria-label="Close search"><Icon name="X" size={18} /></button>

@@ -158,6 +158,7 @@
 }
 .recent li:last-child { border-bottom: 0; }
 .recent__name { font-weight: 500; }
+.recent .status-pill { justify-self: start; }
 .recent__time, .recent__findings { font-size: var(--step--1); }
 .empty-card { max-width: 640px; }
 
@@ -247,6 +248,8 @@
   .topbar__search { min-width: 44px; justify-content: center; }
   .crumbs ol { font-size: var(--step--1); }
   .crumbs li:not(:last-child) { display: none; }
+  .crumbs li + li::before { content: none; }
+  .recent li { grid-template-columns: 1fr; }
   .detail__actions { align-items: flex-start; }
   .detail__hint { text-align: left; }
 }

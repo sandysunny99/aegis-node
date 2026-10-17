@@ -75,7 +75,7 @@ export default function Overview({ datasets, state, error, reload, theme }) {
       <StatusSummary datasets={datasets} />
       <div className="overview__grid">
         <Card title="Shield" id="overview-shield" className="overview__shield">
-          <p className="muted card-lede">One plate per dataset. Hover for details, click to open it.</p>
+          <p className="muted card-lede">One plate per dataset, most urgent in the centre. Select a plate to open its dataset.</p>
           <Shield datasets={[...datasets].sort((a, b) => byUrgency(a.shown, b.shown))} mode="compact" theme={theme} onSelect={openDataset} />
         </Card>
         <Card title="Recent scans" id="overview-recent">

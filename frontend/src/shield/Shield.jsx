@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, useState } from 'react';
 import { statusToPlate } from '../status/statusToPlate';
+import ShieldBoundary from './ShieldBoundary';
 import ShieldGrid from './ShieldGrid';
 
 // The WebGL shield (three + R3F) is a separate lazy chunk: it never blocks first paint.
@@ -42,16 +43,20 @@ export default function Shield({ datasets, mode = 'compact', theme, onSelect, se
     <figure className={`shield shield--${mode}`}>
       <div className="shield__stage">
         {use3D ? (
-          <Suspense fallback={fallback}>
-            <Shield3D
-              datasets={datasets}
-              mode={mode}
-              theme={theme}
-              reducedMotion={reducedMotion}
-              onSelect={onSelect}
-              focusedId={focusedId ?? selectedId}
-            />
-          </Suspense>
+          <ShieldBoundary
+            fallback={<ShieldGrid datasets={datasets} interactive={Boolean(onSelect)} onSelect={onSelect} selectedId={selectedId} theme={theme} />}
+          >
+            <Suspense fallback={fallback}>
+              <Shield3D
+                datasets={datasets}
+                mode={mode}
+                theme={theme}
+                reducedMotion={reducedMotion}
+                onSelect={onSelect}
+                focusedId={focusedId ?? selectedId}
+              />
+            </Suspense>
+          </ShieldBoundary>
         ) : (
           <ShieldGrid datasets={datasets} interactive={Boolean(onSelect)} onSelect={onSelect} selectedId={selectedId} theme={theme} />
         )}

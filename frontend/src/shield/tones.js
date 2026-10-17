@@ -1,12 +1,12 @@
 import { statusToPlate } from '../status/statusToPlate';
 
-/** Token that colours each plate state; read from the live stylesheet so themes apply. */
+/** Plate material per status tone (tokens.css --plate-*), read live so themes apply. */
 const TONE_VAR = {
-  clean: '--status-clean',
-  risk: '--status-risk',
-  breach: '--status-breach',
-  scanning: '--accent',
-  neutral: '--status-neutral',
+  clean: '--plate-clean',
+  risk: '--plate-risk',
+  breach: '--plate-breach',
+  scanning: '--plate-scan',
+  neutral: '--plate-neutral',
 };
 
 export function readTokens() {
@@ -14,10 +14,9 @@ export function readTokens() {
   const get = (name) => css.getPropertyValue(name).trim();
   return {
     tone: Object.fromEntries(Object.entries(TONE_VAR).map(([k, v]) => [k, get(v)])),
-    filler: get('--surface-overlay'),
-    unscanned: get('--status-neutral'),
-    accent: get('--accent'),
-    breach: get('--status-breach-fill'),
+    filler: get('--plate-filler'),
+    unscanned: get('--plate-neutral'),
+    accent: get('--plate-scan'),
   };
 }
 

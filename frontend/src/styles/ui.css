@@ -199,9 +199,11 @@
   .table td::before {
     content: attr(data-label);
     color: var(--text-secondary);
+    font-family: var(--font-ui);
     font-size: var(--step--1);
     text-align: left;
   }
+  .table th[scope="row"] { display: block; width: 100%; padding: var(--space-3) var(--space-4); }
 }
 
 /* ── Tooltip ────────────────────────────────────────────────────────────── */

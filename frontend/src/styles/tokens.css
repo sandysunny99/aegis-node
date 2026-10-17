@@ -34,6 +34,14 @@
   --status-breach-fill: #e5664b;
   --on-breach: #111214;
 
+  /* Shield plate materials: the same metal in both themes (lit by the scene, not the page) */
+  --plate-clean: #8fbf9f;
+  --plate-risk: #e0b052;
+  --plate-breach: #e5664b;
+  --plate-scan: #c99449;
+  --plate-neutral: #a29d93;
+  --plate-filler: #24272b;
+
   /* Typography: one grotesk, one mono, 1.25 modular scale from 16px */
   --font-ui: "IBM Plex Sans", system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
@@ -113,6 +121,8 @@
   --status-neutral: #5a5750;
   --status-breach-fill: #b23a22;
   --on-breach: #ffffff;
+
+  --plate-filler: #d8d2c6;
 
   --shadow-resting: 0 1px 0 rgb(27 29 33 / 0.08);
   --shadow-raised: 2px 4px 12px rgb(27 29 33 / 0.12);

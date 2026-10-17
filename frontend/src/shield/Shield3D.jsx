@@ -49,7 +49,7 @@ function Plates({ plates, tokens, mode, reducedMotion, onHover, onSelect, focuse
       m.setMatrixAt(i, plateTransform(p, look, isFocus ? 0.15 : 0));
       tmpColor.set(look.color);
       // Filler stays a dull empty plate; "not scanned" is a mid-grey plate, clearly not filler.
-      if (look.kind === 'filler') tmpColor.multiplyScalar(1.35);
+      if (look.kind === 'filler') tmpColor.multiplyScalar(1.1);
       if (look.kind === 'unscanned') tmpColor.multiplyScalar(0.5);
       if (look.kind === 'degraded') tmpColor.multiplyScalar(0.8);
       if (look.kind === 'scanning' && !reducedMotion) {
