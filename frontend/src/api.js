@@ -1,9 +1,11 @@
 /**
- * Aegis Node — API Client
+ * Aegis Node API client.
  * Uses fetch for standard requests and XMLHttpRequest for upload progress tracking.
  */
 
-const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
+// Same origin by default: FastAPI serves the built UI, and the Vite dev server proxies
+// /api and /health. Set VITE_API_URL only when the API lives on another host.
+const BASE = import.meta.env.VITE_API_URL ?? '';
 
 // S2: no API key in the browser. Anything read from import.meta.env.VITE_* is
 // compiled into the public bundle, so a key here would protect nothing. API_KEY
@@ -12,7 +14,7 @@ const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
 /** Map HTTP status codes to user-friendly messages. */
 function friendlyError(status, fallback) {
-  if (status === 429) return 'Too many requests — please wait a moment before trying again.';
+  if (status === 429) return 'Too many requests. Wait a moment before trying again.';
   if (status === 403) {
     if (fallback && fallback.toLowerCase().includes('turnstile')) return 'Upload blocked: bot verification failed or is unavailable.';
     if (fallback && fallback.toLowerCase().includes('download')) return 'Access denied: the sanitized download token may be invalid or expired.';
@@ -82,7 +84,7 @@ export function uploadDataset(file, onProgress, turnstileToken = null) {
       }
     });
 
-    xhr.addEventListener('error', () => reject(new Error('Network error — check your connection and try again.')));
+    xhr.addEventListener('error', () => reject(new Error('Network error. Check your connection and try again.')));
     xhr.addEventListener('abort', () => reject(new Error('Upload was cancelled.')));
 
     xhr.send(form);

@@ -1,0 +1,128 @@
+/* Aegis Node, Bastion tokens. Every colour, size and duration used by components
+   comes from here; components never hard-code values. Reasons are in docs/DECISIONS.md. */
+
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Surfaces: four near-black steps, warm graphite (never pure #000) */
+  --surface-inset: #0b0c0e;
+  --surface-base: #111214;
+  --surface-raised: #181a1d;
+  --surface-overlay: #202327;
+  --line: #2c3035;
+  --line-strong: #3b4047;
+
+  /* Text */
+  --text-primary: #ece6da;
+  --text-secondary: #c4beb2;
+  --text-muted: #a29d93;
+  --text-inverse: #111214;
+
+  /* The one accent: interaction (links, focus, primary action) */
+  --accent: #c99449;
+  --accent-strong: #d8a55c;
+  --accent-edge: #7a5a2b;
+  --on-accent: #111214;
+
+  /* Status: semantic only, always paired with an icon and a word */
+  --status-clean: #8fbf9f;
+  --status-risk: #e0b052;
+  --status-breach: #f06a4f;
+  --status-scanning: var(--accent);
+  --status-neutral: #a29d93;
+  --status-breach-fill: #e5664b;
+  --on-breach: #111214;
+
+  /* Typography: one grotesk, one mono, 1.25 modular scale from 16px */
+  --font-ui: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --step--1: 0.8rem;
+  --step-0: 1rem;
+  --step-1: 1.25rem;
+  --step-2: 1.5625rem;
+  --step-3: 1.953rem;
+  --step-4: 2.441rem;
+  --step-5: 3.052rem;
+  --leading-tight: 1.15;
+  --leading-body: 1.55;
+
+  /* Spacing: 4px base */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-24: 96px;
+
+  /* Shape: one small radius; the 6px chamfer is the plate motif (buttons, chips, plates) */
+  --radius: 4px;
+  --cut: 6px;
+  --chamfer: polygon(var(--cut) 0, calc(100% - var(--cut)) 0, 100% var(--cut),
+    100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, var(--cut) 100%,
+    0 calc(100% - var(--cut)), 0 var(--cut));
+  --hex: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+
+  /* Elevation: one lamp, top-left. Three levels only */
+  --shadow-resting: 0 1px 0 rgb(0 0 0 / 0.35);
+  --shadow-raised: 2px 4px 12px rgb(0 0 0 / 0.35);
+  --shadow-pressed: inset 1px 1px 2px rgb(0 0 0 / 0.4);
+
+  /* Focus ring in the accent colour */
+  --focus-ring: 0 0 0 2px var(--surface-base), 0 0 0 4px var(--accent);
+
+  /* Motion */
+  --dur-press: 90ms;
+  --dur-release: 140ms;
+  --dur-state: 200ms;
+  --ease-out: cubic-bezier(0.3, 0.7, 0.4, 1);
+
+  /* Layout */
+  --content-max: 1200px;
+  --gutter: clamp(16px, 4vw, 40px);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --surface-inset: #e9e4da;
+  --surface-base: #f4f0e8;
+  --surface-raised: #fbf9f5;
+  --surface-overlay: #ffffff;
+  --line: #d6cfc2;
+  --line-strong: #b9b1a3;
+
+  --text-primary: #1b1d21;
+  --text-secondary: #3f4146;
+  --text-muted: #5a5750;
+  --text-inverse: #f4f0e8;
+
+  --accent: #7f5620;
+  --accent-strong: #6a4719;
+  --accent-edge: #4f3613;
+  --on-accent: #ffffff;
+
+  --status-clean: #2f6b45;
+  --status-risk: #855a00;
+  --status-breach: #b23a22;
+  --status-neutral: #5a5750;
+  --status-breach-fill: #b23a22;
+  --on-breach: #ffffff;
+
+  --shadow-resting: 0 1px 0 rgb(27 29 33 / 0.08);
+  --shadow-raised: 2px 4px 12px rgb(27 29 33 / 0.12);
+  --shadow-pressed: inset 1px 1px 2px rgb(27 29 33 / 0.15);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-press: 0ms;
+    --dur-release: 0ms;
+    --dur-state: 0ms;
+  }
+}

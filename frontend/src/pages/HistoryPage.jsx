@@ -1,67 +1,66 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { getHistory } from '../api';
+import { byUrgency, effectiveStatus } from '../status/statusToPlate';
+import Button from '../ui/Button';
+import Card from '../ui/Card';
+import Icon from '../ui/Icon';
+import Skeleton from '../ui/Skeleton';
+import StatusPill from '../ui/StatusPill';
+import Table from '../ui/Table';
+
+const formatTime = (iso) => (iso ? new Date(iso).toLocaleString() : 'not scanned');
 
 export default function HistoryPage() {
-  const [history, setHistory] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [items, setItems] = useState([]);
+  const [state, setState] = useState('loading'); // loading | ready | error
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    getHistory(1, 50).then(data => {
-      setHistory(data.items || []);
-      setLoading(false);
-    }).catch(() => setLoading(false));
+  const load = useCallback(() => {
+    setState('loading');
+    getHistory(1, 50)
+      .then((data) => { setItems(data.items || []); setState('ready'); })
+      .catch((err) => { setError(err.message); setState('error'); });
   }, []);
 
-  if (loading) return <div className="card"><span className="spinner" /> Loading history...</div>;
+  useEffect(load, [load]);
+
+  const rows = items
+    .map((item) => ({ ...item, shown: effectiveStatus(item.status, item.verdict) }))
+    .sort((a, b) => byUrgency(a.shown, b.shown));
 
   return (
-    <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-      <div style={{ fontSize: '1.2rem', fontWeight: 600, marginBottom: '1rem' }}>Scan History</div>
-      
-      {history.length === 0 ? (
-        <div style={{ color: 'var(--text-3)' }}>No datasets have been scanned yet.</div>
-      ) : (
-        <div style={{ display: 'grid', gap: '0.75rem' }}>
-          {history.map((item, idx) => (
-            <div key={idx} style={{
-              background: 'var(--bg-1)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--r-sm)',
-              padding: '1rem',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: '1rem'
-            }}>
-              <div>
-                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-1)' }}>{item.original_filename}</div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-3)', fontFamily: 'var(--mono)' }}>{new Date(item.uploaded_at).toLocaleString()}</div>
-              </div>
-              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', fontSize: '0.8rem' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.65rem', color: 'var(--text-3)' }}>RISK</span>
-                  <strong style={{ color: item.risk_score === null ? 'var(--text-3)' : item.risk_score > 6 ? 'var(--rose)' : item.risk_score > 3 ? 'var(--amber)' : 'var(--emerald)' }}>
-                    {item.risk_score !== null ? item.risk_score.toFixed(1) : 'N/A'}
-                  </strong>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.65rem', color: 'var(--text-3)' }}>VERDICT</span>
-                  <strong style={{ color: item.verdict === 'malicious' ? 'var(--rose)' : item.verdict === 'suspicious' ? 'var(--amber)' : item.verdict === null ? 'var(--text-3)' : 'var(--emerald)' }}>
-                    {item.verdict ? item.verdict.toUpperCase() : 'PENDING'}
-                  </strong>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.65rem', color: 'var(--text-3)' }}>THREATS</span>
-                  <strong style={{ color: item.threats_found_count > 0 ? 'var(--rose)' : item.threats_found_count === null ? 'var(--text-3)' : 'var(--emerald)' }}>
-                    {item.threats_found_count !== null ? item.threats_found_count : '-'}
-                  </strong>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+    <div id="panel-history" role="tabpanel" aria-labelledby="tab-history">
+      <Card title="Datasets scanned from this browser" id="history">
+        {state === 'loading' && (
+          <div className="stack-sm" aria-label="Loading scan history">
+            {[0, 1, 2].map((i) => <Skeleton key={i} height="44px" />)}
+          </div>
+        )}
+        {state === 'error' && (
+          <div className="error-banner" role="alert">
+            <Icon name="CircleAlert" />
+            <span>Scan history could not be loaded: {error}</span>
+            <Button variant="ghost" onClick={load}>Retry</Button>
+          </div>
+        )}
+        {state === 'ready' && rows.length === 0 && (
+          <p className="empty">No datasets have been uploaded from this browser yet. Use the Scan a dataset tab to add one.</p>
+        )}
+        {state === 'ready' && rows.length > 0 && (
+          <Table
+            caption="Scan history, most urgent first"
+            rowKey={(r) => r.dataset_id}
+            columns={[
+              { key: 'shown', header: 'Status', render: (r) => <StatusPill status={r.shown} size="sm" /> },
+              { key: 'original_filename', header: 'Name', render: (r) => <span className="break">{r.original_filename}</span> },
+              { key: 'scanned_at', header: 'Last scan', render: (r) => formatTime(r.scanned_at) },
+              { key: 'threats_found_count', header: 'Findings', numeric: true, render: (r) => r.threats_found_count ?? 'not scanned' },
+              { key: 'risk_score', header: 'Risk', numeric: true, render: (r) => (r.risk_score == null ? 'not scanned' : r.risk_score.toFixed(1)) },
+            ]}
+            rows={rows}
+          />
+        )}
+      </Card>
     </div>
   );
 }

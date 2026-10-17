@@ -1,0 +1,37 @@
+/**
+ * Plain-language text for verification_limitations codes from the scan engine.
+ * Unknown codes are shown verbatim so nothing the backend reports is hidden.
+ */
+const DETECTOR_NAMES = {
+  yara: 'YARA rules',
+  libmagic: 'File-type detection (libmagic)',
+  pefile: 'PE import analysis (pefile)',
+  heuristics: 'Heuristic checks',
+  encoding_normalization: 'Encoding normalisation',
+};
+
+export function describeLimitation(code) {
+  const [kind, detail] = String(code).split(':');
+  if (kind === 'DETECTOR_UNAVAILABLE') {
+    return `${DETECTOR_NAMES[detail] ?? detail} could not run on this server, so it did not check this file.`;
+  }
+  if (kind === 'DETECTOR_DISABLED') {
+    return `${DETECTOR_NAMES[detail] ?? detail} is switched off in the server configuration.`;
+  }
+  if (code === 'VT_UNAVAILABLE_AUTH') return 'VirusTotal rejected the API key, so no hash reputation was checked.';
+  if (String(code).startsWith('VT_UNAVAILABLE_')) return `VirusTotal was unavailable (${detail ?? code.slice(15).toLowerCase()}).`;
+  if (code === 'CONFLICT_VT_MALICIOUS') return 'VirusTotal reports this file hash as malicious although the local scan found it clean.';
+  if (code === 'THREAT_INTEL_FAILURE' || code === 'THREAT_INTEL_FUSION_FAILURE') return 'External threat-intelligence enrichment failed for this scan.';
+  return code;
+}
+
+/** Detectors named as unavailable or disabled, for the "what ran" summary. */
+export function detectorGaps(limitations = []) {
+  return limitations
+    .map((code) => String(code).split(':'))
+    .filter(([kind]) => kind === 'DETECTOR_UNAVAILABLE' || kind === 'DETECTOR_DISABLED')
+    .map(([kind, detail]) => ({
+      name: DETECTOR_NAMES[detail] ?? detail,
+      state: kind === 'DETECTOR_DISABLED' ? 'switched off' : 'unavailable',
+    }));
+}

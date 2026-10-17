@@ -32,4 +32,13 @@ export default [
       "no-unused-vars": "warn",
     },
   },
+  {
+    // Node-run files: unit tests and build config
+    files: ["**/*.test.mjs", "vite.config.js", "eslint.config.js"],
+    languageOptions: {
+      ecmaVersion: "latest",
+      sourceType: "module",
+      globals: { ...globals.node },
+    },
+  },
 ];

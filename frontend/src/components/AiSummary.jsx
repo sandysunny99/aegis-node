@@ -1,165 +1,110 @@
-import { useState, useEffect } from 'react';
-import { getAnalysis, analyseDataset, getLlmProviders } from '../api';
+import { useCallback, useEffect, useState } from 'react';
+import { analyseDataset, getAnalysis, getLlmProviders } from '../api';
+import Button from '../ui/Button';
+import Card from '../ui/Card';
+import Icon from '../ui/Icon';
+import Skeleton from '../ui/Skeleton';
+
+/** "Resource not found" is how api.js reports a 404: here it means "no analysis yet". */
+const isNotFound = (err) => /not found|404/i.test(err?.message ?? '');
 
 export default function AiSummary({ datasetId }) {
   const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [collapsed, setCollapsed] = useState(false);
+  const [state, setState] = useState('loading'); // loading | empty | ready | error
+  const [error, setError] = useState('');
   const [providers, setProviders] = useState([]);
-  
   const [llmMode, setLlmMode] = useState('auto');
   const [selectedProvider, setSelectedProvider] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
 
-  useEffect(() => {
-    fetchData();
-    getLlmProviders().then(res => {
-      setProviders(res.providers || []);
-      if (res.providers?.length > 0) {
-        setSelectedProvider(res.providers[0].id);
-      }
-    }).catch(console.error);
+  const load = useCallback(() => {
+    setState('loading');
+    getAnalysis(datasetId)
+      .then((res) => { setData(res); setState('ready'); })
+      .catch((err) => {
+        if (isNotFound(err)) { setData(null); setState('empty'); }
+        else { setError(err.message); setState('error'); }
+      });
   }, [datasetId]);
 
-  const fetchData = () => {
-    setLoading(true);
-    getAnalysis(datasetId)
-      .then(res => {
-        setData(res);
-        setLoading(false);
+  useEffect(() => {
+    load();
+    getLlmProviders()
+      .then((res) => {
+        const configured = (res.providers || []).filter((p) => p.configured);
+        setProviders(configured);
+        if (configured.length > 0) setSelectedProvider(configured[0].id);
       })
-      .catch(err => {
-        // If 404, it just means no analysis yet, which is fine if we allow manual triggering
-        if (err.message.includes('404')) {
-          setData(null);
-        } else {
-          setError(err.message);
-        }
-        setLoading(false);
-      });
-  };
+      .catch(() => setProviders([]));
+  }, [load]);
 
   const handleAnalyze = async () => {
     setAnalyzing(true);
-    setError(null);
+    setError('');
     try {
       const res = await analyseDataset(datasetId, {
         llmMode,
         provider: llmMode === 'manual' ? selectedProvider : null,
       });
       setData(res);
+      setState('ready');
     } catch (err) {
       setError(err.message);
     }
     setAnalyzing(false);
   };
 
-  if (loading && !data) return <div className="card"><span className="spinner" /> Loading AI Security Analysis...</div>;
-
-  const a = data || {};
-  
-  // Format model name output
-  let displayProvider = a.final_provider || a.initial_provider || "Unknown";
-  let displayModel = a.model_name || "Unknown";
-  
-  if (a.model_name) {
-    if (a.model_name === "chain_exhausted") {
-       displayProvider = "Chain Exhausted";
-       displayModel = "None";
-    } else if (a.model_name.includes('/')) {
-       const parts = a.model_name.split('/');
-       displayProvider = a.final_provider || parts[0];
-       displayModel = parts.slice(1).join('/');
-    } else {
-       // Legacy or groq fallback
-       displayProvider = a.final_provider || (a.model_name.includes('gemini') ? 'gemini' : a.model_name.includes('llama') ? 'groq' : 'unknown');
-       displayModel = a.model_name;
-    }
-  }
-
   return (
-    <div className="card">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <div className="card-title" style={{ marginBottom: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{ color: 'var(--blue)' }}>🛡️</span> AI SECURITY & ANALYSIS
-          </div>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-3)' }}>LLM Analysis protected by native Guardrails.</div>
-        </div>
-        <button className="btn btn-ghost" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => setCollapsed(!collapsed)}>
-          {collapsed ? 'Expand ▼' : 'Collapse ▲'}
-        </button>
+    <Card title="AI analysis" id="ai-analysis">
+      <p className="card-sub card-lede">
+        An LLM explains the scanner findings. Raw cell values are never sent to it, and it cannot change the verdict.
+      </p>
+
+      <div className="field-row">
+        <fieldset className="field-row" style={{ border: 0, margin: 0, padding: 0 }}>
+          <legend className="visually-hidden">Provider selection</legend>
+          <label><input type="radio" name="llmMode" value="auto" checked={llmMode === 'auto'} onChange={() => setLlmMode('auto')} /> Automatic fallback chain</label>
+          <label><input type="radio" name="llmMode" value="manual" checked={llmMode === 'manual'} onChange={() => setLlmMode('manual')} disabled={providers.length === 0} /> Choose a provider</label>
+        </fieldset>
+        {llmMode === 'manual' && (
+          <label>
+            <span className="visually-hidden">Provider</span>
+            <select className="select" value={selectedProvider} onChange={(e) => setSelectedProvider(e.target.value)}>
+              {providers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </label>
+        )}
+        <Button variant="secondary" onClick={handleAnalyze} loading={analyzing}>
+          {data ? 'Analyse again' : 'Analyse findings'}
+        </Button>
       </div>
 
-      {!collapsed && (
-        <div style={{ marginTop: '1.5rem' }}>
-          
-          <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', alignItems: 'center', background: 'var(--bg-1)', padding: '1rem', borderRadius: 'var(--r-md)', border: '1px solid var(--border)' }}>
-            <div style={{ fontSize: '0.8rem', fontWeight: 600 }}>Mode:</div>
-            <label style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-              <input type="radio" name="llmMode" value="auto" checked={llmMode === 'auto'} onChange={() => setLlmMode('auto')} /> Auto
-            </label>
-            <label style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-              <input type="radio" name="llmMode" value="manual" checked={llmMode === 'manual'} onChange={() => setLlmMode('manual')} /> Manual
-            </label>
-            
-            {llmMode === 'manual' && (
-              <select value={selectedProvider} onChange={(e) => setSelectedProvider(e.target.value)} style={{ padding: '0.25rem', fontSize: '0.8rem', borderRadius: 'var(--r-sm)', background: 'var(--bg-2)', border: '1px solid var(--border)', color: 'var(--text-1)' }}>
-                {providers.filter(p => p.configured).map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            )}
-            <button className="btn btn-primary" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', marginLeft: 'auto' }} onClick={handleAnalyze} disabled={analyzing}>
-              {analyzing ? <><span className="spinner" /> Analyzing...</> : (data ? 'Re-Analyze' : 'Analyze Dataset')}
-            </button>
-          </div>
-          
-          {error && <div style={{ color: 'var(--rose)', marginBottom: '1rem', fontSize: '0.8rem' }}>Error: {error}</div>}
-
-          {data && (
-            <>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', background: 'var(--bg-1)', padding: '1rem', borderRadius: 'var(--r-md)', border: '1px solid var(--border)', fontFamily: 'var(--mono)', fontSize: '0.8rem', marginBottom: '1.5rem' }}>
-                 <div style={{ flex: 1, minWidth: '120px' }}><div style={{ color: 'var(--text-3)', fontSize: '0.65rem' }}>AI PROVIDER</div><strong style={{ color: 'var(--cyan)', textTransform: 'capitalize' }}>{displayProvider}</strong></div>
-                 <div style={{ flex: 1, minWidth: '120px' }}><div style={{ color: 'var(--text-3)', fontSize: '0.65rem' }}>MODEL</div><strong style={{ color: 'var(--text-1)' }}>{displayModel}</strong></div>
-                 <div style={{ flex: 1, minWidth: '120px' }}><div style={{ color: 'var(--text-3)', fontSize: '0.65rem' }}>AI STATUS</div><strong style={{ color: a.status === 'completed' ? 'var(--emerald)' : 'var(--amber)' }}>{a.status}</strong></div>
-              </div>
-
-              {/* Observability metadata */}
-              <div style={{ background: 'var(--bg-1)', padding: '1rem', borderRadius: 'var(--r-sm)', border: '1px solid var(--border)', marginBottom: '1.5rem', fontFamily: 'var(--mono)', fontSize: '0.75rem', display: 'grid', gap: '0.5rem' }}>
-                <div style={{ display: 'flex' }}><span style={{ width: '120px', color: 'var(--text-3)' }}>LLM Mode:</span> <span style={{ color: 'var(--text-2)' }}>{a.llm_mode || 'auto'}</span></div>
-                <div style={{ display: 'flex' }}><span style={{ width: '120px', color: 'var(--text-3)' }}>Initial / Final:</span> <span style={{ color: 'var(--text-2)' }}>{a.initial_provider || 'N/A'} ➔ {a.final_provider || 'N/A'}</span></div>
-                <div style={{ display: 'flex' }}><span style={{ width: '120px', color: 'var(--text-3)' }}>Provider Attempts:</span> <span style={{ color: 'var(--text-2)' }}>{(a.provider_attempts || []).join(', ') || 'N/A'}</span></div>
-                <div style={{ display: 'flex' }}><span style={{ width: '120px', color: 'var(--text-3)' }}>Fallback Used:</span> <strong style={{ color: a.fallback_used ? 'var(--amber)' : 'var(--emerald)' }}>{a.fallback_used ? `Yes (${a.fallback_reason})` : 'No'}</strong></div>
-              </div>
-
-              {a.guardrail_status && (
-                <div style={{ background: 'var(--bg-1)', padding: '1rem', borderRadius: 'var(--r-sm)', border: '1px solid var(--border)', marginBottom: '1.5rem', fontFamily: 'var(--mono)', fontSize: '0.75rem', display: 'grid', gap: '0.5rem' }}>
-                  <div style={{ display: 'flex' }}><span style={{ width: '100px', color: 'var(--text-3)' }}>Guardrail:</span> <strong style={{ color: a.guardrail_status === 'BLOCK' ? 'var(--rose)' : a.guardrail_status === 'RESTRICT' ? 'var(--amber)' : 'var(--emerald)' }}>{a.guardrail_status}</strong></div>
-                  <div style={{ display: 'flex' }}><span style={{ width: '100px', color: 'var(--text-3)' }}>LLM State:</span> <strong style={{ color: a.guardrail_status === 'BLOCK' ? 'var(--text-3)' : 'var(--cyan)' }}>{a.guardrail_status === 'BLOCK' ? 'BYPASSED' : 'INVOKED'}</strong></div>
-                  <div style={{ display: 'flex' }}><span style={{ width: '100px', color: 'var(--text-3)' }}>Context:</span> <span style={{ color: 'var(--text-2)' }}>{a.llm_context_mode || 'STANDARD'}</span></div>
-                </div>
-              )}
-
-              <div style={{ fontSize: '0.85rem', lineHeight: '1.5', color: 'var(--text-1)', whiteSpace: 'pre-wrap', background: 'var(--bg-2)', padding: '1.25rem', borderRadius: 'var(--r-sm)', border: '1px solid var(--border)' }}>
-                {a.summary || 'No narrative provided.'}
-              </div>
-            </>
-          )}
-
-          <div style={{ marginTop: '1.5rem', fontSize: '0.7rem', color: 'var(--text-3)', borderTop: '1px solid var(--border)', paddingTop: '0.75rem', display: 'flex', gap: '2rem' }}>
-            <div>
-              <strong>DETERMINISTIC AUTHORITY:</strong><br/>
-              Local scanner + verification
-            </div>
-            <div>
-              <strong>AI ROLE:</strong><br/>
-              Explanation / analyst assistance
-            </div>
-          </div>
+      {state === 'loading' && (
+        <div className="stack-sm" aria-label="Loading AI analysis">
+          <Skeleton width="60%" /><Skeleton width="90%" /><Skeleton width="75%" />
         </div>
       )}
-    </div>
+      {state === 'empty' && <p className="empty">No AI analysis has been run for this dataset yet.</p>}
+      {(state === 'error' || error) && (
+        <div className="error-banner error-banner--spaced" role="alert">
+          <Icon name="CircleAlert" />
+          <span>{error || 'The analysis could not be loaded.'}</span>
+          {state === 'error' && <Button variant="ghost" onClick={load}>Retry</Button>}
+        </div>
+      )}
+
+      {state === 'ready' && data && (
+        <div className="stack">
+          <dl className="kv">
+            <dt>Status</dt><dd>{data.status}</dd>
+            <dt>Provider</dt><dd>{data.final_provider || data.initial_provider || 'none'}{data.model_name ? ` (${data.model_name})` : ''}</dd>
+            <dt>Providers tried</dt><dd>{(data.provider_attempts || []).join(', ') || 'none'}</dd>
+            <dt>Fallback used</dt><dd>{data.fallback_used ? `yes (${data.fallback_reason})` : 'no'}</dd>
+            <dt>Prompt guardrail</dt><dd>{data.guardrail_status || 'not run'}{data.guardrail_status === 'BLOCK' ? ', LLM not called' : ''}</dd>
+          </dl>
+          <p className="prose">{data.summary || 'The provider returned no summary.'}</p>
+        </div>
+      )}
+    </Card>
   );
 }
