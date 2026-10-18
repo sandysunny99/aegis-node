@@ -12,6 +12,19 @@ export const TI_PROVIDERS = [
   { id: 'abuseipdb', name: 'AbuseIPDB', sends: 'public IPs found in the file', idle: 'No public IP addresses were found in the file, so nothing was looked up.' },
 ];
 
+const ANSWERED = new Set(['MATCH', 'NO_MATCH']);
+
+/**
+ * Per-lookup result state. Newer APIs send `result_state` (MATCH, NO_MATCH, TIMEOUT,
+ * RATE_LIMITED, UNAUTHORIZED, UNAVAILABLE, INVALID_RESPONSE, NOT_QUERIED); reports stored
+ * before that field existed are derived from `error_status` and `reputation`.
+ */
+export function lookupState(e) {
+  if (e.result_state) return e.result_state;
+  if (e.error_status) return String(e.error_status).toUpperCase();
+  return e.reputation === 'malicious' || e.reputation === 'suspicious' ? 'MATCH' : 'NO_MATCH';
+}
+
 /**
  * Per-provider state from a TIFusionReport.
  * state: match | no_match | unavailable | not_queried | disabled | not_run
@@ -25,19 +38,19 @@ export function providerStates(tiReport) {
     if (tiReport.status === 'disabled' || !(tiReport.providers_checked ?? []).includes(p.id)) {
       return { ...p, state: 'disabled', tone: 'neutral', text: 'Not configured on this server, so not queried.' };
     }
-    const evidence = (tiReport.evidence ?? []).filter((e) => e.provider === p.id);
+    const evidence = (tiReport.evidence ?? []).filter((e) => e.provider === p.id && lookupState(e) !== 'NOT_QUERIED');
     if (evidence.length === 0) {
       return { ...p, state: 'not_queried', tone: 'neutral', text: p.idle };
     }
-    const failed = evidence.filter((e) => e.error_status);
-    const answered = evidence.filter((e) => !e.error_status);
-    const hits = answered.filter((e) => e.reputation === 'malicious' || e.reputation === 'suspicious');
+    const failed = evidence.filter((e) => !ANSWERED.has(lookupState(e)));
+    const answered = evidence.filter((e) => ANSWERED.has(lookupState(e)));
+    const hits = answered.filter((e) => lookupState(e) === 'MATCH');
     if (hits.length > 0) {
       const worst = hits.some((e) => e.reputation === 'malicious') ? 'malicious' : 'suspicious';
       return { ...p, state: 'match', tone: 'breach', text: `Match: ${hits.length} of ${evidence.length} indicator${evidence.length === 1 ? '' : 's'} reported ${worst}.`, evidence };
     }
     if (answered.length === 0) {
-      const reasons = [...new Set(failed.map((e) => e.error_status))].join(', ');
+      const reasons = [...new Set(failed.map((e) => (e.error_status || lookupState(e)).toLowerCase().replace(/_/g, ' ')))].join(', ');
       return { ...p, state: 'unavailable', tone: 'risk', text: `Unavailable (${reasons}), so this provider gave no evidence.`, evidence };
     }
     const partial = failed.length > 0 ? ` ${failed.length} lookup${failed.length === 1 ? '' : 's'} failed.` : '';
@@ -54,6 +67,14 @@ export function providerStates(tiReport) {
 /** One-line state for the whole enrichment layer. */
 export function enrichmentSummary(tiReport) {
   if (!tiReport) return { word: 'Not completed', tone: 'risk', text: 'Threat-intelligence enrichment failed or did not run for this scan.' };
+  // Newer APIs send enrichment_status; older stored reports only have `status`.
+  switch (tiReport.enrichment_status) {
+    case 'DISABLED': return { word: 'Off', tone: 'neutral', text: 'No threat-intelligence provider is configured, so nothing was sent to a third party.' };
+    case 'COMPLETE': return { word: 'Completed', tone: 'neutral', text: 'Every lookup answered (match or no match).' };
+    case 'PARTIAL': return { word: 'Partial', tone: 'risk', text: 'Some lookups failed; the evidence below is incomplete.' };
+    case 'UNAVAILABLE': return { word: 'Unavailable', tone: 'risk', text: 'Every lookup failed; there is no enrichment evidence.' };
+    default: break;
+  }
   switch (tiReport.status) {
     case 'disabled': return { word: 'Off', tone: 'neutral', text: 'No threat-intelligence provider is configured, so nothing was sent to a third party.' };
     case 'active': return { word: 'Completed', tone: 'neutral', text: 'Every configured provider answered.' };

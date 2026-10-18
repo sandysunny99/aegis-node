@@ -44,6 +44,28 @@ test('a missing report means enrichment did not complete', () => {
   assert.equal(enrichmentSummary({ status: 'degraded' }).word, 'Partial');
 });
 
+test('newer reports: result_state decides, and NO_MATCH with reputation unknown is still a no-match', () => {
+  const s = byId(providerStates({
+    status: 'degraded',
+    enrichment_status: 'PARTIAL',
+    providers_checked: ['urlhaus', 'virustotal'],
+    evidence: [
+      { provider: 'urlhaus', reputation: 'unknown', result_state: 'NO_MATCH' },
+      { provider: 'virustotal', reputation: 'unknown', result_state: 'RATE_LIMITED', error_status: 'rate_limited' },
+    ],
+  }));
+  assert.equal(s.urlhaus.state, 'no_match');
+  assert.equal(s.virustotal.state, 'unavailable');
+  assert.match(s.virustotal.text, /rate limited/);
+  assert.equal(enrichmentSummary({ status: 'degraded', enrichment_status: 'PARTIAL' }).word, 'Partial');
+  assert.equal(enrichmentSummary({ status: 'error', enrichment_status: 'UNAVAILABLE' }).word, 'Unavailable');
+});
+
+test('NOT_QUERIED lookups do not count as checks', () => {
+  const s = byId(providerStates({ status: 'active', providers_checked: ['abuseipdb'], evidence: [{ provider: 'abuseipdb', result_state: 'NOT_QUERIED' }] }));
+  assert.equal(s.abuseipdb.state, 'not_queried');
+});
+
 test('AI layer distinguishes not run, blocked, completed and failed', () => {
   assert.equal(aiSummary(null).word, 'Not run');
   assert.equal(aiSummary({ status: 'failed', guardrail_status: 'BLOCK' }).word, 'Blocked');

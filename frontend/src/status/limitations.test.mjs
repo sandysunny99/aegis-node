@@ -34,3 +34,7 @@ test('detector codes name the detector and its state', () => {
 test('provider outages are described generically', () => {
   assert.match(describeLimitation('URLHAUS_UNAVAILABLE_TIMEOUT'), /Urlhaus was unavailable \(timeout\)/);
 });
+
+test('inspection-limit codes say what was not inspected', () => {
+  assert.match(describeLimitation('INSPECTION_LIMIT:xlsx_rows=10000'), /limit of 10000 workbook rows.*not inspected/);
+});

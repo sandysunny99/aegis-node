@@ -36,6 +36,7 @@ This keeps the following visibly different: a malicious finding, a clean local s
 ## Known backend semantics the UI reports as-is
 
 - URLhaus `not_found` arrives as `reputation: "benign"` (`enrichment._url_evidence`). The UI labels any `benign` as "No malicious match… not proof the data is safe". The mapping itself belongs to the detection thread (master brief B3).
+- **Forward-compatible (18 Oct):** the detection branch `integrate/core-audit` (not merged here) adds `evidence[].result_state`, `enrichment_status` and `INSPECTION_LIMIT:<limit>=<n>` limitation codes. `layers.js` prefers `result_state` and `enrichment_status` when present and falls back to `error_status` / `reputation` / `status` for older reports, so a NO_MATCH with reputation `unknown` still reads as a no-match and NOT_QUERIED lookups never count as checks. `limitations.js` describes the inspection-limit codes. Covered by 3 new unit tests.
 - The API has no stale or cache-age field, so the UI shows no "stale" state. It will once the provider contract adds one.
 
 ## Waiting on another thread

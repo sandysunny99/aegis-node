@@ -20,6 +20,12 @@ export function describeLimitation(code) {
   }
   if (code === 'VT_UNAVAILABLE_AUTH') return 'VirusTotal rejected the API key, so no hash reputation was checked.';
   if (String(code).startsWith('VT_UNAVAILABLE_')) return `VirusTotal was unavailable (${detail ?? code.slice(15).toLowerCase()}).`;
+  if (kind === 'INSPECTION_LIMIT') {
+    // e.g. INSPECTION_LIMIT:xlsx_rows=10000
+    const [what, value] = String(detail ?? '').split('=');
+    const label = { xlsx_rows: 'workbook rows', xlsx_count: 'workbook rows counted' }[what] ?? what;
+    return `The scanner stopped at its limit of ${value ?? '?'} ${label}, so content beyond it was not inspected.`;
+  }
   if (code === 'CLAMAV_UNAVAILABLE') return 'The antivirus engine was not reachable, so no signature scan ran on this file.';
   if (code === 'PARTIAL_DATASET_SCAN') return 'Only part of the dataset was inspected, so findings may be incomplete.';
   if (code === 'PARSER_LIMITATION') return 'The file could not be fully parsed, so some values were not checked cell by cell.';
