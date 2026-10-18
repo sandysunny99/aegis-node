@@ -76,7 +76,16 @@ class ScanReportRecord(Base):
     __tablename__ = "scan_reports"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    # Unguessable id used by the history API; the integer id stays internal.
+    public_id: Mapped[str] = mapped_column(
+        String(32), unique=True, index=True, nullable=False, default=new_public_id
+    )
     dataset_id: Mapped[int] = mapped_column(Integer, ForeignKey("datasets.id"), nullable=False, index=True)
+    # When the scan began; scanned_at below is when it finished. Null on rows older than history.
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Deployment profile and AV provider in effect for this scan (null on older rows).
+    profile: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    av_provider: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
     # ClamAV stage
     clamav_status: Mapped[str] = mapped_column(String(64), nullable=False, default="skipped")
@@ -271,3 +280,35 @@ class RemediationRecord(Base):
             f"status={self.remediation_status!r} reduction={self.threat_reduction_percent:.1f}%>"
         )
 
+
+class ScanEventRecord(Base):
+    """
+    Append-only history event (upload, scan steps, threat intel, AI, remediation).
+
+    Written only by services/history.py through the normal API flow; never updated.
+    `detail_json` holds small, bounded facts (states, counts, verdicts), never file
+    contents, original filenames, secrets or raw provider payloads.
+    """
+
+    __tablename__ = "scan_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    dataset_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("datasets.id"), nullable=True, index=True)
+    scan_report_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("scan_reports.id"), nullable=True, index=True
+    )
+    event_type: Mapped[str] = mapped_column(String(48), nullable=False, index=True)
+    outcome: Mapped[str] = mapped_column(String(16), nullable=False, default="ok")  # ok | failed
+    detail_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, server_default=func.now(), index=True
+    )
+
+    scan_report: Mapped["ScanReportRecord | None"] = relationship("ScanReportRecord")
+
+    @property
+    def detail(self) -> dict:
+        try:
+            return json.loads(self.detail_json)
+        except ValueError:
+            return {}

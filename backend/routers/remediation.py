@@ -29,6 +29,7 @@ from limiter import limiter  # noqa: E402
 from models import RemediationRecord, ScanReportRecord  # noqa: E402
 from schemas import RemediationActionSchema, RemediationResponse  # noqa: E402
 from services.file_service import file_service  # noqa: E402
+from services.history import record_event  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 from utils.auth import require_api_key  # noqa: E402
 from utils.datasets import get_dataset_by_public_id  # noqa: E402
@@ -144,15 +145,26 @@ async def remediate_dataset(
     except (FileNotFoundError, ValueError) as err:
         raise HTTPException(status_code=404, detail="Source file unavailable for remediation.") from err
 
+    record_event(db, "REMEDIATION_STARTED", dataset=record, scan=latest_report,
+                 original_findings=orig_findings_count)
+    db.commit()
+
+    def _failed(stage: str) -> None:
+        db.rollback()
+        record_event(db, "REMEDIATION_FAILED", dataset=record, outcome="failed", stage=stage)
+        db.commit()
+
     # Catch sanitization exceptions, log full traceback, return generic 500 error
     try:
         san_result = await run_in_threadpool(sanitize_file, orig_source_path, record.file_format)
     except Exception as exc:
         logger.exception("Unexpected exception during dataset remediation for dataset_id=%s", dataset_id)
+        _failed("sanitize")
         raise HTTPException(status_code=500, detail="Internal server error during remediation execution.") from exc
 
     if san_result.error:
         logger.error("Sanitization process failed for dataset %s: %s", dataset_id, san_result.error)
+        _failed("sanitize")
         raise HTTPException(status_code=500, detail="Sanitization failed. Check server logs for details.")
 
     # 4. Save sanitized file to data/sanitized/ (Original remains untouched)
@@ -166,6 +178,7 @@ async def remediate_dataset(
         rescan_result = await run_in_threadpool(run_scan, str(san_meta["file_path"]))
     except Exception as exc:
         logger.exception("Re-scan failed during remediation for dataset_id=%s", dataset_id)
+        _failed("verification_rescan")
         raise HTTPException(status_code=500, detail="Verification re-scan failed during remediation.") from exc
 
     san_risk = rescan_result.risk_score
@@ -230,6 +243,10 @@ async def remediate_dataset(
     )
     db.add(rescan_report)
     db.flush()
+    record_event(db, "VERIFICATION_SCAN_COMPLETED", dataset=record, scan=rescan_report,
+                 verdict=rescan_result.verdict, coverage_status=rescan_result.coverage_status,
+                 limitations=rescan_result.verification_limitations,
+                 sanitized_sha256=san_meta["sha256_hash"])
 
     # Build action dicts
     action_dicts = [
@@ -272,6 +289,9 @@ async def remediate_dataset(
         rescan_report_id=rescan_report.id,
     )
     db.add(db_record)
+    record_event(db, "REMEDIATION_COMPLETED", dataset=record, scan=rescan_report,
+                 remediation_status=rem_status, dataset_status=record.status,
+                 changes=san_result.changes_count, remaining_actionable=len(remaining_actionable))
     db.commit()
     db.refresh(db_record)
 

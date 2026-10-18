@@ -6,6 +6,7 @@ Endpoints: upload, scan, status, report.
 import json
 import logging
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 # Ensure scanner/ package directory is resolvable from the router
@@ -28,6 +29,7 @@ from schemas import (  # noqa: E402
     TIFusionReport,
 )
 from services.file_service import file_service  # noqa: E402
+from services.history import detector_events, record_event, threat_intel_events  # noqa: E402
 from services.threat_intelligence.enrichment import enrich_scan_result  # noqa: E402
 from sqlalchemy import update  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
@@ -108,6 +110,9 @@ async def upload_dataset(
         status="uploaded",
     )
     db.add(record)
+    db.flush()
+    record_event(db, "UPLOAD_ACCEPTED", dataset=record, file_format=record.file_format,
+                 file_size_bytes=record.file_size_bytes, sha256=record.sha256_hash)
     db.commit()
     db.refresh(record)
 
@@ -161,6 +166,7 @@ def _scan_response(record: DatasetRecord, report: ScanReportRecord) -> ScanResul
 
     return ScanResultResponse(
         scan_id=report.id,
+        scan_public_id=report.public_id,
         dataset_id=record.public_id,
         clamav_status=report.clamav_status,
         clamav_virus_name=report.clamav_virus_name,
@@ -216,6 +222,11 @@ async def scan_dataset(
     if updated.rowcount == 0:
         raise HTTPException(status_code=409, detail="Scan already in progress for this dataset. Please wait.")
     db.refresh(record)
+    started_at = datetime.now(UTC)
+    av_provider = (settings.av_provider or "").strip().lower()
+    started = record_event(db, "SCAN_STARTED", dataset=record, profile=settings.aegis_profile,
+                           av_provider=av_provider)
+    db.commit()
 
     # C2: everything after the status flip is guarded, so a failure anywhere
     # (scan, TI, quarantine move, DB write) can never leave the row in 'scanning'.
@@ -245,8 +256,19 @@ async def scan_dataset(
             findings_json=json.dumps(result.to_findings_dicts()),
             verification_limitations_json=json.dumps(result.verification_limitations),
             threat_intel_json=ti_report.model_dump_json() if ti_report else _DISABLED_TI_JSON,
+            started_at=started_at,
+            profile=settings.aegis_profile,
+            av_provider=av_provider,
         )
         db.add(report)
+        db.flush()
+        started.scan_report_id = report.id  # link the start event once the report exists
+        detector_events(db, record, report, result)
+        threat_intel_events(db, record, report, ti_report)
+        record_event(db, "SCAN_COMPLETED", dataset=record, scan=report, verdict=result.verdict,
+                     dataset_status=record.status, coverage_status=result.coverage_status,
+                     enrichment_status=ti_report.enrichment_status if ti_report else "DISABLED",
+                     limitations=result.verification_limitations, duration_ms=result.scan_duration_ms)
         db.commit()
         db.refresh(report)
     except Exception as exc:
@@ -254,6 +276,8 @@ async def scan_dataset(
         record = db.get(DatasetRecord, record.id)
         # Keep the last good state if there was one; otherwise mark the failure.
         record.status = previous_status if record.latest_scan_report else "error"
+        record_event(db, "SCAN_FAILED", dataset=record, outcome="failed",
+                     error=type(exc).__name__, dataset_status=record.status)
         db.commit()
         logger.exception("Scan failed for dataset %s", record.public_id)
         raise HTTPException(status_code=500, detail="Scan execution failed") from exc

@@ -54,6 +54,7 @@ def create_all_tables() -> None:
     _migrate_dataset_public_id()
     _migrate_remediation_integrity_method()
     _migrate_remediation_rescan_report()
+    _migrate_scan_history_columns()
 
 
 def _migrate_dataset_public_id() -> None:
@@ -112,3 +113,31 @@ def _migrate_remediation_rescan_report() -> None:
                 "ALTER TABLE remediations ADD COLUMN rescan_report_id INTEGER "
                 "REFERENCES scan_reports(id)"
             ))
+
+
+def _migrate_scan_history_columns() -> None:
+    """
+    Add scan_reports.public_id / started_at / profile / av_provider to older databases
+    and backfill a public_id per existing row. scan_events is a new table (create_all).
+    Existing rows are never rewritten otherwise.
+    """
+    import uuid
+
+    from sqlalchemy import inspect, text
+
+    columns = {c["name"] for c in inspect(engine).get_columns("scan_reports")}
+    with engine.begin() as conn:
+        if "public_id" not in columns:
+            conn.execute(text("ALTER TABLE scan_reports ADD COLUMN public_id VARCHAR(32)"))
+        for name, ddl in (("started_at", "TIMESTAMP"), ("profile", "VARCHAR(16)"), ("av_provider", "VARCHAR(32)")):
+            if name not in columns:
+                conn.execute(text(f"ALTER TABLE scan_reports ADD COLUMN {name} {ddl}"))
+        missing = conn.execute(text("SELECT id FROM scan_reports WHERE public_id IS NULL")).all()
+        for (row_id,) in missing:
+            conn.execute(
+                text("UPDATE scan_reports SET public_id = :pid WHERE id = :id"),
+                {"pid": uuid.uuid4().hex, "id": row_id},
+            )
+        conn.execute(text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS ix_scan_reports_public_id ON scan_reports (public_id)"
+        ))

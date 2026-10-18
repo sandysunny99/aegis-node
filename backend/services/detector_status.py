@@ -29,6 +29,26 @@ def _configured(flag: bool, key: str | None) -> bool:
     return bool(flag) and bool((key or "").strip())
 
 
+def persistence_info() -> dict:
+    """
+    Whether scan history survives a restart in this deployment. SQLite counts as
+    durable only in the full profile and outside /tmp (Render free has no disk);
+    an external database URL counts as durable.
+    """
+    db_url = settings.database_url or ""
+    kind = db_url.split(":", 1)[0].split("+", 1)[0] if db_url else "unknown"
+    if kind == "sqlite":
+        on_tmp = "/tmp/" in db_url or db_url.endswith("/tmp")
+        durable = settings.aegis_profile == "full" and not on_tmp
+        note = ("SQLite on a persistent volume" if durable
+                else "SQLite on temporary storage: history is lost when the server restarts")
+    elif kind == "unknown":
+        durable, note = False, "database not configured"
+    else:
+        durable, note = True, "external database"
+    return {"durable": durable, "database": kind, "note": note}
+
+
 def detector_report(av_status: dict) -> dict:
     """Profile, per-detector state, storage and database persistence."""
     av_provider = av_status.get("av_provider", "unknown")
@@ -64,8 +84,7 @@ def detector_report(av_status: dict) -> dict:
                True, lookup="public IPs only"),
     ]
 
-    db_url = settings.database_url or ""
-    db_kind = db_url.split(":", 1)[0] if db_url else "unknown"
+    persistence = persistence_info()
     return {
         "profile": settings.aegis_profile,
         "detectors": detectors,
@@ -75,7 +94,7 @@ def detector_report(av_status: dict) -> dict:
             "persistent": bool(settings.r2_enabled) or settings.aegis_profile == "full",
         },
         "database": {
-            "kind": db_kind,
-            "persistent": db_kind != "sqlite" or settings.aegis_profile == "full",
+            "kind": persistence["database"],
+            "persistent": persistence["durable"],
         },
     }

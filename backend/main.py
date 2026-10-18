@@ -19,6 +19,7 @@ from routers.analysis import router as analysis_router
 from routers.datasets import router as datasets_router
 from routers.history import router as history_router
 from routers.remediation import router as remediation_router
+from routers.scans import router as scans_router
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -92,6 +93,7 @@ app.include_router(datasets_router)
 app.include_router(analysis_router)
 app.include_router(history_router)
 app.include_router(remediation_router)
+app.include_router(scans_router)
 
 
 # ─── Health Check ─────────────────────────────────────────────────────────────

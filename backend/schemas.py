@@ -92,6 +92,9 @@ class ThreatFinding(BaseModel):
 class ScanResultResponse(BaseModel):
     """Returned after a scan is completed."""
     scan_id: int
+    scan_public_id: str | None = Field(
+        default=None, description="Unguessable scan id used by the history API (/api/v1/scans/{id})"
+    )
     dataset_id: str = Field(..., description="Unguessable public dataset identifier (uuid4 hex)")
     clamav_status: str
     clamav_virus_name: str | None

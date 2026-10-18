@@ -21,6 +21,7 @@ from fastapi.concurrency import run_in_threadpool  # noqa: E402
 from limiter import limiter  # noqa: E402
 from models import LlmAnalysisRecord  # noqa: E402
 from schemas import AnalysisResponse  # noqa: E402
+from services.history import record_event  # noqa: E402
 from services.llm_service import analyse  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 from utils.auth import require_api_key  # noqa: E402
@@ -55,6 +56,8 @@ async def analyse_dataset(
     # Use latest scan report findings
     latest_report = record.latest_scan_report
     findings = latest_report.findings
+    record_event(db, "AI_ANALYSIS_STARTED", dataset=record, scan=latest_report, llm_mode=llm_mode)
+    db.commit()
 
     # F1: Run blocking LLM network call in threadpool - keeps event loop free
     result = await run_in_threadpool(
@@ -104,6 +107,11 @@ async def analyse_dataset(
         provider_attempts_json=json.dumps(result.provider_attempts),
     )
     db.add(db_record)
+    record_event(db, "AI_ANALYSIS_COMPLETED", dataset=record, scan=latest_report,
+                 outcome="ok" if result.status == "completed" else "failed",
+                 status=result.status, llm_invoked=result.llm_invoked, llm_bypassed=result.llm_bypassed,
+                 guardrail_status=result.guardrail_status, guardrail_score=result.guardrail_score,
+                 provider=result.final_provider or None, fallback_used=result.fallback_used)
     db.commit()
     db.refresh(db_record)
 
