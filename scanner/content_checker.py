@@ -13,6 +13,7 @@ import io
 import json
 import logging
 import re
+import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -29,7 +30,10 @@ logger = logging.getLogger(__name__)
 
 # ─── Maximum rows inspected per dataset ─────────────────────────────────────
 _MAX_ROWS = 10_000
-_XLSX_MAX_MB = 50  # Hard cap for Excel files (openpyxl loads full sheet)
+_XLSX_MAX_MB = 50  # Hard cap for Excel files (compressed size)
+_XLSX_MAX_UNCOMPRESSED_BYTES = 500 * 1024 * 1024  # zip-bomb guard: total declared size
+_XLSX_MAX_ENTRIES = 10_000                         # zip-bomb guard: archive members
+_XLSX_COUNT_MAX_ROWS = 1_000_000                   # rows counted for coverage (not inspected)
 _TXT_MAX_LINES = 10_000
 _SAMPLE_MAX_LEN = 200  # max chars shown in finding sample
 
@@ -309,10 +313,86 @@ def _count_nonblank_lines(path: Path) -> int | None:
         return None
 
 
-def _load_dataframe(path: Path) -> tuple[pd.DataFrame | None, int | None, str, str | None]:
+def _xlsx_archive_error(path: Path) -> str | None:
+    """Refuse malformed archives and ones that would decompress past the budget (zip bombs)."""
+    try:
+        with zipfile.ZipFile(path) as zf:
+            infos = zf.infolist()
+            if len(infos) > _XLSX_MAX_ENTRIES:
+                return f"XLSX_DECOMPRESSION_LIMIT: {len(infos)} archive entries (max {_XLSX_MAX_ENTRIES})"
+            declared = sum(i.file_size for i in infos)
+            if declared > _XLSX_MAX_UNCOMPRESSED_BYTES:
+                return (f"XLSX_DECOMPRESSION_LIMIT: {declared} bytes uncompressed "
+                        f"(max {_XLSX_MAX_UNCOMPRESSED_BYTES})")
+    except zipfile.BadZipFile as exc:
+        return f"Failed to parse dataset: not a valid XLSX archive ({exc})"
+    return None
+
+
+def _load_xlsx(path: Path, limits: list[str] | None) -> tuple[pd.DataFrame | None, int | None, str | None]:
+    """
+    Read every worksheet (read-only, values only, formulas never evaluated) up to
+    _MAX_ROWS data rows in total, and count all data rows up to _XLSX_COUNT_MAX_ROWS so
+    coverage is exact. Columns are named "<sheet>:<header>" so findings say where.
+    """
+    from openpyxl import load_workbook
+
+    error = _xlsx_archive_error(path)
+    if error:
+        return None, None, error
+
+    frames: list[pd.DataFrame] = []
+    inspected = 0
+    total = 0
+    count_capped = False
+    # data_only=False returns formula text (e.g. '=CMD(...)') instead of the cached result;
+    # with data_only=True a formula Excel never calculated reads as empty and is missed.
+    # openpyxl never evaluates formulas either way.
+    wb = load_workbook(filename=str(path), read_only=True, data_only=False)
+    try:
+        for ws in wb.worksheets:
+            headers: list[str] = []
+            rows: list[list[str]] = []
+            for i, row in enumerate(ws.iter_rows(values_only=True)):
+                if i == 0:
+                    headers = [str(c) if c is not None else f"col_{j}" for j, c in enumerate(row)]
+                    continue
+                if all(c is None for c in row):
+                    continue
+                total += 1
+                if inspected < _MAX_ROWS:
+                    rows.append([str(c) if c is not None else "" for c in row])
+                    inspected += 1
+                if total >= _XLSX_COUNT_MAX_ROWS:
+                    count_capped = True
+                    break
+            if rows:
+                width = max(len(headers), max(len(r) for r in rows))
+                names = [f"{ws.title}:{h}" for h in headers] + [
+                    f"{ws.title}:col_{j}" for j in range(len(headers), width)]
+                frames.append(pd.DataFrame([r + [""] * (width - len(r)) for r in rows], columns=names[:width]))
+            if count_capped:
+                break
+    finally:
+        wb.close()
+
+    if limits is not None:
+        if total > inspected:
+            limits.append(f"INSPECTION_LIMIT:xlsx_rows={_MAX_ROWS}")
+        if count_capped:
+            limits.append(f"INSPECTION_LIMIT:xlsx_count={_XLSX_COUNT_MAX_ROWS}")
+    df = pd.concat(frames, ignore_index=True, sort=False).fillna("") if frames else pd.DataFrame()
+    # A capped count is a lower bound: report one more row than seen so coverage stays PARTIAL.
+    return df, (total + 1 if count_capped else total), None
+
+
+def _load_dataframe(
+    path: Path, limits: list[str] | None = None
+) -> tuple[pd.DataFrame | None, int | None, str, str | None]:
     """
     Load dataset into DataFrame with accurate row/element totals.
-    Returns (df, rows_total, coverage_type, error_msg).
+    Returns (df, rows_total, coverage_type, error_msg). Inspection limits that were hit
+    are appended to `limits` when given.
     Supports CSV, Parquet, JSON, JSONL, XLSX (openpyxl read_only), TXT.
     """
     suffix = path.suffix.lower()
@@ -394,25 +474,9 @@ def _load_dataframe(path: Path) -> tuple[pd.DataFrame | None, int | None, str, s
             size_mb = path.stat().st_size / (1024 * 1024)
             if size_mb > _XLSX_MAX_MB:
                 return None, None, coverage_type, f"Excel file too large ({size_mb:.1f} MB). Max {_XLSX_MAX_MB} MB for XLSX scanning."
-            try:
-                from openpyxl import load_workbook
-                wb = load_workbook(filename=str(path), read_only=True, data_only=True)
-                ws = wb.active
-                rows = []
-                headers: list[str] = []
-                for i, row in enumerate(ws.iter_rows(values_only=True)):
-                    if i == 0:
-                        headers = [str(c) if c is not None else f"col_{j}" for j, c in enumerate(row)]
-                    else:
-                        rows.append([str(c) if c is not None else "" for c in row])
-                        if len(rows) >= _MAX_ROWS:
-                            break
-                wb.close()
-                df = pd.DataFrame(rows, columns=headers[:len(rows[0])] if rows else headers)
-                rows_total = len(df)
-            except ImportError:
-                df = pd.read_excel(path, engine="openpyxl", nrows=_MAX_ROWS, dtype=str)
-                rows_total = len(df)
+            df, rows_total, xlsx_error = _load_xlsx(path, limits)
+            if xlsx_error:
+                return None, None, coverage_type, xlsx_error
 
         elif suffix == ".txt":
             coverage_type = "BYTE_BASED"
@@ -546,9 +610,11 @@ def check_file(file_path: str) -> ContentCheckResult:
         )
 
     # ── Stage 1: Dataframe content inspection ─────────────────────────────────
-    df, rows_total, coverage_type, error = _load_dataframe(path)
+    inspection_limits: list[str] = []
+    df, rows_total, coverage_type, error = _load_dataframe(path, inspection_limits)
     result.coverage_type = coverage_type
     result.rows_total = rows_total
+    result.limitations.extend(inspection_limits)
 
     if error:
         result.error = error
