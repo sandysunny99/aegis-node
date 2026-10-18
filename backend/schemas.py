@@ -54,6 +54,13 @@ class NormalizedTIEvidence(BaseModel):
     reference_url: str | None = None
     raw_metadata: dict[str, Any] = Field(default_factory=dict)
     error_status: str | None = None
+    result_state: str = Field(
+        default="NOT_QUERIED",
+        description=(
+            "MATCH | NO_MATCH | UNAVAILABLE | UNAUTHORIZED | RATE_LIMITED | TIMEOUT | "
+            "INVALID_RESPONSE | NOT_QUERIED. NO_MATCH is not proof that the indicator is safe."
+        ),
+    )
 
 class TIFusionReport(BaseModel):
     status: str = Field(..., description="active | degraded | disabled | error")
@@ -62,6 +69,13 @@ class TIFusionReport(BaseModel):
     providers_checked: list[str] = []
     limitations: list[str] = []
     conflicts: list[str] = []
+    enrichment_status: str = Field(
+        default="DISABLED",
+        description=(
+            "COMPLETE (every lookup answered) | PARTIAL (some failed) | UNAVAILABLE (all failed) | "
+            "DISABLED (no provider configured). Separate from the local verdict."
+        ),
+    )
 
 class ThreatFinding(BaseModel):
     """A single threat or anomaly detected during scanning."""
@@ -93,6 +107,10 @@ class ScanResultResponse(BaseModel):
     verification_limitations: list[str] = Field(default_factory=list)
     findings: list[ThreatFinding]
     threat_intel: TIFusionReport | None = None
+    enrichment_status: str = Field(
+        default="DISABLED",
+        description="Threat-intel enrichment state; never changes `verdict`. See TIFusionReport.",
+    )
 
 
 # ─── Dataset Status ───────────────────────────────────────────────────────────

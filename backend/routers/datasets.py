@@ -176,6 +176,7 @@ def _scan_response(record: DatasetRecord, report: ScanReportRecord) -> ScanResul
         verification_limitations=report.verification_limitations,
         findings=[ThreatFinding(**f) for f in report.findings],
         threat_intel=ti_out,
+        enrichment_status=ti_out.enrichment_status if ti_out else "DISABLED",
     )
 
 

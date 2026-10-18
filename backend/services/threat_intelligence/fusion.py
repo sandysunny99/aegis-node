@@ -89,8 +89,16 @@ def fuse_reports(evidence_list: list[NormalizedTIEvidence], providers_checked: l
         else:
             status = "degraded"
 
+    if error_count == 0:
+        enrichment_status = "COMPLETE"
+    elif error_count < len(evidence_list):
+        enrichment_status = "PARTIAL"
+    else:
+        enrichment_status = "UNAVAILABLE"
+
     return TIFusionReport(
         status=status,
+        enrichment_status=enrichment_status,
         evidence=evidence_list,
         evidence_strength=strength,
         providers_checked=providers_checked,

@@ -40,6 +40,24 @@ _IPV4_RE = re.compile(rb"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 
 _UNAVAILABLE = ("timeout", "rate_limited", "provider_error", "unauthorized", "forbidden")
 
+# Adapter status strings -> one documented result state (docs/THREAT_INTEL_API_CONTRACT.md).
+_RESULT_STATES = {
+    "malicious": "MATCH",
+    "suspicious": "MATCH",
+    "clean": "NO_MATCH",
+    "not_found": "NO_MATCH",
+    "timeout": "TIMEOUT",
+    "rate_limited": "RATE_LIMITED",
+    "unauthorized": "UNAUTHORIZED",
+    "forbidden": "UNAUTHORIZED",
+    "provider_error": "UNAVAILABLE",
+}
+
+
+def result_state(status: str) -> str:
+    """Normalised state for an adapter status; anything unexpected is INVALID_RESPONSE."""
+    return _RESULT_STATES.get(status, "INVALID_RESPONSE")
+
 
 @dataclass
 class Indicators:
@@ -84,7 +102,9 @@ def _url_evidence(url: str, intel) -> NormalizedTIEvidence:
     elif intel.status == "malicious":
         rep, sev = "malicious", "critical"
     elif intel.status in ("clean", "not_found"):
-        rep, sev = "benign", "informational"
+        # No URLhaus entry (or an entry with no known threat) says nothing about safety:
+        # it is a no-match, never "benign" (Phase B3).
+        rep, sev = "unknown", "informational"
     else:
         rep, sev = "unknown", "low"
     return NormalizedTIEvidence(
@@ -97,6 +117,7 @@ def _url_evidence(url: str, intel) -> NormalizedTIEvidence:
         category=intel.tags[0] if intel.tags else None,
         reference_url=intel.raw_reference,
         error_status=error_status,
+        result_state=result_state(intel.status),
     )
 
 
@@ -122,6 +143,7 @@ def _ip_evidence(ip: str, intel) -> NormalizedTIEvidence:
         category=None,
         reference_url=intel.raw_reference,
         error_status=error_status,
+        result_state=result_state(intel.status),
     )
 
 
@@ -176,6 +198,7 @@ async def _virustotal_evidence(result) -> NormalizedTIEvidence | None:
         category=vt_intel.tags[0] if vt_intel.tags else None,
         reference_url=vt_intel.raw_reference,
         error_status=error_status,
+        result_state=result_state(status),
     )
 
 
