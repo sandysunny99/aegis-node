@@ -44,9 +44,9 @@ Oracle VM + DNS + `SCAN_GATEWAY_TOKEN`/`CLAMAV_API_TOKEN`; optional keys: VirusT
 |---|---|---|---|---|---|---|
 | AbuseIPDB | yes (Individual plan) | public IP | 1,000 IP checks & reports/day; 100 block checks/day; 5 blacklist downloads/day | commercial terms not stated on the pricing page | lookups are not published | https://www.abuseipdb.com/pricing |
 | VirusTotal | yes (Community key) | SHA-256 | 500 requests/day, 4/minute | "must not be used in commercial products or services" | uploads are shared with the community; hash lookups do not upload | https://docs.virustotal.com/reference/public-vs-premium-api |
-| MalwareBazaar | yes, Auth-Key | SHA-256, TLSH | fair use; numbers not verified | free under fair use (abuse.ch terms); commercial not verified | — | abuse.ch pages did not resolve on 17 Oct 2026 (DNS failure from two networks); not verified |
-| ThreatFox | yes, Auth-Key | hash, domain, IP:port, URL | not verified | as above | — | not verified (same DNS failure) |
-| URLhaus (existing) | yes, Auth-Key | URL | not verified | as above | — | not verified (same DNS failure) |
+| MalwareBazaar | yes; `Auth-Key` header required (free from auth.abuse.ch) | `query=get_info&hash=` (SHA-256, MD5 or SHA-1) to `https://mb-api.abuse.ch/api/v1/` | "Query Volume Limits" for non-commercial use; **no number published** | free for authenticated users "for not-for-profit purposes"; commercial or for-profit use "may require a paid subscription" via Spamhaus | the same API also offers sample download and upload; Aegis must use `get_info` only | https://bazaar.abuse.ch/api/ and https://abuse.ch/terms-of-use/ (effective 4 Nov 2025), read 18 Oct 2026 |
+| ThreatFox | yes; `Auth-Key` required | `search_ioc` (IP, IP:port, domain, URL; `exact_match`), `search_hash` (MD5/SHA-256) to `https://threatfox-api.abuse.ch/api/v1/` | as above; no number published; expired IOCs are not returned by the API | as above | — | https://threatfox.abuse.ch/api/, read 18 Oct 2026 |
+| URLhaus (existing) | yes; `Auth-Key` | URL | as above | as above | — | abuse.ch terms above; API page not re-read |
 | AlienVault OTX | yes, API key | IP, domain, URL, hash | not verified (docs page is a JavaScript app and did not render) | not verified | pulses are community-published | https://otx.alienvault.com/api (not readable) |
 | PhishTank | lookup API + local database | URL | rate-limited; HTTP 509 when exceeded; limit shown in headers; descriptive User-Agent required | terms hosted by Cisco, not read | — | https://phishtank.org/api_info.php |
 | Shodan | "All Shodan accounts come with a free API plan"; free credits not stated | public IP | free credits not verified; cheapest paid plan $69/month, 10,000 query credits | commercial use listed only for paid plans | — | https://account.shodan.io/billing |
@@ -65,8 +65,8 @@ Oracle VM + DNS + `SCAN_GATEWAY_TOKEN`/`CLAMAV_API_TOKEN`; optional keys: VirusT
 | URLhaus | **KEEP** | Frozen, lookup-only; fix the `not_found → benign` mapping only with your OK |
 | AbuseIPDB | **KEEP** | 1,000 checks/day covers 5 IPs per scan; add IPv6 extraction later |
 | VirusTotal | **KEEP, academic only** | Hash lookup only; the terms forbid commercial products, so it must stay off in any commercial deployment |
-| MalwareBazaar | **IMPLEMENT** (after terms check) | Hash and TLSH lookups add family/tag evidence; same Auth-Key as URLhaus |
-| ThreatFox | **IMPLEMENT** (after terms check) | IOC lookups for the URLs/IPs/hashes Aegis already extracts |
+| MalwareBazaar | **IMPLEMENT**, academic / not-for-profit only | `get_info` by SHA-256 adds family, tags and first-seen for known samples; never `get_file` or upload. Same Auth-Key as URLhaus. TLSH deferred (no tested use case) |
+| ThreatFox | **IMPLEMENT**, academic / not-for-profit only | `search_ioc` with `exact_match: true` for the URLs/IPs Aegis already extracts, `search_hash` for the file SHA-256; no submissions |
 | CIRCL hashlookup | **IMPLEMENT** | Known-good annotation that may never downgrade a local malicious verdict; no key |
 | AlienVault OTX | **DEFER** | Overlaps URLhaus/ThreatFox/AbuseIPDB; limits and terms not verifiable today |
 | PhishTank | **DEFER** | Useful only if URL evidence is common in your datasets; registration status not verified |
@@ -77,4 +77,8 @@ Oracle VM + DNS + `SCAN_GATEWAY_TOKEN`/`CLAMAV_API_TOKEN`; optional keys: VirusT
 | Joe Sandbox | **MANUAL_ONLY** | Terms not verifiable; community analyses may be public |
 | Hunter.io | **EXCLUDE** | Email discovery for outreach; extracting emails from user datasets would be people-search |
 
-Before any IMPLEMENT row is built: re-read the abuse.ch terms and API pages when they resolve again, and record the numbers here.
+abuse.ch recheck (18 Oct 2026): the terms and the MalwareBazaar and ThreatFox API pages were read. They do not publish numeric quotas, so per-scan lookups stay capped (5 URLs, 5 IPs, 1 hash) and cached.
+
+**Network finding:** on this laptop's network the default DNS resolver returns no answer for `abuse.ch` and every subdomain (including `urlhaus-api.abuse.ch`, `mb-api.abuse.ch`, `threatfox-api.abuse.ch`), while Cloudflare's resolver (1.1.1.1) answers normally. So any abuse.ch lookup run from this network (local Docker included) ends as `provider_error` → `UNAVAILABLE`, which Aegis already reports honestly. Render and the Oracle VM use their own resolvers and are expected to work; confirm with one lookup after deployment.
+
+Approval asked for: the three IMPLEMENT rows above (MalwareBazaar, ThreatFox, CIRCL hashlookup), each lookup-only, off by default, behind its own flag, with the Phase 8 provider test list.
