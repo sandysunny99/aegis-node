@@ -1,3 +1,4 @@
+import { useDetectors } from '../data/useDetectors';
 import { enrichmentSummary, providerStates } from '../status/layers';
 import Card from '../ui/Card';
 import Table from '../ui/Table';
@@ -8,6 +9,7 @@ const REPUTATION_TEXT = {
   suspicious: 'Suspicious',
   benign: 'No malicious match',
   unknown: 'Unknown (no match)',
+  known_good: 'Known file (annotation)',
 };
 
 /**
@@ -16,7 +18,7 @@ const REPUTATION_TEXT = {
  */
 export default function ThreatIntelligence({ tiReport }) {
   const summary = enrichmentSummary(tiReport);
-  const providers = providerStates(tiReport);
+  const providers = providerStates(tiReport, useDetectors());
   const evidence = tiReport?.evidence ?? [];
 
   return (

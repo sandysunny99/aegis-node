@@ -6,11 +6,31 @@
  * Everything here is derived from fields the API returns; nothing is assumed.
  */
 
-export const TI_PROVIDERS = [
-  { id: 'virustotal', name: 'VirusTotal', sends: 'file SHA-256', idle: 'No result recorded for the file hash.' },
-  { id: 'urlhaus', name: 'URLhaus', sends: 'URLs found in the file', idle: 'No URLs were found in the file, so nothing was looked up.' },
-  { id: 'abuseipdb', name: 'AbuseIPDB', sends: 'public IPs found in the file', idle: 'No public IP addresses were found in the file, so nothing was looked up.' },
-];
+// Display text for providers the UI knows. The list itself comes from GET /health/detectors
+// (layer L4) when the server has it; older servers fall back to the original three.
+const PROVIDER_TEXT = {
+  virustotal: { name: 'VirusTotal', sends: 'file SHA-256', idle: 'No result recorded for the file hash.' },
+  urlhaus: { name: 'URLhaus', sends: 'URLs found in the file', idle: 'No URLs were found in the file, so nothing was looked up.' },
+  abuseipdb: { name: 'AbuseIPDB', sends: 'public IPs found in the file', idle: 'No public IP addresses were found in the file, so nothing was looked up.' },
+  malwarebazaar: { name: 'MalwareBazaar', sends: 'file SHA-256', idle: 'No result recorded for the file hash.' },
+  threatfox: { name: 'ThreatFox', sends: 'file SHA-256 and URLs found in the file', idle: 'No result recorded for the file hash or URLs.' },
+  circl_hashlookup: { name: 'CIRCL hashlookup', sends: 'file SHA-256', idle: 'No result recorded for the file hash.' },
+};
+const LEGACY_PROVIDERS = ['virustotal', 'urlhaus', 'abuseipdb'];
+
+/** Provider rows: the server catalogue (or the legacy three) plus any provider named in the report. */
+export function providerList(tiReport, catalog) {
+  const fromCatalog = catalog?.filter((d) => d.layer === 'L4');
+  const rows = fromCatalog ? fromCatalog.map((d) => ({ id: d.name, lookup: d.lookup })) : LEGACY_PROVIDERS.map((id) => ({ id }));
+  const named = [...(tiReport?.providers_checked ?? []), ...(tiReport?.evidence ?? []).map((e) => e.provider)];
+  for (const id of named) if (id && !rows.some((r) => r.id === id)) rows.push({ id });
+  return rows.map(({ id, lookup }) => ({
+    id,
+    name: PROVIDER_TEXT[id]?.name ?? id,
+    sends: PROVIDER_TEXT[id]?.sends ?? lookup ?? 'indicators found in the file',
+    idle: PROVIDER_TEXT[id]?.idle ?? 'No indicator in the file was looked up.',
+  }));
+}
 
 const ANSWERED = new Set(['MATCH', 'NO_MATCH']);
 
@@ -27,11 +47,12 @@ export function lookupState(e) {
 
 /**
  * Per-provider state from a TIFusionReport.
- * state: match | no_match | unavailable | not_queried | disabled | not_run
+ * state: match | known | no_match | unavailable | not_queried | disabled | not_run
+ * `catalog` is GET /health/detectors `detectors` (null on servers without it).
  * tone:  breach | risk | clean | neutral (for the status chip colour)
  */
-export function providerStates(tiReport) {
-  return TI_PROVIDERS.map((p) => {
+export function providerStates(tiReport, catalog = null) {
+  return providerList(tiReport, catalog).map((p) => {
     if (!tiReport) {
       return { ...p, state: 'not_run', tone: 'risk', text: 'Enrichment did not complete for this scan.' };
     }
@@ -44,10 +65,15 @@ export function providerStates(tiReport) {
     }
     const failed = evidence.filter((e) => !ANSWERED.has(lookupState(e)));
     const answered = evidence.filter((e) => ANSWERED.has(lookupState(e)));
-    const hits = answered.filter((e) => lookupState(e) === 'MATCH');
+    // CIRCL's "known_good" is an annotation that fusion ignores: never a hit, never a verdict.
+    const known = answered.filter((e) => e.reputation === 'known_good');
+    const hits = answered.filter((e) => lookupState(e) === 'MATCH' && e.reputation !== 'known_good');
     if (hits.length > 0) {
       const worst = hits.some((e) => e.reputation === 'malicious') ? 'malicious' : 'suspicious';
       return { ...p, state: 'match', tone: 'breach', text: `Match: ${hits.length} of ${evidence.length} indicator${evidence.length === 1 ? '' : 's'} reported ${worst}.`, evidence };
+    }
+    if (known.length > 0) {
+      return { ...p, state: 'known', tone: 'neutral', text: `Known file (annotation): the hash is listed as known software. This is not a verdict and does not show the data is safe.`, evidence };
     }
     if (answered.length === 0) {
       const reasons = [...new Set(failed.map((e) => (e.error_status || lookupState(e)).toLowerCase().replace(/_/g, ' ')))].join(', ');

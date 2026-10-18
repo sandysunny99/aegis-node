@@ -66,6 +66,44 @@ test('NOT_QUERIED lookups do not count as checks', () => {
   assert.equal(s.abuseipdb.state, 'not_queried');
 });
 
+const catalog = [
+  { name: 'clamav', layer: 'L1', enabled: true },
+  { name: 'virustotal', layer: 'L4', enabled: true, lookup: 'sha256 only' },
+  { name: 'urlhaus', layer: 'L4', enabled: false, lookup: 'URLs only' },
+  { name: 'abuseipdb', layer: 'L4', enabled: false, lookup: 'public IPs only' },
+  { name: 'malwarebazaar', layer: 'L4', enabled: false, lookup: 'sha256 only' },
+  { name: 'threatfox', layer: 'L4', enabled: false, lookup: 'sha256 and extracted URLs' },
+  { name: 'circl_hashlookup', layer: 'L4', enabled: true, lookup: 'sha256 only; known-good annotation' },
+  { name: 'newfeed', layer: 'L4', enabled: false, lookup: 'domains only' },
+];
+
+test('providers come from the server catalogue, not a fixed three', () => {
+  const ids = providerStates({ status: 'active', providers_checked: ['virustotal'], evidence: [] }, catalog).map((p) => p.id);
+  assert.deepEqual(ids, ['virustotal', 'urlhaus', 'abuseipdb', 'malwarebazaar', 'threatfox', 'circl_hashlookup', 'newfeed']);
+  const s = byId(providerStates({ status: 'active', providers_checked: [], evidence: [] }, catalog));
+  assert.equal(s.newfeed.name, 'newfeed');
+  assert.equal(s.newfeed.sends, 'domains only');
+  assert.equal(s.malwarebazaar.name, 'MalwareBazaar');
+});
+
+test('without a catalogue, providers named in the report are still listed', () => {
+  const ids = providerStates({ status: 'active', providers_checked: ['threatfox'], evidence: [] }).map((p) => p.id);
+  assert.ok(ids.includes('threatfox'));
+  assert.ok(ids.includes('virustotal'));
+});
+
+test('a CIRCL known-file match is an annotation, never a malicious match or a clean verdict', () => {
+  const s = byId(providerStates({
+    status: 'active',
+    providers_checked: ['circl_hashlookup'],
+    evidence: [{ provider: 'circl_hashlookup', reputation: 'known_good', result_state: 'MATCH' }],
+  }, catalog));
+  assert.equal(s.circl_hashlookup.state, 'known');
+  assert.equal(s.circl_hashlookup.tone, 'neutral');
+  assert.match(s.circl_hashlookup.text, /Known file \(annotation\)/);
+  assert.match(s.circl_hashlookup.text, /not a verdict/);
+});
+
 test('AI layer distinguishes not run, blocked, completed and failed', () => {
   assert.equal(aiSummary(null).word, 'Not run');
   assert.equal(aiSummary({ status: 'failed', guardrail_status: 'BLOCK' }).word, 'Blocked');
