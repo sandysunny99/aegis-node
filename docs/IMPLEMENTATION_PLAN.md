@@ -37,3 +37,16 @@ Frontend (`integrate/core-audit` still has the old UI): it reads `/health` only 
 1. B1 MZ false positive → 2. B2 XLSX coverage → 3. B3 URLhaus mapping + truth table + enrichment status → 4. Scan history events and API (contract posted for the UI thread) → 5. Static-analysis safeguards and sandbox design → 6. Gate 4: recheck abuse.ch, stop for provider approval.
 
 Not in this thread: Bastion UI changes (History page), any push or deploy, Oracle VM creation, Render configuration changes.
+
+## Progress (18 Oct 2026)
+
+| Gate | State | Commits | Evidence |
+|---|---|---|---|
+| 1 Baseline | done | `12c5f80` | table above |
+| 2 Core accuracy | done | `991a10c` MZ/PE, `ceb743f` XLSX, `aa9e8f1` URLhaus + enrichment status | MAL-002 high 23/23 → 0/23 on the synthetic set; XLSX 10000/10000 FULL → 10000/29959 PARTIAL; truth table `docs/architecture/VERDICT_TRUTH_TABLE.md` |
+| 3 History and sandbox | done (backend) | `4d8072d` history, `0bb17d2` sandbox | `docs/SCAN_HISTORY_API.md`; Docker: history survives restart, hardened container passes the E2E set; History page is the UI thread's |
+| 4 Provider matrix | **waiting for approval** | `bac64a9` | `docs/THREAT_INTELLIGENCE_PROVIDER_AUDIT.md` |
+| 5 Oracle integration | blocked on the VM (owner) | `9fd35e9` | `docs/ORACLE_CLAMAV_DEPLOYMENT.md` |
+| 6 Release | not started | — | nothing pushed |
+
+Backend suite: 541 passed; ruff clean; `docker compose config` valid. Open decisions: PostgreSQL driver (A6), provider matrix.
