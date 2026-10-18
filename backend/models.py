@@ -10,10 +10,32 @@ from datetime import UTC, datetime
 from database import Base
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.types import TypeDecorator
 
 
 def _now() -> datetime:
     return datetime.now(UTC)
+
+
+class UTCDateTime(TypeDecorator):
+    """
+    DateTime that always comes back timezone-aware in UTC. SQLite stores no offset, so
+    naive values would reach the API without one and browsers would read UTC as local
+    time. Values are written in UTC; naive values read back are UTC.
+    """
+
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is not None and value.tzinfo is not None:
+            value = value.astimezone(UTC)
+        return value
+
+    def process_result_value(self, value, dialect):
+        if value is not None and value.tzinfo is None:
+            value = value.replace(tzinfo=UTC)
+        return value
 
 
 def new_public_id() -> str:
@@ -39,7 +61,7 @@ class DatasetRecord(Base):
     file_format: Mapped[str] = mapped_column(String(32), nullable=False, default="unknown")
     object_key: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     storage_backend: Mapped[str] = mapped_column(String(32), nullable=False, default="local")
-    uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, server_default=func.now())
+    uploaded_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=_now, server_default=func.now())
     # status: uploaded | scanning | clean | clean_limited | incomplete | quarantined | suspicious
     #         | remediated | partial_remediated | remediated_unverified | error
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="uploaded")
@@ -82,7 +104,7 @@ class ScanReportRecord(Base):
     )
     dataset_id: Mapped[int] = mapped_column(Integer, ForeignKey("datasets.id"), nullable=False, index=True)
     # When the scan began; scanned_at below is when it finished. Null on rows older than history.
-    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
     # Deployment profile and AV provider in effect for this scan (null on older rows).
     profile: Mapped[str | None] = mapped_column(String(16), nullable=True)
     av_provider: Mapped[str | None] = mapped_column(String(32), nullable=True)
@@ -102,7 +124,7 @@ class ScanReportRecord(Base):
 
     # Timing
     scan_duration_ms: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    scanned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, server_default=func.now())
+    scanned_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=_now, server_default=func.now())
 
     # Full findings and limitations stored as JSON text
     findings_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
@@ -191,7 +213,7 @@ class LlmAnalysisRecord(Base):
     completion_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     error_message: Mapped[str] = mapped_column(Text, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=_now, server_default=func.now())
 
     dataset: Mapped["DatasetRecord"] = relationship("DatasetRecord", back_populates="llm_analyses")
 
@@ -242,7 +264,7 @@ class RemediationRecord(Base):
     # Secure one-time download token — generated on remediation, required for download
     download_token: Mapped[str] = mapped_column(String(64), unique=True, nullable=True, index=True)
     # Timestamp when the token was generated — used to enforce expiry (default 60 min)
-    token_created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+    token_created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=True, default=None)
     used: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     remediation_status: Mapped[str] = mapped_column(String(32), nullable=False, default="completed")  # completed | partial | unverified | failed
@@ -266,7 +288,7 @@ class RemediationRecord(Base):
     rescan_report_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("scan_reports.id"), nullable=True)
     rescan_report: Mapped["ScanReportRecord | None"] = relationship("ScanReportRecord")
 
-    remediated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, server_default=func.now())
+    remediated_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=_now, server_default=func.now())
 
     dataset: Mapped["DatasetRecord"] = relationship("DatasetRecord", back_populates="remediations")
 
@@ -301,7 +323,7 @@ class ScanEventRecord(Base):
     outcome: Mapped[str] = mapped_column(String(16), nullable=False, default="ok")  # ok | failed
     detail_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_now, server_default=func.now(), index=True
+        UTCDateTime(), default=_now, server_default=func.now(), index=True
     )
 
     scan_report: Mapped["ScanReportRecord | None"] = relationship("ScanReportRecord")
