@@ -1,12 +1,12 @@
 import {
-  ArrowDown, ArrowUp, ArrowUpDown, Circle, CircleAlert, CircleDashed, CircleHelp, FileText, LayoutGrid,
+  ArrowDown, ArrowUp, ArrowUpDown, Circle, CircleAlert, CircleDashed, CircleHelp, FileText, History, LayoutGrid,
   LoaderCircle, Menu, Moon, PanelLeftClose, PanelLeftOpen, RefreshCw, Search, ShieldAlert, ShieldCheck,
   ShieldHalf, ShieldMinus, ShieldQuestion, ShieldX, SlidersHorizontal, Sun, Table2, Upload, X,
 } from 'lucide-react';
 
 // Only icons the UI actually uses are imported, so the bundle stays small.
 const ICONS = {
-  ArrowDown, ArrowUp, ArrowUpDown, Circle, CircleAlert, CircleDashed, CircleHelp, FileText, LayoutGrid,
+  ArrowDown, ArrowUp, ArrowUpDown, Circle, CircleAlert, CircleDashed, CircleHelp, FileText, History, LayoutGrid,
   LoaderCircle, Menu, Moon, PanelLeftClose, PanelLeftOpen, RefreshCw, Search, ShieldAlert, ShieldCheck,
   ShieldHalf, ShieldMinus, ShieldQuestion, ShieldX, SlidersHorizontal, Sun, Table2, Upload, X,
 };

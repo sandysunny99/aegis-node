@@ -199,6 +199,11 @@ export default function ScanPage({ health, onScanned }) {
               <Button variant="secondary" onClick={() => { window.location.hash = `/app/datasets/${uploadResult.dataset_id}`; }}>
                 Open dataset page
               </Button>
+              {/^[0-9a-f]{32}$/.test(scanResult?.scan_public_id ?? '') && (
+                <Button variant="ghost" onClick={() => { window.location.hash = `/app/history/${scanResult.scan_public_id}`; }}>
+                  View scan timeline
+                </Button>
+              )}
               <Button variant="ghost" onClick={reset}>Scan another dataset</Button>
             </>
           )}

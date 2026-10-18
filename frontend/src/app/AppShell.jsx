@@ -7,6 +7,7 @@ const NAV = [
   { href: '#/app', label: 'Overview', icon: 'LayoutGrid', match: (r) => r === '/app' },
   { href: '#/app/scan', label: 'Scan a dataset', icon: 'Upload', match: (r) => r === '/app/scan' },
   { href: '#/app/datasets', label: 'Datasets', icon: 'Table2', match: (r) => r.startsWith('/app/datasets') },
+  { href: '#/app/history', label: 'History', icon: 'History', match: (r) => r.startsWith('/app/history') },
   { href: '#/app/settings', label: 'Settings', icon: 'SlidersHorizontal', match: (r) => r === '/app/settings' },
 ];
 

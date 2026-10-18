@@ -222,11 +222,25 @@
 .timeline__dot { grid-row: span 2; width: 12px; height: 11px; margin-top: 5px; clip-path: var(--hex); background: var(--accent); }
 .timeline time { font-size: var(--step--1); }
 
+/* ── Scan history ──────────────────────────────────────────────────────── */
+#history .notice, #detail-history .notice { margin-bottom: var(--space-4); }
+.pager { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-4); }
+.scan-list { list-style: none; margin: 0 0 var(--space-5); padding: 0; display: grid; gap: var(--space-2); }
+.scan-list li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
+.scan-list__heading { font-size: var(--step-0); margin-bottom: var(--space-3); }
+.timeline__title { font-weight: 500; }
+.timeline__text { color: var(--text-secondary); }
+.timeline__item--risk .timeline__dot { background: var(--status-risk); }
+.timeline__item--risk .timeline__title { color: var(--status-risk); }
+.timeline__item--breach .timeline__dot { background: var(--status-breach); }
+.timeline__item--breach .timeline__title { color: var(--status-breach); }
+
 .settings { display: grid; gap: var(--space-6); max-width: 760px; }
 
 /* ── Result layers: local scan / threat intel / AI, kept visibly separate ── */
 .layers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-6); }
 .layer { display: grid; align-content: start; gap: var(--space-3); min-width: 0; }
+.layer > .status-pill { justify-self: start; }
 .layer + .layer { padding-left: var(--space-6); border-left: 1px solid var(--line); }
 .layer__title { font-size: var(--step-0); }
 .layer__title .muted { display: block; font-weight: 400; margin-top: 2px; }

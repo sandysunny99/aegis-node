@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { getDatasetStatus, getRemediationReport, getScanReport, scanDataset } from '../api';
+import { getDatasetEvents, getDatasetScans, getDatasetStatus, getRemediationReport, getScanReport, scanDataset } from '../api';
 import AiSummary from '../components/AiSummary';
+import EventTimeline from '../components/EventTimeline';
 import RemediationCard from '../components/RemediationCard';
 import ResultLayers from '../components/ResultLayers';
 import ThreatIntelligence from '../components/ThreatIntelligence';
 import { formatBytes, formatTime } from '../data/useDatasets';
+import { historyMissing, verdictStatus } from '../status/history';
 import { describeLimitation, detectorGaps } from '../status/limitations';
 import { VERDICT_TO_STATUS, effectiveStatus, statusToPlate } from '../status/statusToPlate';
 import { plainDashes } from '../status/text';
@@ -13,6 +15,7 @@ import Card from '../ui/Card';
 import Icon from '../ui/Icon';
 import Skeleton from '../ui/Skeleton';
 import StatusPill from '../ui/StatusPill';
+import { PersistenceNotice } from './HistoryPage';
 
 const isNotFound = (err) => /not found|404/i.test(err?.message ?? '');
 const SEVERITIES = ['critical', 'high', 'medium', 'low', 'info'];
@@ -64,6 +67,65 @@ function Timeline({ dataset, report, remediation }) {
         </li>
       ))}
     </ol>
+  );
+}
+
+/**
+ * Every scan of this dataset and its full event timeline (GET /datasets/{id}/scans and /events).
+ * Older servers lack those routes: fall back to the latest-scan summary and say so.
+ */
+function DatasetHistory({ id, dataset, report, remediation }) {
+  const [data, setData] = useState(null);
+  const [state, setState] = useState('loading'); // loading | ready | absent | error
+  const [error, setError] = useState('');
+
+  const load = useCallback(() => {
+    setState('loading');
+    Promise.all([getDatasetScans(id), getDatasetEvents(id)])
+      .then(([scans, events]) => { setData({ scans, events }); setState('ready'); })
+      .catch((err) => {
+        if (historyMissing(err)) setState('absent');
+        else { setError(err.message); setState('error'); }
+      });
+  }, [id]);
+
+  useEffect(() => { load(); }, [load]);
+
+  return (
+    <Card title="Scan history" id="detail-history">
+      {state === 'loading' && <div className="stack-sm" aria-label="Loading scan history">{[0, 1, 2].map((i) => <Skeleton key={i} height="32px" />)}</div>}
+      {state === 'error' && (
+        <div className="error-banner" role="alert">
+          <Icon name="CircleAlert" />
+          <span>Scan history could not be loaded: {error}</span>
+          <Button variant="ghost" onClick={load}>Retry</Button>
+        </div>
+      )}
+      {state === 'absent' && (
+        <>
+          <Timeline dataset={dataset} report={report} remediation={remediation} />
+          <p className="muted table-note">This server keeps only the latest scan report per dataset.</p>
+        </>
+      )}
+      {state === 'ready' && (
+        <>
+          <PersistenceNotice persistence={data.scans.persistence} />
+          {data.scans.items.length > 0 && (
+            <ul className="scan-list" aria-label="Scans of this dataset, newest first">
+              {data.scans.items.map((s) => (
+                <li key={s.scan_id}>
+                  <StatusPill status={verdictStatus(s.verdict)} size="sm" />
+                  <a href={`#/app/history/${s.scan_id}`}>{formatTime(s.completed_at)}</a>
+                  {s.target === 'sanitized' && <span className="muted">verification re-scan</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+          <h3 className="scan-list__heading">Timeline</h3>
+          <EventTimeline events={data.events.items} linkScans />
+        </>
+      )}
+    </Card>
   );
 }
 
@@ -192,10 +254,13 @@ export default function DatasetDetail({ id, onChanged }) {
           {report && <RemediationCard datasetId={id} scanResult={report} />}
         </div>
         <aside className="detail__side">
-          <Card title="Scan history" id="detail-history">
-            <Timeline dataset={dataset} report={report} remediation={remediation} />
-            <p className="muted table-note">The API keeps the latest scan report per dataset.</p>
-          </Card>
+          <DatasetHistory
+            key={`${report?.scanned_at}-${remediation?.remediated_at}`}
+            id={id}
+            dataset={dataset}
+            report={report}
+            remediation={remediation}
+          />
           <Card title="Metadata" id="detail-meta">
             <dl className="kv">
               <dt>Size</dt><dd>{formatBytes(dataset.file_size_bytes)}</dd>

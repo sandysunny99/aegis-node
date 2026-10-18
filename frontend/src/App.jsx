@@ -3,7 +3,9 @@ import { healthCheck } from './api';
 import AppShell from './app/AppShell';
 import DatasetDetail from './app/DatasetDetail';
 import DatasetsPage from './app/DatasetsPage';
+import HistoryPage from './app/HistoryPage';
 import Overview from './app/Overview';
+import ScanDetailPage from './app/ScanDetailPage';
 import ScanPage from './app/ScanPage';
 import SettingsPage from './app/SettingsPage';
 import { useDatasets } from './data/useDatasets';
@@ -25,6 +27,7 @@ function AppRoutes({ route, theme, onThemeChange }) {
   useEffect(reloadHealth, [reloadHealth]);
 
   const detailMatch = route.match(/^\/app\/datasets\/([0-9a-f]{32})$/);
+  const scanMatch = route.match(/^\/app\/history\/([0-9a-f]{32})$/);
   let crumbs;
   let page;
 
@@ -33,6 +36,12 @@ function AppRoutes({ route, theme, onThemeChange }) {
     const known = datasets.items.find((d) => d.dataset_id === id);
     crumbs = [APP_HOME, { label: 'Datasets', href: '#/app/datasets' }, { label: known?.original_filename ?? id.slice(0, 12) }];
     page = <DatasetDetail key={id} id={id} onChanged={datasets.reload} />;
+  } else if (scanMatch) {
+    crumbs = [APP_HOME, { label: 'History', href: '#/app/history' }, { label: scanMatch[1].slice(0, 12) }];
+    page = <ScanDetailPage key={scanMatch[1]} id={scanMatch[1]} datasets={datasets.items} />;
+  } else if (route === '/app/history') {
+    crumbs = [APP_HOME, { label: 'History' }];
+    page = <HistoryPage datasets={datasets.items} />;
   } else if (route === '/app/datasets') {
     crumbs = [APP_HOME, { label: 'Datasets' }];
     page = <DatasetsPage datasets={datasets.items} state={datasets.state} error={datasets.error} reload={datasets.reload} />;
