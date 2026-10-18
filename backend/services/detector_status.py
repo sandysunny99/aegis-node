@@ -10,6 +10,7 @@ from config import settings
 
 from scanner import heuristics
 from scanner.yara_scanner import yara_scanner
+from services.threat_intelligence import lookups
 
 
 def _entry(name: str, layer: str, enabled: bool, available: bool,
@@ -82,6 +83,12 @@ def detector_report(av_status: dict) -> dict:
                True, lookup="URLs only"),
         _entry("abuseipdb", "L4", _configured(settings.enable_abuseipdb, settings.abuseipdb_api_key),
                True, lookup="public IPs only"),
+        _entry("malwarebazaar", "L4", "malwarebazaar" in lookups.enabled_providers(), True,
+               lookup="sha256 only"),
+        _entry("threatfox", "L4", "threatfox" in lookups.enabled_providers(), True,
+               lookup="sha256 and extracted URLs"),
+        _entry("circl_hashlookup", "L4", "circl_hashlookup" in lookups.enabled_providers(), True,
+               lookup="sha256 only; known-good annotation"),
     ]
 
     persistence = persistence_info()

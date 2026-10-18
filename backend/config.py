@@ -188,6 +188,15 @@ class Settings(BaseSettings):
     abuseipdb_api_key: str | None = None
     abuseipdb_timeout_seconds: float = 5.0
 
+    # Lookup-only providers approved 18 Oct 2026 (off by default). MalwareBazaar and
+    # ThreatFox use the abuse.ch Auth-Key (falls back to URLHAUS_AUTH_KEY);
+    # abuse.ch terms allow free use for not-for-profit purposes only.
+    abusech_auth_key: str | None = None
+    enable_malwarebazaar: bool = False
+    enable_threatfox: bool = False
+    enable_circl_hashlookup: bool = False
+    threat_intel_timeout_seconds: float = 8.0
+
     enable_phishtank: bool = False
     enable_shodan: bool = False
     enable_hibp: bool = False
@@ -313,6 +322,8 @@ class Settings(BaseSettings):
             self.virustotal_api_key = _read_secret_file("VIRUSTOTAL_API_KEY")
         if not self.urlhaus_auth_key:
             self.urlhaus_auth_key = _read_secret_file("URLHAUS_AUTH_KEY")
+        if not self.abusech_auth_key:
+            self.abusech_auth_key = _read_secret_file("ABUSECH_AUTH_KEY")
         if not self.abuseipdb_api_key:
             self.abuseipdb_api_key = _read_secret_file("ABUSEIPDB_API_KEY")
         if not self.api_key:

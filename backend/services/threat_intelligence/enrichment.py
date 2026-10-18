@@ -22,6 +22,7 @@ from config import settings
 from fastapi.concurrency import run_in_threadpool
 from schemas import NormalizedTIEvidence, TIFusionReport
 
+from services.threat_intelligence import lookups
 from services.threat_intelligence.abuseipdb import lookup_ip
 from services.threat_intelligence.fusion import evaluate_local_verdict_conflict, fuse_reports
 from services.threat_intelligence.urlhaus import lookup_url
@@ -156,7 +157,7 @@ def configured_providers() -> list[str]:
         providers.append("urlhaus")
     if settings.enable_abuseipdb and (settings.abuseipdb_api_key or "").strip():
         providers.append("abuseipdb")
-    return providers
+    return providers + lookups.enabled_providers()
 
 
 async def _virustotal_evidence(result) -> NormalizedTIEvidence | None:
@@ -214,6 +215,16 @@ async def _fused_report(result, file_path: str, evidence: list[NormalizedTIEvide
         intel = await lookup_ip(ip)
         if intel.status not in ("unconfigured", "invalid_ip"):
             evidence.append(_ip_evidence(ip, intel))
+
+    # Approved lookup-only providers (each returns None when disabled).
+    for lookup in (lookups.malwarebazaar_hash, lookups.threatfox_hash, lookups.circl_hash):
+        ev = await lookup(result.sha256_hash)
+        if ev is not None:
+            evidence.append(ev)
+    for url in indicators.urls:
+        ev = await lookups.threatfox_url(url)
+        if ev is not None:
+            evidence.append(ev)
 
     report = fuse_reports(evidence, configured_providers())
     conflict = evaluate_local_verdict_conflict(result.verdict, report)
