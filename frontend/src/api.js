@@ -23,7 +23,8 @@ function friendlyError(status, fallback) {
     return fallback || 'Access denied.';
   }
   if (status === 401) return 'This server requires an API key; the public web UI cannot use it.';
-  if (status === 413) return 'File is too large. Maximum upload size is 50 MB.';
+  // The limit is per deployment (25 MB on Render), so use the server's own message.
+  if (status === 413) return fallback && !/^HTTP \d+/.test(fallback) && fallback !== 'Request Entity Too Large' ? fallback : 'File is too large for this server. Settings shows the upload limit.';
   if (status === 415) return 'Unsupported file type. Please upload a CSV, JSON, JSONL, Parquet, XLSX, or TXT file.';
   if (status === 404) return 'Resource not found. Please refresh and try again.';
   if (status === 500) return 'An internal server error occurred. Check that the backend is running.';
@@ -233,6 +234,10 @@ export async function getDatasetScans(datasetId) {
 
 export async function getDatasetEvents(datasetId) {
   return request(`/api/v1/datasets/${datasetId}/events`);
+}
+
+export async function getDetectors() {
+  return request('/health/detectors');
 }
 
 export async function healthCheck() {

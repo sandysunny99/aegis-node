@@ -144,6 +144,7 @@ export default function ScanPage({ health, onScanned }) {
 
       <Card title="Dataset file" id="dataset-file">
         <UploadZone
+          maxMb={health?.max_file_size_mb ?? null}
           file={selectingFile ? file : null}
           onFile={(newFile) => {
             setFile(newFile);

@@ -11,7 +11,7 @@ function formatBytes(b) {
   return `${(b / 1024 ** 2).toFixed(1)} MB`;
 }
 
-export default function UploadZone({ file, onFile, onClear, uploadProgress }) {
+export default function UploadZone({ file, onFile, onClear, uploadProgress, maxMb = null }) {
   const [dragging, setDragging] = useState(false);
   const [rejected, setRejected] = useState('');
   const inputRef = useRef(null);
@@ -85,7 +85,7 @@ export default function UploadZone({ file, onFile, onClear, uploadProgress }) {
         />
         <Icon name="Upload" size={28} className="upload-icon" />
         <p className="upload-label">{dragging ? 'Drop the dataset to select it' : 'Drop a dataset here, or choose a file'}</p>
-        <p className="upload-hint" id="upload-hint">{FORMATS}, up to the server's size limit</p>
+        <p className="upload-hint" id="upload-hint">{FORMATS}, {maxMb ? `up to ${maxMb} MB` : "up to the server's size limit"}</p>
       </div>
       {rejected && (
         <div className="error-banner" role="alert">

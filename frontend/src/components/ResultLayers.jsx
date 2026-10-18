@@ -1,4 +1,5 @@
 import { detectorGaps } from '../status/limitations';
+import { useDetectors } from '../data/useDetectors';
 import { aiSummary, coverageSummary, enrichmentSummary, providerStates } from '../status/layers';
 import { VERDICT_TO_STATUS } from '../status/statusToPlate';
 import Card from '../ui/Card';
@@ -14,7 +15,7 @@ export default function ResultLayers({ report, analysis }) {
   const coverage = coverageSummary(report);
   const gaps = detectorGaps(report.verification_limitations);
   const ti = enrichmentSummary(report.threat_intel);
-  const providers = providerStates(report.threat_intel);
+  const providers = providerStates(report.threat_intel, useDetectors());
   const ai = analysis === undefined ? null : aiSummary(analysis);
 
   return (
