@@ -12,6 +12,7 @@ from database import create_all_tables
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from limiter import limiter
@@ -49,7 +50,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "default-src 'self'; "
             "script-src 'self' https://challenges.cloudflare.com; "
             "frame-src 'self' https://challenges.cloudflare.com; "
-            "style-src 'self' 'unsafe-inline'; "
+            # IBM Plex is served by Google Fonts (CSS from googleapis, files from gstatic)
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com; "
             "img-src 'self' data:; "
             "connect-src 'self' https://challenges.cloudflare.com"
         )
@@ -76,6 +79,10 @@ app.add_middleware(SlowAPIMiddleware)
 
 # ─── Security Headers (A-006) ───────────────────────────────────────────────────
 app.add_middleware(SecurityHeadersMiddleware)
+
+# ─── Compression ─────────────────────────────────────────────────────────────
+# The built UI ships ~360 KB of JavaScript; gzip brings the landing bundle to ~116 KB.
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 # ─── CORS ────────────────────────────────────────────────────────────────────
 # Configured via settings.allowed_origins ("*" in dev, domain list in production)
@@ -216,10 +223,14 @@ _STATIC_DIR = Path(__file__).parent / "static"
 if _STATIC_DIR.exists():
     app.mount("/assets", StaticFiles(directory=str(_STATIC_DIR / "assets")), name="assets")
 
+    # index.html must be revalidated on every visit, or browsers keep showing an old UI after a
+    # rebuild; the hashed /assets files can be cached as usual.
+    _INDEX_HEADERS = {"Cache-Control": "no-cache"}
+
     @app.get("/", include_in_schema=False)
     async def serve_root():
         """Serve React index.html at root."""
-        return FileResponse(str(_STATIC_DIR / "index.html"))
+        return FileResponse(str(_STATIC_DIR / "index.html"), headers=_INDEX_HEADERS)
 
     @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_spa(full_path: str):
@@ -230,7 +241,7 @@ if _STATIC_DIR.exists():
         # Don't intercept API, documentation, or static asset routes (case-insensitive)
         if full_path.lower().startswith(("api/", "health", "docs", "openapi", "redoc", "assets")):
             raise HTTPException(status_code=404, detail="Not found")
-        return FileResponse(str(_STATIC_DIR / "index.html"))
+        return FileResponse(str(_STATIC_DIR / "index.html"), headers=_INDEX_HEADERS)
 else:
     # Development mode — just return API info at root
     @app.get("/", tags=["system"])

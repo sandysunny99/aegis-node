@@ -1,9 +1,13 @@
+import { scanQuery } from './status/history';
+
 /**
- * Aegis Node — API Client
+ * Aegis Node API client.
  * Uses fetch for standard requests and XMLHttpRequest for upload progress tracking.
  */
 
-const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
+// Same origin by default: FastAPI serves the built UI, and the Vite dev server proxies
+// /api and /health. Set VITE_API_URL only when the API lives on another host.
+const BASE = import.meta.env.VITE_API_URL ?? '';
 
 // S2: no API key in the browser. Anything read from import.meta.env.VITE_* is
 // compiled into the public bundle, so a key here would protect nothing. API_KEY
@@ -12,7 +16,7 @@ const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
 /** Map HTTP status codes to user-friendly messages. */
 function friendlyError(status, fallback) {
-  if (status === 429) return 'Too many requests — please wait a moment before trying again.';
+  if (status === 429) return 'Too many requests. Wait a moment before trying again.';
   if (status === 403) {
     if (fallback && fallback.toLowerCase().includes('turnstile')) return 'Upload blocked: bot verification failed or is unavailable.';
     if (fallback && fallback.toLowerCase().includes('download')) return 'Access denied: the sanitized download token may be invalid or expired.';
@@ -34,7 +38,11 @@ async function request(path, options = {}) {
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     const detail = err.detail ?? `HTTP ${res.status}`;
-    throw new Error(friendlyError(res.status, detail));
+    const error = new Error(friendlyError(res.status, typeof detail === 'string' ? detail : `HTTP ${res.status}`));
+    // Kept so callers can tell "route not on this server" from "resource not found".
+    error.status = res.status;
+    error.detail = detail;
+    throw error;
   }
   return res.json();
 }
@@ -82,7 +90,7 @@ export function uploadDataset(file, onProgress, turnstileToken = null) {
       }
     });
 
-    xhr.addEventListener('error', () => reject(new Error('Network error — check your connection and try again.')));
+    xhr.addEventListener('error', () => reject(new Error('Network error. Check your connection and try again.')));
     xhr.addEventListener('abort', () => reject(new Error('Upload was cancelled.')));
 
     xhr.send(form);
@@ -176,7 +184,7 @@ export function getSanitizedDownloadUrl(datasetId, token) {
 // to grant a global view). Wrapped in try/catch: storage can be unavailable.
 const MY_DATASETS_KEY = 'aegis.myDatasets';
 
-function myDatasetIds() {
+export function myDatasetIds() {
   try {
     const ids = JSON.parse(window.localStorage.getItem(MY_DATASETS_KEY) || '[]');
     return Array.isArray(ids) ? ids.filter((id) => /^[0-9a-f]{32}$/.test(id)) : [];
@@ -199,6 +207,32 @@ export async function getHistory(page = 1, pageSize = 20) {
   const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
   params.set('ids', myDatasetIds().join(','));
   return request(`/api/v1/history?${params.toString()}`);
+}
+
+// ─── Scan history (GET /api/v1/scans …, docs/SCAN_HISTORY_API.md) ────────────
+// Older servers do not have these routes; see status/history.js historyMissing().
+
+export async function listScans(filters = {}, page = 1, pageSize = 20) {
+  const params = scanQuery(filters, page, pageSize);
+  // A public deployment has no API key, so the list is scoped to this browser's uploads.
+  params.set('ids', myDatasetIds().join(','));
+  return request(`/api/v1/scans?${params.toString()}`);
+}
+
+export async function getScan(scanId) {
+  return request(`/api/v1/scans/${scanId}`);
+}
+
+export async function getScanEvents(scanId) {
+  return request(`/api/v1/scans/${scanId}/events`);
+}
+
+export async function getDatasetScans(datasetId) {
+  return request(`/api/v1/datasets/${datasetId}/scans`);
+}
+
+export async function getDatasetEvents(datasetId) {
+  return request(`/api/v1/datasets/${datasetId}/events`);
 }
 
 export async function healthCheck() {

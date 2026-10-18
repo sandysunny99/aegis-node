@@ -1,0 +1,264 @@
+/* Primitives: PlateButton, icon button, status pill, card, table, tooltip, skeleton. */
+
+/* ── PlateButton ─────────────────────────────────────────────────────────── */
+.plate-btn {
+  --depth: 4px;
+  --face: var(--accent);
+  --face-text: var(--on-accent);
+  --edge: var(--accent-edge);
+  position: relative;
+  display: inline-grid;
+  border: 0;
+  padding: 0;
+  margin-top: var(--depth);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  min-height: 44px;
+  min-width: 44px;
+}
+.plate-btn__edge {
+  position: absolute;
+  inset: 0;
+  background: var(--edge);
+  clip-path: var(--chamfer);
+}
+.plate-btn__face {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: var(--space-3) var(--space-5);
+  font-weight: 500;
+  font-size: 0.9375rem;
+  line-height: 1.2;
+  color: var(--face-text);
+  background: var(--face);
+  clip-path: var(--chamfer);
+  transform: translateY(calc(var(--depth) * -1));
+  transition: transform var(--dur-release) var(--ease-out);
+}
+.plate-btn:hover:not(:disabled) .plate-btn__face { transform: translateY(calc(var(--depth) * -1.5)); }
+.plate-btn:active:not(:disabled) .plate-btn__face {
+  transform: translateY(0);
+  transition-duration: var(--dur-press);
+}
+.plate-btn:disabled { cursor: not-allowed; }
+.plate-btn:disabled .plate-btn__face { transform: translateY(0); opacity: 0.55; }
+.plate-btn.is-loading .plate-btn__face { opacity: 1; }
+.plate-btn.is-loading .plate-btn__label { visibility: hidden; }
+.plate-btn__spinner {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.plate-btn--secondary {
+  --face: var(--surface-overlay);
+  --face-text: var(--text-primary);
+  --edge: var(--line-strong);
+}
+.plate-btn--secondary .plate-btn__face { box-shadow: inset 0 0 0 1px var(--line-strong); }
+
+.plate-btn--danger {
+  --face: var(--status-breach-fill);
+  --face-text: var(--on-breach);
+  --edge: color-mix(in oklab, var(--status-breach-fill) 55%, black);
+}
+
+.plate-btn--ghost { margin-top: 0; }
+.plate-btn--ghost .plate-btn__face {
+  background: transparent;
+  color: var(--text-primary);
+  transform: none;
+  clip-path: none;
+  padding: var(--space-2) var(--space-3);
+}
+.plate-btn--ghost:hover:not(:disabled) .plate-btn__face {
+  transform: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ── Icon button (theme toggle, close) ───────────────────────────────────── */
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.icon-btn:hover { border-color: var(--line-strong); }
+
+/* ── Status pill: flat hex + icon + word ─────────────────────────────────── */
+.status-pill {
+  --tone: var(--status-neutral);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3) var(--space-1) var(--space-2);
+  border: 0;
+  clip-path: var(--chamfer);
+  background: color-mix(in oklab, var(--tone) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--tone) 45%, transparent);
+  color: var(--tone);
+  font-size: var(--step--1);
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.status-pill--sm { padding: 2px var(--space-2); gap: 6px; }
+.status-pill--clean { --tone: var(--status-clean); }
+.status-pill--risk { --tone: var(--status-risk); }
+.status-pill--breach { --tone: var(--status-breach); }
+.status-pill--scanning { --tone: var(--status-scanning); }
+.status-pill--neutral { --tone: var(--status-neutral); }
+
+/* ── Card ───────────────────────────────────────────────────────────────── */
+.card {
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-resting);
+  min-width: 0;
+}
+.card__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+.card__title { font-size: var(--step-1); }
+.card__actions { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+
+/* ── Table ──────────────────────────────────────────────────────────────── */
+.table-wrap {
+  max-height: 70vh;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+  font-variant-numeric: tabular-nums;
+}
+.table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface-overlay);
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: var(--step--1);
+  text-align: left;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--line-strong);
+}
+.table td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+.table tr:last-child td { border-bottom: 0; }
+.table tbody tr:hover { background: var(--surface-overlay); }
+.table tr.is-selected { background: color-mix(in oklab, var(--accent) 12%, transparent); }
+.table .is-numeric { text-align: right; }
+.table .is-mono { font-family: var(--font-mono); font-size: 0.875rem; }
+
+@media (max-width: 767px) {
+  .table-wrap { max-height: none; border: 0; }
+  .table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .table, .table tbody, .table tr, .table td { display: block; width: 100%; }
+  .table tr {
+    margin-bottom: var(--space-3);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface-raised);
+    box-shadow: var(--shadow-resting);
+  }
+  .table td {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-4);
+    text-align: right;
+  }
+  .table td::before {
+    content: attr(data-label);
+    color: var(--text-secondary);
+    font-family: var(--font-ui);
+    font-size: var(--step--1);
+    text-align: left;
+  }
+  .table th[scope="row"] { display: block; width: 100%; padding: var(--space-3) var(--space-4); }
+}
+
+/* ── Tooltip ────────────────────────────────────────────────────────────── */
+.tooltip { position: relative; display: inline-flex; }
+.tooltip__tip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + var(--space-2));
+  z-index: 50;
+  width: max-content;
+  max-width: 260px;
+  transform: translateX(-50%);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface-overlay);
+  color: var(--text-primary);
+  font-size: var(--step--1);
+  line-height: 1.4;
+  box-shadow: var(--shadow-raised);
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity var(--dur-state) var(--ease-out);
+  pointer-events: none;
+}
+.tooltip__tip.is-open { visibility: visible; opacity: 1; }
+
+/* ── Skeleton ───────────────────────────────────────────────────────────── */
+.skeleton {
+  display: inline-block;
+  width: var(--sk-w);
+  height: var(--sk-h);
+  border-radius: var(--radius);
+  background: linear-gradient(90deg, var(--surface-overlay), var(--line), var(--surface-overlay));
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+@keyframes shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
+
+/* ── Inline notices (errors, limitations) ───────────────────────────────── */
+.notice {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line-strong);
+  border-left-width: 1px;
+  border-radius: var(--radius);
+  background: var(--surface-overlay);
+  color: var(--text-primary);
+  font-size: 0.9375rem;
+}
+.notice--error { border-color: color-mix(in oklab, var(--status-breach) 55%, transparent); }
+.notice--risk { border-color: color-mix(in oklab, var(--status-risk) 55%, transparent); }
+.notice__icon { flex: none; margin-top: 2px; }
+.notice--error .notice__icon { color: var(--status-breach); }
+.notice--risk .notice__icon { color: var(--status-risk); }

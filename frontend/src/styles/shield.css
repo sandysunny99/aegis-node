@@ -1,0 +1,76 @@
+/* The Bastion shield: 3D stage, 2D plate grid, hover label. */
+.shield { position: relative; margin: 0; }
+.shield__stage { position: relative; aspect-ratio: 1 / 1; width: 100%; }
+.shield--compact .shield__stage { aspect-ratio: 4 / 3; }
+.shield-3d { position: absolute; inset: 0; }
+.shield-3d canvas { touch-action: pan-y; }
+
+.shield-grid { display: block; width: 100%; height: 100%; color: var(--line-strong); }
+.shield-grid__plate {
+  fill: var(--plate);
+  stroke: var(--surface-base);
+  stroke-width: 0.06;
+  transition: fill var(--dur-state) var(--ease-out);
+}
+.shield-grid__plate--filler { fill: var(--surface-overlay); }
+.shield-grid__plate--unscanned { fill: var(--surface-overlay); stroke: var(--text-muted); stroke-width: 0.05; }
+.shield-grid__plate--degraded { fill-opacity: 0.75; }
+.shield-grid__plate--breached { stroke: var(--status-breach); stroke-width: 0.12; }
+.shield-grid a:focus-visible { outline: none; }
+.shield-grid a:focus-visible .shield-grid__plate,
+.shield-grid__plate.is-selected { stroke: var(--accent); stroke-width: 0.16; }
+.shield-grid a:hover .shield-grid__plate { fill-opacity: 1; stroke: var(--text-primary); stroke-width: 0.08; }
+
+.shield-tip {
+  position: absolute;
+  z-index: 5;
+  display: grid;
+  gap: 2px;
+  min-width: 180px;
+  max-width: 260px;
+  padding: var(--space-2) var(--space-3);
+  transform: translate(12px, 12px);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface-overlay);
+  box-shadow: var(--shadow-raised);
+  font-size: var(--step--1);
+  pointer-events: none;
+  overflow-wrap: anywhere;
+}
+
+.shield__caption { margin-top: var(--space-3); }
+.shield__keylist {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+/* Keyboard users see the list they are tabbing through, next to the shield */
+.shield__keylist:focus-within {
+  position: static;
+  width: auto;
+  height: auto;
+  clip: auto;
+  white-space: normal;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.shield__keylist button {
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface-overlay);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--step--1);
+  cursor: pointer;
+}

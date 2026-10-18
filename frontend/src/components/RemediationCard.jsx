@@ -1,236 +1,152 @@
 import { useCallback, useState } from 'react';
 import { downloadSanitized, remediateDataset } from '../api';
+import { describeLimitation } from '../status/limitations';
+import { VERDICT_TO_STATUS } from '../status/statusToPlate';
+import Button from '../ui/Button';
+import Card from '../ui/Card';
+import Icon from '../ui/Icon';
+import StatusPill from '../ui/StatusPill';
 
-function CircleProgress({ value, size = 56, strokeWidth = 5, color }) {
-  const r = (size - strokeWidth) / 2;
-  const circ = 2 * Math.PI * r;
-  const dash = circ * (value / 100);
-  return (
-    <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={strokeWidth} />
-      <circle
-        cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color}
-        strokeWidth={strokeWidth} strokeLinecap="round"
-        strokeDasharray={`${dash} ${circ - dash}`}
-        style={{ transition: 'stroke-dasharray 0.8s ease' }}
-      />
-    </svg>
-  );
-}
+const OUTCOME = {
+  completed: { status: 'remediated', text: 'Remediation completed and the sanitized copy passed the verification re-scan.' },
+  partial: { status: 'partial_remediated', text: 'Remediation was partial: some actionable findings remain in the sanitized copy.' },
+  unverified: { status: 'remediated_unverified', text: 'The sanitized copy could not be fully verified by the re-scan. Treat it as unverified.' },
+};
 
 export default function RemediationCard({ datasetId, scanResult }) {
   const [state, setState] = useState('idle'); // idle | loading | done | error
   const [report, setReport] = useState(null);
   const [error, setError] = useState('');
+  const [downloading, setDownloading] = useState(false);
+  const [downloaded, setDownloaded] = useState(false);
 
-  const hasThreats = scanResult?.threats_found_count > 0;
+  const hasFindings = scanResult?.threats_found_count > 0;
 
   const handleRemediate = useCallback(async () => {
     setState('loading'); setError('');
     try {
-      const r = await remediateDataset(datasetId);
-      setReport(r); setState('done');
+      setReport(await remediateDataset(datasetId));
+      setState('done');
     } catch (e) {
       setError(e.message); setState('error');
     }
   }, [datasetId]);
 
-  if (!hasThreats) {
+  const handleDownload = async () => {
+    setDownloading(true); setError('');
+    try {
+      await downloadSanitized(datasetId, report.download_token);
+      setDownloaded(true);
+    } catch (err) {
+      setError(err.message);
+    }
+    setDownloading(false);
+  };
+
+  if (!hasFindings) {
     return (
-      <div style={{
-        marginTop: '1.5rem', padding: '1.25rem',
-        background: 'rgba(16,185,129,0.06)',
-        border: '1px solid rgba(16,185,129,0.2)',
-        borderRadius: 'var(--r-md)',
-        display: 'flex', alignItems: 'center', gap: '0.875rem',
-      }}>
-        <span style={{ fontSize: '1.5rem' }}>✅</span>
-        <div>
-          <div style={{ fontWeight: 600, color: 'var(--emerald)', marginBottom: '0.2rem' }}>Dataset is Clean</div>
-          <div style={{ fontSize: '0.82rem', color: 'var(--text-3)' }}>No threats were detected. No remediation is needed.</div>
-        </div>
-      </div>
+      <Card title="Remediation" id="remediation">
+        <p className="muted">The scanner reported no findings, so there is nothing to remediate.</p>
+      </Card>
     );
   }
 
-  return (
-    <div style={{ marginTop: '1.5rem' }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem',
-      }}>
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <div className="card-title" style={{ marginBottom: '0.2rem' }}>REMEDIATION & VERIFICATION</div>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-3)' }}>Neutralizes threats in-place while preserving dataset schema and structure.</div>
-            </div>
-          </div>
-        </div>
-        {state === 'idle' && (
-          <button className="btn btn-primary" onClick={handleRemediate} id="remediate-btn">
-            Remediate & Sanitize
-          </button>
-        )}
-        {state === 'loading' && (
-          <button className="btn btn-primary" disabled>
-            <span className="spinner" /> Sanitizing…
-          </button>
-        )}
-      </div>
+  const outcome = report ? OUTCOME[report.remediation_status] : null;
 
-      {state === 'error' && (
-        <div className="error-banner fade-in">⚠️ {error}</div>
+  return (
+    <Card
+      title="Remediation and verification"
+      id="remediation"
+      actions={state !== 'done' && (
+        <Button variant="primary" onClick={handleRemediate} loading={state === 'loading'} id="remediate-btn">
+          Remediate dataset
+        </Button>
+      )}
+    >
+      <p className="card-sub card-lede">
+        Neutralises findings in a copy of the dataset, keeps its schema, then re-scans the copy before you can download it.
+      </p>
+
+      {error && (
+        <div className="error-banner error-banner--spaced" role="alert">
+          <Icon name="CircleAlert" />
+          <span>{error}</span>
+        </div>
       )}
 
       {state === 'done' && report && (
-        <div className="fade-in">
-          {/* Metrics grid */}
-          <div style={{
-            display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px,1fr))',
-            gap: '0.875rem', marginBottom: '1.25rem',
-          }}>
-            <MetricRing
-              label="Threat Reduction"
-              value={report.threat_reduction_percent}
-              color={report.threat_reduction_percent === 100 ? 'var(--emerald)' : 'var(--amber)'}
-            />
-            <MetricRing
-              label={report.integrity_method === 'exact_rows' ? 'Data Integrity' : 'Data Integrity (est.)'}
-              value={report.integrity_preserved ?? 100}
-              color="var(--cyan)"
-            />
-            <MetricBox label="Threats Resolved" value={report.resolved_findings_count} color="var(--emerald)" />
-            <MetricBox
-              label="Remaining"
-              value={report.remaining_findings_count}
-              color={report.remediation_status === 'completed' ? (report.remaining_findings_count > 0 ? 'var(--cyan)' : 'var(--emerald)') : 'var(--rose)'}
-            />
-            <MetricBox label="Changes Made" value={report.changes_count} color="var(--blue)" />
+        <div className="stack">
+          <div className="notice" role="status">
+            {outcome && <StatusPill status={outcome.status} />}
+            <span>{outcome ? outcome.text : `Remediation status: ${report.remediation_status}`}</span>
           </div>
 
-          {/* Status banner */}
-          <div style={{
-            padding: '0.75rem 1rem', borderRadius: 'var(--r-sm)',
-            background: report.remediation_status === 'completed'
-              ? 'rgba(16,185,129,0.08)' : 'rgba(245,158,11,0.08)',
-            border: `1px solid ${report.remediation_status === 'completed'
-              ? 'rgba(16,185,129,0.25)' : 'rgba(245,158,11,0.25)'}`,
-            marginBottom: '1rem',
-            fontSize: '0.85rem',
-            color: report.remediation_status === 'completed' ? 'var(--emerald)' : 'var(--amber)',
-            display: 'flex', alignItems: 'center', gap: '0.625rem',
-          }}>
-            {report.remediation_status === 'completed' ? '✅' : '⚠️'}
-            {report.remediation_status === 'completed'
-              ? (report.remaining_findings_count > 0
-                  ? 'Remediation completed — all actionable threats neutralized (Research metadata preserved)'
-                  : 'Remediation completed — all threats neutralized')
-              : 'Remediation partial — some threats may remain'}
-          </div>
+          <dl className="summary">
+            <div><dt>Findings resolved</dt><dd>{report.resolved_findings_count} of {report.original_findings_count}</dd></div>
+            <div><dt>Remaining</dt><dd>{report.remaining_findings_count}</dd></div>
+            <div><dt>Cells changed</dt><dd>{report.changes_count}</dd></div>
+            <div>
+              <dt>{report.integrity_method === 'exact_rows' ? 'Fields unchanged' : 'Fields unchanged (estimated)'}</dt>
+              <dd>{report.integrity_preserved}%</dd>
+            </div>
+            <div>
+              <dt>Re-scan verdict</dt>
+              <dd>
+                {report.rescan_verdict
+                  ? <StatusPill status={VERDICT_TO_STATUS[report.rescan_verdict] ?? 'incomplete'} size="sm" />
+                  : 'not reported'}
+              </dd>
+            </div>
+          </dl>
 
-          {/* Actions taken */}
-          {report.actions && report.actions.length > 0 && (
-            <ActionsList actions={report.actions} />
+          {report.rescan_limitations?.length > 0 && (
+            <div className="notice notice--risk" role="note">
+              <Icon name="ShieldMinus" className="notice__icon" />
+              <ul className="notice__list">
+                {report.rescan_limitations.map((c) => <li key={c}>{describeLimitation(c)}</li>)}
+              </ul>
+            </div>
           )}
 
-          {/* Download — only shown when download_token is available (A-002, A-018) */}
-          {report.download_token && (
-            <div style={{ marginTop: '1rem', display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-              <button
-                onClick={async () => {
-                  try {
-                    await downloadSanitized(datasetId, report.download_token);
-                  } catch (err) {
-                    setError(err.message);
-                  }
-                }}
-                className="btn btn-primary"
-                id="download-sanitized-btn"
-              >
-                ⬇ Download Clean Dataset
-              </button>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-3)' }}>
-                SHA-256: <span style={{ fontFamily: 'var(--mono)', color: 'var(--text-2)', fontSize: '0.7rem' }}>
-                  {report.sanitized_sha256?.slice(0, 12)}…
-                </span>
+          {report.actions?.length > 0 && <ActionsList actions={report.actions} />}
+
+          {report.download_token && !downloaded && (
+            <div className="btn-row">
+              <Button variant="secondary" onClick={handleDownload} loading={downloading} id="download-sanitized-btn">
+                Download sanitized copy
+              </Button>
+              <span className="muted">
+                One-time download. SHA-256 <span className="mono">{report.sanitized_sha256?.slice(0, 12)}</span>
               </span>
             </div>
           )}
+          {downloaded && <p className="muted">Downloaded. The link was single-use; remediate again for a new copy.</p>}
         </div>
       )}
-    </div>
-  );
-}
-
-function MetricRing({ label, value, color }) {
-  return (
-    <div style={{
-      background: 'var(--bg-3)', border: '1px solid var(--border)',
-      borderRadius: 'var(--r-sm)', padding: '1rem',
-      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem',
-    }}>
-      <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-        <CircleProgress value={value} size={60} strokeWidth={5} color={color} />
-        <span style={{
-          position: 'absolute', fontSize: '0.75rem', fontWeight: 700,
-          fontFamily: 'var(--mono)', color,
-        }}>{value.toFixed(0)}%</span>
-      </div>
-      <div style={{ fontSize: '0.7rem', color: 'var(--text-3)', textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-        {label}
-      </div>
-    </div>
-  );
-}
-
-function MetricBox({ label, value, color }) {
-  return (
-    <div className="stat">
-      <div className="stat-label">{label}</div>
-      <div className="stat-value" style={{ color }}>{value}</div>
-    </div>
+    </Card>
   );
 }
 
 function ActionsList({ actions }) {
-  const [show, setShow] = useState(false);
+  const [open, setOpen] = useState(false);
   return (
     <div>
-      <button
-        onClick={() => setShow(x => !x)}
-        style={{
-          background: 'none', border: 'none', color: 'var(--cyan)',
-          cursor: 'pointer', fontSize: '0.8rem', fontFamily: 'var(--font)',
-          display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0',
-          marginBottom: show ? '0.75rem' : '0',
-        }}
-      >
-        {show ? '▾' : '▸'} {actions.length} remediation action{actions.length !== 1 ? 's' : ''} taken
+      <button type="button" className="link-btn" aria-expanded={open} onClick={() => setOpen((x) => !x)}>
+        {open ? 'Hide' : 'Show'} {actions.length} remediation action{actions.length !== 1 ? 's' : ''}
       </button>
-      {show && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      {open && (
+        <ul className="findings">
           {actions.map((a, i) => (
-            <div key={i} style={{
-              background: 'var(--bg-0)', border: '1px solid var(--border)',
-              borderRadius: 'var(--r-sm)', padding: '0.625rem 0.875rem',
-              fontSize: '0.8rem',
-            }}>
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.25rem' }}>
-                <span style={{ fontFamily: 'var(--mono)', color: 'var(--cyan)', fontSize: '0.72rem' }}>{a.rule_id}</span>
-                <span style={{ color: 'var(--text-3)', fontSize: '0.7rem' }}>{a.location}</span>
+            <li key={`${a.rule_id}-${a.location}-${i}`} className="finding">
+              <div className="finding__top">
+                <span className="finding__rule">{a.rule_id}</span>
+                <span className="finding__loc">{a.location}</span>
               </div>
-              <div style={{ color: 'var(--text-2)' }}>{a.action_taken}</div>
-              {a.sample_after && (
-                <div style={{
-                  marginTop: '0.35rem', fontFamily: 'var(--mono)', fontSize: '0.72rem',
-                  color: 'var(--emerald)', background: 'rgba(0,0,0,0.3)',
-                  padding: '0.25rem 0.5rem', borderRadius: '4px',
-                }}>→ {a.sample_after}</div>
-              )}
-            </div>
+              <p>{a.action_taken}</p>
+              {a.sample_after && <p className="finding__loc">After: {a.sample_after}</p>}
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );
