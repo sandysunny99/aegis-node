@@ -33,3 +33,10 @@ No provider receives file contents, rows or filenames; no adapter downloads samp
 Per-request timeout (`THREAT_INTEL_TIMEOUT_SECONDS`, default 8 s, 5 s connect); responses over 1 MB, non-JSON or of the wrong shape → `INVALID_RESPONSE`; redirects not followed; answers cached for 1 hour by (provider, type, indicator), failures not cached; concurrent lookups of the same indicator share one request; single attempt, no retry storm. Per scan the most requests are 1 per hash provider plus 5 URL lookups for ThreatFox.
 
 Tested in `tests/test_new_ti_providers.py`: match, no match, disabled, missing key, 401, 403, 429, 503, timeout, connection error, not JSON, wrong root type, wrong `data` type, oversized, cache hit, failures not cached, invalid hash never sent, known-good with a malicious local finding, external match on a clean scan (conflict, verdict unchanged), partial enrichment. No live calls were made.
+
+## Live checks (labelled, no keys recorded)
+
+| Date | Provider | Request | Result |
+|---|---|---|---|
+| 18 Oct 2026 | CIRCL hashlookup (no account) | SHA-256 of the empty file | `MATCH`, `known_good`, `known_file:snap:…`, `trust:100` |
+| — | MalwareBazaar, ThreatFox | not run | needs an abuse.ch Auth-Key, and abuse.ch does not resolve on the development network |
