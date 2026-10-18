@@ -87,6 +87,10 @@ export default function ScanPage({ health, onScanned }) {
   const [scanResult, setScanResult] = useState(null);
   const [error, setError] = useState('');
   const [turnstileToken, setTurnstileToken] = useState(null);
+  const [turnstileFailed, setTurnstileFailed] = useState(false);
+  const onTurnstileVerify = useCallback((token) => { setTurnstileToken(token); setTurnstileFailed(false); }, []);
+  const onTurnstileExpire = useCallback(() => setTurnstileToken(null), []);
+  const onTurnstileError = useCallback(() => { setTurnstileToken(null); setTurnstileFailed(true); }, []);
   const [analysis, setAnalysis] = useState(undefined);
 
   const reset = useCallback(() => {
@@ -172,7 +176,14 @@ export default function ScanPage({ health, onScanned }) {
         )}
 
         {phase === 'idle' && health?.turnstile_enabled && (
-          <TurnstileWidget siteKey={health?.turnstile_site_key} onVerify={setTurnstileToken} onExpire={() => setTurnstileToken(null)} />
+          <TurnstileWidget siteKey={health?.turnstile_site_key} onVerify={onTurnstileVerify} onExpire={onTurnstileExpire} onError={onTurnstileError} />
+        )}
+
+        {phase === 'idle' && health?.turnstile_enabled && turnstileFailed && (
+          <div className="error-banner error-banner--spaced" role="alert">
+            <Icon name="CircleAlert" />
+            <span>Bot verification could not load, so uploads are blocked. Reload the page; if it keeps failing, the site's Turnstile settings need this domain.</span>
+          </div>
         )}
 
         <div className="btn-row">
