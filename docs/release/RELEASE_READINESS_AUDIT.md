@@ -43,7 +43,7 @@ There is **no Vercel configuration** in any branch. The canonical deployment is 
 
 ## Open items
 
-1. **UI (sent to the UI thread):** 413 message hard-codes "50 MB"; threat-intel panels list only three providers and do not label CIRCL `known_good`; `/analysis` 404 logs a console error (harmless).
+1. **UI:** the 413 message and the provider list are fixed in `44e0017`, merged as `acc0dc2` (frontend 33/33, backend 564 after the merge). Still open: `/analysis` 404 logs a console error when no analysis exists (harmless; needs a backend change).
 2. **PostgreSQL:** needs approval (see below).
 3. **Oracle:** owner-side setup.
 4. **Signatures in the test image** were dated 27 Sep 2026 on first start (bundled database before freshclam's first update); on the VM, check `/api/v1/version` after the first freshclam run.
