@@ -47,8 +47,10 @@ def production_config_problems(cfg: "Settings") -> list[str]:
     turnstile_on = bool(
         cfg.cloudflare_turnstile_secret_key.strip() and cfg.cloudflare_turnstile_site_key.strip()
     )
-    if not cfg.api_key and not turnstile_on:
-        problems.append("set API_KEY or Cloudflare Turnstile keys; write endpoints would be open")
+    if not cfg.api_key and not turnstile_on and not cfg.allow_public_uploads:
+        problems.append(
+            "set API_KEY or Cloudflare Turnstile keys, or ALLOW_PUBLIC_UPLOADS=true; write endpoints would be open"
+        )
     return problems
 
 
@@ -157,6 +159,8 @@ class Settings(BaseSettings):
     cloudflare_turnstile_site_key: str = ""
     cloudflare_turnstile_secret_key: str = ""
     turnstile_allowed_hostnames: str = "aegis-node.onrender.com"
+    # Owner opt-in for a public demo without bot protection (uploads stay rate-limited).
+    allow_public_uploads: bool = False
 
     # ─── Scanner & Multi-Engine Detection ────────────────────────────────────
     av_provider: str = "clamav_rest"

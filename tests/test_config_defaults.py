@@ -85,3 +85,13 @@ def test_default_database_is_absolute_under_data_dir(tmp_path, monkeypatch):
 def test_explicit_database_url_is_kept(monkeypatch):
     monkeypatch.delenv("DATABASE_URL", raising=False)
     assert _settings(database_url="sqlite:////tmp/x.db").database_url == "sqlite:////tmp/x.db"
+
+
+def test_production_accepts_explicit_public_uploads_without_turnstile():
+    """The owner may run a public demo without bot protection, but only by saying so."""
+    cfg = _settings(app_env="production", allowed_origins=["https://aegis.example"], allow_public_uploads=True)
+    assert cfg.allow_public_uploads is True
+
+
+def test_public_uploads_are_off_by_default():
+    assert _settings(app_env="development").allow_public_uploads is False

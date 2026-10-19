@@ -30,6 +30,9 @@ async def verify_turnstile_token(token: str | None, remote_ip: str | None = None
     # If Turnstile secret key is not configured, gracefully bypass check (open in dev/tests)
     # BUT explicitly deny in production to prevent misconfiguration bypasses.
     if not secret_key:
+        if is_production and settings.allow_public_uploads is True:
+            logger.warning("Turnstile not configured; ALLOW_PUBLIC_UPLOADS=true, uploads are open (rate-limited).")
+            return True
         if is_production:
             logger.error("SECURITY: CLOUDFLARE_TURNSTILE_SECRET_KEY is unset in production. Denying request.")
             return False
