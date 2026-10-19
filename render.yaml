@@ -108,6 +108,11 @@ services:
       - key: API_KEY
         sync: false
 
+      # Owner decision (19 Oct 2026): public demo without bot protection. Only takes effect
+      # when the Turnstile keys are removed; uploads stay rate-limited (10/minute per IP).
+      - key: ALLOW_PUBLIC_UPLOADS
+        value: "true"
+
       - key: DOWNLOAD_TOKEN_EXPIRY_MINUTES
         value: "60"
 
