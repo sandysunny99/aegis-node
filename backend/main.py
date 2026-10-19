@@ -169,7 +169,8 @@ def _health_payload(av_status: dict) -> dict:
     ai_fallback_chain = [
         p.strip().lower() for p in (settings.ai_fallback_chain or "").split(",") if p.strip()
     ]
-    turnstile_enabled = bool(
+    public_uploads = settings.allow_public_uploads is True
+    turnstile_enabled = not public_uploads and bool(
         settings.cloudflare_turnstile_site_key.strip()
         and settings.cloudflare_turnstile_secret_key.strip()
     )
@@ -182,6 +183,7 @@ def _health_payload(av_status: dict) -> dict:
         "ai_fallback_chain": ai_fallback_chain,
         "turnstile_enabled": turnstile_enabled,
         "turnstile_site_key": settings.cloudflare_turnstile_site_key if turnstile_enabled else "",
+        "public_uploads": public_uploads,
         "max_file_size_mb": settings.max_upload_size_mb,
         "supported_formats": [ext.lstrip(".") for ext in sorted(settings.allowed_extensions)],
     }
