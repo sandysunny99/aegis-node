@@ -52,11 +52,11 @@ def _computed(findings, triage, matches):
             *(cls[c] for c in CLASSES)]
 
 
-def test_triage_file_is_valid_and_owner_review_is_pending():
+def test_triage_file_is_valid_and_every_entry_is_owner_approved():
     _, triage = _policy_and_triage()
-    assert triage
+    assert len(triage) == 14
     for entry in triage.values():
-        assert "awaiting owner review" in entry["owner"], entry["key"]
+        assert entry["owner"] == "Sandeep (owner-approved 2026-10-24)", entry["key"]
 
 
 def test_after_triage_report_matches_triage_file_exactly():

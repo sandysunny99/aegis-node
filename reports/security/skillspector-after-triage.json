@@ -7,7 +7,7 @@
   "mode": "gate",
   "llm_used": false,
   "network": "blocked (dead local proxy)",
-  "generated_at": "2026-10-24T11:55:37+00:00",
+  "generated_at": "2026-10-24T12:22:39+00:00",
   "limits": {
     "timeout_seconds": 180,
     "max_files_per_target": 50,
@@ -34,12 +34,12 @@
           ],
           "occurrences": 1,
           "triage": "false_positive",
-          "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)"
+          "owner": "Sandeep (owner-approved 2026-10-24)"
         }
       ],
       "exit_code": 0,
       "report_bytes": 14104,
-      "duration_seconds": 5.62,
+      "duration_seconds": 7.47,
       "score": 8,
       "severity": "LOW",
       "recommendation": "SAFE",
@@ -60,7 +60,7 @@
       "findings": [],
       "exit_code": 0,
       "report_bytes": 12461,
-      "duration_seconds": 5.09,
+      "duration_seconds": 5.51,
       "score": 0,
       "severity": "LOW",
       "recommendation": "SAFE",
@@ -81,7 +81,7 @@
       "findings": [],
       "exit_code": 0,
       "report_bytes": 12462,
-      "duration_seconds": 5.26,
+      "duration_seconds": 5.32,
       "score": 0,
       "severity": "LOW",
       "recommendation": "SAFE",
@@ -102,7 +102,7 @@
       "findings": [],
       "exit_code": 0,
       "report_bytes": 12469,
-      "duration_seconds": 5.2,
+      "duration_seconds": 5.72,
       "score": 0,
       "severity": "LOW",
       "recommendation": "SAFE",
@@ -123,7 +123,7 @@
       "findings": [],
       "exit_code": 0,
       "report_bytes": 12478,
-      "duration_seconds": 5.16,
+      "duration_seconds": 5.6,
       "score": 0,
       "severity": "LOW",
       "recommendation": "SAFE",
@@ -144,7 +144,7 @@
       "findings": [],
       "exit_code": 0,
       "report_bytes": 12477,
-      "duration_seconds": 5.05,
+      "duration_seconds": 5.46,
       "score": 0,
       "severity": "LOW",
       "recommendation": "SAFE",
@@ -174,7 +174,7 @@
           ],
           "occurrences": 1,
           "triage": "false_positive",
-          "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)"
+          "owner": "Sandeep (owner-approved 2026-10-24)"
         },
         {
           "key": "475efe2b2932f6b8",
@@ -187,7 +187,7 @@
           ],
           "occurrences": 1,
           "triage": "accepted_risk",
-          "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)"
+          "owner": "Sandeep (owner-approved 2026-10-24)"
         },
         {
           "key": "dbe350a3ee7e62e3",
@@ -202,7 +202,7 @@
           ],
           "occurrences": 3,
           "triage": "false_positive",
-          "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)"
+          "owner": "Sandeep (owner-approved 2026-10-24)"
         },
         {
           "key": "1f0f0b857781e17d",
@@ -215,7 +215,7 @@
           ],
           "occurrences": 1,
           "triage": "false_positive",
-          "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)"
+          "owner": "Sandeep (owner-approved 2026-10-24)"
         },
         {
           "key": "9864d1c804a8fa35",
@@ -228,7 +228,7 @@
           ],
           "occurrences": 1,
           "triage": "false_positive",
-          "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)"
+          "owner": "Sandeep (owner-approved 2026-10-24)"
         },
         {
           "key": "5a05309530dca327",
@@ -241,7 +241,7 @@
           ],
           "occurrences": 1,
           "triage": "accepted_risk",
-          "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)"
+          "owner": "Sandeep (owner-approved 2026-10-24)"
         },
         {
           "key": "696ab3c72c8028c3",
@@ -254,7 +254,7 @@
           ],
           "occurrences": 1,
           "triage": "accepted_risk",
-          "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)"
+          "owner": "Sandeep (owner-approved 2026-10-24)"
         },
         {
           "key": "2009c7eadbd26131",
@@ -267,7 +267,7 @@
           ],
           "occurrences": 1,
           "triage": "accepted_risk",
-          "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)"
+          "owner": "Sandeep (owner-approved 2026-10-24)"
         },
         {
           "key": "40e009c84fa5feaa",
@@ -280,7 +280,7 @@
           ],
           "occurrences": 1,
           "triage": "accepted_risk",
-          "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)"
+          "owner": "Sandeep (owner-approved 2026-10-24)"
         },
         {
           "key": "85ac3115f9af6cd7",
@@ -293,7 +293,7 @@
           ],
           "occurrences": 1,
           "triage": "false_positive",
-          "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)"
+          "owner": "Sandeep (owner-approved 2026-10-24)"
         },
         {
           "key": "88956b1adb464154",
@@ -306,12 +306,12 @@
           ],
           "occurrences": 1,
           "triage": "false_positive",
-          "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)"
+          "owner": "Sandeep (owner-approved 2026-10-24)"
         }
       ],
       "exit_code": 1,
       "report_bytes": 34457,
-      "duration_seconds": 9.0,
+      "duration_seconds": 8.68,
       "score": 78,
       "severity": "HIGH",
       "recommendation": "DO_NOT_INSTALL",
@@ -341,7 +341,7 @@
           ],
           "occurrences": 1,
           "triage": "accepted_risk",
-          "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)"
+          "owner": "Sandeep (owner-approved 2026-10-24)"
         },
         {
           "key": "247711d5f05ce1aa",
@@ -354,12 +354,12 @@
           ],
           "occurrences": 2,
           "triage": "accepted_risk",
-          "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)"
+          "owner": "Sandeep (owner-approved 2026-10-24)"
         }
       ],
       "exit_code": 0,
       "report_bytes": 16622,
-      "duration_seconds": 5.7,
+      "duration_seconds": 4.94,
       "score": 29,
       "severity": "MEDIUM",
       "recommendation": "CAUTION",

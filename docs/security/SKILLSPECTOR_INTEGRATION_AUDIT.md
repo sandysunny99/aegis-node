@@ -16,8 +16,8 @@ analysis off and outbound HTTP blocked, and pointed at 8 approved targets. The f
 found 13 findings (0 critical, 3 high, 10 medium). On review, none was a confirmed risk;
 two scripts behind accepted risks were still hardened at the owner's request
 (`cleanup.ps1`, `verify_gateway.py`). The current run finds 14 findings covering 17 matches
-(4 high, 10 medium): 7 false positives and 7 accepted risks, all awaiting the owner's
-sign-off. A test-first wrapper (`scripts/skill_scan.py`) was added. The hosted CI job is
+(4 high, 10 medium): 7 false positives and 7 accepted risks, all approved by the
+owner on 2026-10-24 with conditions (section 5). A test-first wrapper (`scripts/skill_scan.py`) was added. The hosted CI job is
 deferred because the tool's environment is 217 MB and alpha. The production dataset
 scanner, backend and frontend dependencies, deploy config and any user-wide Claude or MCP
 configuration are unchanged.
@@ -175,8 +175,30 @@ The new finding is `dbe350a3ee7e62e3`: the opt-in text added to `verify_gateway.
 | UTF-8 BOM | `1f0f0b857781e17d` (AE4 MEDIUM, `debug_logs.ps1:1`), `9864d1c804a8fa35` (AE4 MEDIUM, `debug_scan.ps1:1`) | false positive | Two-line ASCII scripts; same file without the BOM gives no AE4 (tested) |
 | Local round trip | `85ac3115f9af6cd7`, `88956b1adb464154` (TT2 MEDIUM, `smoke_fresh_db.py:18,23`) | false positive | Dataset id from 127.0.0.1 sent back to 127.0.0.1 |
 
-Every entry's owner field reads "proposed by Claude, awaiting owner review". None has been
-approved by the owner.
+**Owner sign-off (Sandeep, 2026-10-24).** All 14 dispositions are approved as listed:
+7 `false_positive`, 7 `accepted_risk`; each entry's owner field reads
+"Sandeep (owner-approved 2026-10-24)". Keys, rules, evidence and reasons are unchanged, and
+on `main` at `d5d34c6` the scan reproduces exactly these 14 findings with no stale or changed
+entries. The approval covers these individual, documented findings only. It is not blanket
+approval for agents to run scripts or read secrets, and it rests on these conditions:
+
+- `verify_gateway.py` (`475efe2b2932f6b8`, HIGH): accepted only because paid calls need
+  `--confirm-paid-calls`; run it only when the owner explicitly asks.
+- `skill_scan.py` (`5a05309530dca327`, `696ab3c72c8028c3`, `2009c7eadbd26131`,
+  `40e009c84fa5feaa`): keep the argument-list call, `shell=False`, closed stdin, timeout,
+  `--no-llm`, the minimal environment and its no-key/token/secret test, the dead proxy,
+  bounded reports, and the in-repo, no-symlink target checks.
+- `ci.yml` (`c2721df122b4d47c`, `247711d5f05ce1aa`): covers the existing `libmagic1` install on
+  an ephemeral hosted runner only, with least-privilege permissions and no secrets in that job;
+  not arbitrary privileged commands or unreviewed workflow changes.
+- `cleanup.ps1`: no accepted-risk entry is needed for the old behaviour, provided the default
+  keeps volumes and deletion still needs `-RemoveVolumes` plus the exact phrase, as
+  `tests/test_cleanup_script.py` checks.
+- The SkillSpector CI workflow stays removed; this approval does not cover restoring it or
+  adding SkillSpector to the normal CI job.
+
+A static scan, even fully triaged, is not proof that these scripts or skills are safe at
+run time.
 
 ### Manual-review items the scanner missed
 
@@ -284,11 +306,11 @@ CI deferral. Test results for the branch are in the thread report and the last c
 
 ## 12. Remaining work and owner decisions
 
-1. Review the 14 triage entries (7 false positives, 7 accepted risks) and change their owner
-   field when you accept them.
+1. Done 2026-10-24: owner approved all 14 triage entries (section 5). Any new or changed
+   finding needs a fresh owner review.
 2. Decide later whether SkillSpector may run in CI (self-hosted runner, exception, or not).
 3. Scan the laptop-only agent files (`.claude/`, skills, MCP settings) locally, or commit the
    ones that should be shared.
 4. Re-pin deliberately: when moving to a newer SkillSpector, rerun, compare with
    `reports/security/skillspector-after-triage.json`, and re-triage changed keys.
-5. Nothing deployed. `main` untouched.
+5. Nothing deployed by this work.

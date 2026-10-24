@@ -41,5 +41,6 @@
 - **Own triage file instead of a SkillSpector baseline**: entries need a classification and an owner, and the raw score stays visible.
 - **Incomplete or failed scans fail the gate whatever the score**: SkillSpector exits 0 on a partial scan and reports CAUTION, score 9, on a failed one.
 - **Owner review, same day**: triage counts corrected (6 false positives / 7 accepted risks in the first run, not 8 / 5) and now checked by a test; a new match under a reviewed key voids the review; hosted CI install deferred (217 MB, alpha); `cleanup.ps1` keeps data by default and `verify_gateway.py` needs `--confirm-paid-calls`.
+- **Owner sign-off, 24 Oct**: Sandeep approved all 14 triage entries (7 false positive, 7 accepted risk) with conditions recorded in the audit, section 5: paid `verify_gateway.py` calls only on explicit request with `--confirm-paid-calls`, wrapper controls kept, `ci.yml` acceptance limited to the `libmagic1` install, SkillSpector CI workflow stays removed.
 - **MCP server not adopted**: nothing to gate yet, stdio initialize hang still open upstream, HTTP has no auth.
 - **No change to the dataset scanner, verdicts, backend or frontend dependencies, or deploy config.** Details: `docs/security/SKILLSPECTOR_INTEGRATION_AUDIT.md`.
