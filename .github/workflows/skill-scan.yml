@@ -1,0 +1,58 @@
+# Report-only SkillSpector scan of the agent skills, rules and scripts listed in
+# security/skill_scan_targets.json. It never blocks a merge, never deploys and has no
+# access to repository secrets. See docs/security/SKILL_SECURITY_SCANNING.md.
+name: Agent skill scan (report-only)
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "AGENTS.md"
+      - "docs/AGENT_*.md"
+      - "docs/*SKILLS*.md"
+      - "scripts/**"
+      - "security/**"
+      - ".github/workflows/**"
+
+permissions:
+  contents: read
+
+env:
+  SKILLSPECTOR_REPO: https://github.com/NVIDIA/SkillSpector.git
+  SKILLSPECTOR_COMMIT: d7338f58200a9ae2a24810cee08911ab68b107a7
+  UV_VERSION: "0.11.32"
+
+jobs:
+  skill-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install pinned SkillSpector outside the workspace (locked deps, no extras)
+        run: |
+          git clone --quiet "$SKILLSPECTOR_REPO" "$RUNNER_TEMP/skillspector-src"
+          git -C "$RUNNER_TEMP/skillspector-src" checkout --quiet "$SKILLSPECTOR_COMMIT"
+          test "$(git -C "$RUNNER_TEMP/skillspector-src" rev-parse HEAD)" = "$SKILLSPECTOR_COMMIT"
+          python -m pip install --quiet "uv==$UV_VERSION"
+          cd "$RUNNER_TEMP/skillspector-src"
+          UV_PROJECT_ENVIRONMENT="$RUNNER_TEMP/skillspector-venv" uv sync --frozen --no-dev --python 3.12
+      - name: Static scan (LLM off, outbound HTTP blocked by the wrapper)
+        run: |
+          python scripts/skill_scan.py \
+            --scanner "$RUNNER_TEMP/skillspector-venv/bin/skillspector" \
+            --mode report \
+            --out "$RUNNER_TEMP/skill-scan"
+          cat "$RUNNER_TEMP/skill-scan/skillspector-summary.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload sanitized summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: skillspector-summary
+          path: ${{ runner.temp }}/skill-scan/
+          retention-days: 14
+          if-no-files-found: warn

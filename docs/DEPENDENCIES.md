@@ -37,3 +37,19 @@ The 3D packages load in a lazy chunk, so they are not part of the initial landin
 | fastapi / uvicorn / httpx / python-multipart | 0.143.0 / 0.54.0 / 0.28.1 / 0.0.32 | MIT / BSD-3 / BSD-3 / Apache-2.0 | Scan gateway; same versions as the tested backend venv | local venv, 17 Oct 2026 |
 
 ClamAV is GPL-2.0. It runs as its own container and Aegis only calls it over HTTP; it is not linked into Aegis. It was already part of the project before this change. clamav-rest-api's MIT licence was checked on https://github.com/benzino77/clamav-rest-api (17 Oct 2026).
+
+## Development tools outside the runtime (agent-skill scan, 24 Oct 2026)
+
+Not in `requirements*.txt`, `package.json` or the Docker image. Installed in its own venv
+outside the repo, and by the report-only workflow `.github/workflows/skill-scan.yml`.
+
+| Name | Pinned | Licence | Reason | Checked |
+|---|---|---|---|---|
+| NVIDIA SkillSpector | 2.12.0, commit `d7338f58200a9ae2a24810cee08911ab68b107a7`, deps from its `uv.lock` | Apache-2.0 | Static scan of agent skills, rules, scripts and CI (`scripts/skill_scan.py`) | `pyproject.toml`, `LICENSE`, installed metadata, 24 Oct 2026 |
+| uv (CI only) | 0.11.32 | Apache-2.0 OR MIT | Installs SkillSpector from its lockfile | PyPI, 24 Oct 2026 |
+
+- The locked install is 69 distributions, about 217 MB, and pulls LangGraph, LangChain,
+  openai, anthropic, boto3 and google-auth even for static use. No GPL or AGPL licence was
+  found; MPL-2.0 appears in certifi, orjson and tqdm (used unmodified).
+- **Needs the owner's OK** before the CI job is relied on: it is over the 50 MB threshold and
+  marked alpha. Details: `docs/security/SKILLSPECTOR_INTEGRATION_AUDIT.md`, section 7.
