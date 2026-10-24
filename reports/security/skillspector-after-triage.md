@@ -2,7 +2,7 @@
 
 - SkillSpector 2.12.0 at commit `d7338f58200a9ae2a24810cee08911ab68b107a7`
 - Mode: gate; static only (LLM analysis off); outbound HTTP(S) blocked
-- Generated: 2026-10-24T11:55:37+00:00
+- Generated: 2026-10-24T12:22:39+00:00
 - Gate verdict: **PASS**
 
 This report lists rule ids, files, lines and finding keys only. It contains no

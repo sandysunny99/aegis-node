@@ -8,7 +8,7 @@
       "file": "AGENTS.md",
       "occurrences": 1,
       "classification": "false_positive",
-      "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
+      "owner": "Sandeep (owner-approved 2026-10-24)",
       "reviewed": "2026-10-24",
       "reason": "Line 7 reads 'NEVER automatically execute or fetch user-supplied URLs'. The regex matched 'automatically execute' inside a prohibition; the rule forbids autonomy rather than granting it."
     },
@@ -19,7 +19,7 @@
       "file": "serve_local.ps1",
       "occurrences": 1,
       "classification": "false_positive",
-      "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
+      "owner": "Sandeep (owner-approved 2026-10-24)",
       "reviewed": "2026-10-24",
       "reason": "Line 4 is a comment explaining that .env sets APP_ENV=production. The script never reads, prints or sends .env; it only sets APP_ENV for its own process."
     },
@@ -30,7 +30,7 @@
       "file": "verify_gateway.py",
       "occurrences": 1,
       "classification": "accepted_risk",
-      "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
+      "owner": "Sandeep (owner-approved 2026-10-24)",
       "reviewed": "2026-10-24",
       "reason": "Line 32 is load_dotenv() in _load_backend(), which runs only after --confirm-paid-calls (added 2026-10-24, tested in tests/test_cleanup_script.py). It loads real keys to make billable Groq calls with a fixed prompt; keys are never printed; no repo or dataset content is sent. Agents run it only when the owner asks."
     },
@@ -41,7 +41,7 @@
       "file": "debug_logs.ps1",
       "occurrences": 1,
       "classification": "false_positive",
-      "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
+      "owner": "Sandeep (owner-approved 2026-10-24)",
       "reviewed": "2026-10-24",
       "reason": "Two-line ASCII script saved with a UTF-8 BOM. Verified: the same file without the BOM produces no AE4, with the BOM it does. The BOM is the only non-ASCII character."
     },
@@ -52,7 +52,7 @@
       "file": "debug_scan.ps1",
       "occurrences": 1,
       "classification": "false_positive",
-      "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
+      "owner": "Sandeep (owner-approved 2026-10-24)",
       "reviewed": "2026-10-24",
       "reason": "Same as debug_logs.ps1: two-line ASCII script whose only non-ASCII content is the UTF-8 BOM that triggers the Unicode-density check."
     },
@@ -63,7 +63,7 @@
       "file": "skill_scan.py",
       "occurrences": 1,
       "classification": "accepted_risk",
-      "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
+      "owner": "Sandeep (owner-approved 2026-10-24)",
       "reviewed": "2026-10-24",
       "reason": "Version probe of the pinned scanner: subprocess.run with an argument list ([scanner, '--version']), shell=False, stdin closed, timeout, minimal env. tests/test_skill_scan.py checks argv and env."
     },
@@ -74,7 +74,7 @@
       "file": "skill_scan.py",
       "occurrences": 1,
       "classification": "accepted_risk",
-      "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
+      "owner": "Sandeep (owner-approved 2026-10-24)",
       "reviewed": "2026-10-24",
       "reason": "Scan call: argument list [scanner, 'scan', <policy-validated path>, '--no-llm', '--format', 'json'], shell=False, stdin closed, timeout, dead proxy, report size cap. tests/test_skill_scan.py covers each control."
     },
@@ -85,7 +85,7 @@
       "file": "skill_scan.py",
       "occurrences": 1,
       "classification": "accepted_risk",
-      "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
+      "owner": "Sandeep (owner-approved 2026-10-24)",
       "reviewed": "2026-10-24",
       "reason": "SkillSpector traces 'env' from os.environ.get into subprocess.run. The only host values copied by scanner_env() are PATH and, on Windows, SYSTEMROOT/WINDIR/COMSPEC/PATHEXT; everything else is constant. A test asserts no KEY/TOKEN/SECRET variable reaches the scanner."
     },
@@ -96,7 +96,7 @@
       "file": "skill_scan.py",
       "occurrences": 1,
       "classification": "accepted_risk",
-      "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
+      "owner": "Sandeep (owner-approved 2026-10-24)",
       "reviewed": "2026-10-24",
       "reason": "Same 'env' flow into the scan call: PATH (+ Windows SYSTEMROOT/WINDIR/COMSPEC/PATHEXT) from the host, the rest constant, proxies forced to 127.0.0.1:9. The target path comes from the policy file and passes _resolve_target (relative, in repo, no symlinks, exists)."
     },
@@ -107,7 +107,7 @@
       "file": "smoke_fresh_db.py",
       "occurrences": 1,
       "classification": "false_positive",
-      "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
+      "owner": "Sandeep (owner-approved 2026-10-24)",
       "reviewed": "2026-10-24",
       "reason": "Manual smoke test against 127.0.0.1:8000: the dataset id returned by the local dev server is sent back to the same local server. No external host is involved."
     },
@@ -118,7 +118,7 @@
       "file": "smoke_fresh_db.py",
       "occurrences": 1,
       "classification": "false_positive",
-      "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
+      "owner": "Sandeep (owner-approved 2026-10-24)",
       "reviewed": "2026-10-24",
       "reason": "Same local round trip as line 18: the history query sends the local dataset id back to 127.0.0.1:8000."
     },
@@ -129,7 +129,7 @@
       "file": "ci.yml",
       "occurrences": 1,
       "classification": "accepted_risk",
-      "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
+      "owner": "Sandeep (owner-approved 2026-10-24)",
       "reviewed": "2026-10-24",
       "reason": "'sudo apt-get update && sudo apt-get install -y libmagic1' in the backend job of ci.yml: root on an ephemeral GitHub-hosted runner to install one Debian package. Workflow permissions are contents: read; this job references no secrets (only the separate gitleaks job uses GITHUB_TOKEN); no deploy step."
     },
@@ -140,7 +140,7 @@
       "file": "ci.yml",
       "occurrences": 2,
       "classification": "accepted_risk",
-      "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
+      "owner": "Sandeep (owner-approved 2026-10-24)",
       "reviewed": "2026-10-24",
       "reason": "Same sudo apt-get line as the TM2 entry (SkillSpector reports PE2 twice on it, once per sudo). Elevated install on a disposable hosted runner, contents: read, no secrets in the job."
     },
@@ -151,7 +151,7 @@
       "file": "verify_gateway.py",
       "occurrences": 3,
       "classification": "false_positive",
-      "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
+      "owner": "Sandeep (owner-approved 2026-10-24)",
       "reviewed": "2026-10-24",
       "reason": "Lines 3, 28 and 87 are the docstring, a function docstring and a printed message that mention .env; none reads it. The real read (line 32) is a separate accepted-risk entry."
     }
