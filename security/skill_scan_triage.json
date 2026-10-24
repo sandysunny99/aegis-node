@@ -1,0 +1,135 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "key": "1361abeab0e6ccb4",
+      "target": "agents-md",
+      "rule_id": "EA2",
+      "file": "AGENTS.md",
+      "classification": "false_positive",
+      "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
+      "reviewed": "2026-10-24",
+      "reason": "Line 7 reads 'NEVER automatically execute or fetch user-supplied URLs'. The regex matched 'automatically execute' inside a prohibition; the rule forbids autonomy rather than granting it."
+    },
+    {
+      "key": "779b0d6aca5eec7d",
+      "target": "scripts",
+      "rule_id": "PE3",
+      "file": "serve_local.ps1",
+      "classification": "false_positive",
+      "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
+      "reviewed": "2026-10-24",
+      "reason": "Line 4 is a comment explaining that .env sets APP_ENV=production. The script never reads, prints or sends .env; it only sets APP_ENV for its own process."
+    },
+    {
+      "key": "475efe2b2932f6b8",
+      "target": "scripts",
+      "rule_id": "PE3",
+      "file": "verify_gateway.py",
+      "classification": "accepted_risk",
+      "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
+      "reviewed": "2026-10-24",
+      "reason": "Manual check script: loads the local .env so it can call Groq directly and via the Cloudflare AI Gateway with a fixed prompt ('Analyze this: Clean file.'). It reads real keys and makes paid external calls, so agents must only run it when the owner asks. No repo or dataset content is sent."
+    },
+    {
+      "key": "1f0f0b857781e17d",
+      "target": "scripts",
+      "rule_id": "AE4",
+      "file": "debug_logs.ps1",
+      "classification": "false_positive",
+      "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
+      "reviewed": "2026-10-24",
+      "reason": "Two-line ASCII script saved with a UTF-8 BOM. Verified: the same file without the BOM produces no AE4, with the BOM it does. The BOM is the only non-ASCII character."
+    },
+    {
+      "key": "9864d1c804a8fa35",
+      "target": "scripts",
+      "rule_id": "AE4",
+      "file": "debug_scan.ps1",
+      "classification": "false_positive",
+      "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
+      "reviewed": "2026-10-24",
+      "reason": "Same as debug_logs.ps1: two-line ASCII script whose only non-ASCII content is the UTF-8 BOM that triggers the Unicode-density check."
+    },
+    {
+      "key": "5a05309530dca327",
+      "target": "scripts",
+      "rule_id": "AST4",
+      "file": "skill_scan.py",
+      "classification": "accepted_risk",
+      "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
+      "reviewed": "2026-10-24",
+      "reason": "The SkillSpector wrapper must start the pinned scanner (version probe). It uses an argument list, no shell, a minimal environment without keys, a timeout and stdin closed."
+    },
+    {
+      "key": "696ab3c72c8028c3",
+      "target": "scripts",
+      "rule_id": "AST4",
+      "file": "skill_scan.py",
+      "classification": "accepted_risk",
+      "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
+      "reviewed": "2026-10-24",
+      "reason": "The scan call of the wrapper: argument list, no shell, --no-llm, minimal environment, dead proxy for egress, timeout, bounded report size. Covered by tests/test_skill_scan.py."
+    },
+    {
+      "key": "2009c7eadbd26131",
+      "target": "scripts",
+      "rule_id": "TT2",
+      "file": "skill_scan.py",
+      "classification": "accepted_risk",
+      "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
+      "reviewed": "2026-10-24",
+      "reason": "Taint flow into the version-probe subprocess call. The inputs are the configured scanner path and a constant flag; no network-derived data reaches the call."
+    },
+    {
+      "key": "40e009c84fa5feaa",
+      "target": "scripts",
+      "rule_id": "TT2",
+      "file": "skill_scan.py",
+      "classification": "accepted_risk",
+      "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
+      "reviewed": "2026-10-24",
+      "reason": "Taint flow into the scan subprocess call. The target path comes from the reviewed policy file and is validated (relative, inside repo, no symlinks) before use."
+    },
+    {
+      "key": "85ac3115f9af6cd7",
+      "target": "scripts",
+      "rule_id": "TT2",
+      "file": "smoke_fresh_db.py",
+      "classification": "false_positive",
+      "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
+      "reviewed": "2026-10-24",
+      "reason": "Manual smoke test against 127.0.0.1:8000: the dataset id returned by the local dev server is sent back to the same local server. No external host is involved."
+    },
+    {
+      "key": "88956b1adb464154",
+      "target": "scripts",
+      "rule_id": "TT2",
+      "file": "smoke_fresh_db.py",
+      "classification": "false_positive",
+      "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
+      "reviewed": "2026-10-24",
+      "reason": "Same local round trip as line 18: the history query sends the local dataset id back to 127.0.0.1:8000."
+    },
+    {
+      "key": "c2721df122b4d47c",
+      "target": "ci-workflows",
+      "rule_id": "TM2",
+      "file": "ci.yml",
+      "classification": "accepted_risk",
+      "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
+      "reviewed": "2026-10-24",
+      "reason": "'sudo apt-get update && sudo apt-get install -y libmagic1' on an ephemeral GitHub-hosted runner, needed for MIME detection tests. The job has contents: read only and no deploy step."
+    },
+    {
+      "key": "247711d5f05ce1aa",
+      "target": "ci-workflows",
+      "rule_id": "PE2",
+      "file": "ci.yml",
+      "classification": "accepted_risk",
+      "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
+      "reviewed": "2026-10-24",
+      "reason": "Same sudo apt-get line as the TM2 entry: root on a throwaway hosted runner to install one Debian package."
+    }
+  ]
+}

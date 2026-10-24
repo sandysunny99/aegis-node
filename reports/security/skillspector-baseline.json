@@ -1,0 +1,376 @@
+{
+  "tool": {
+    "name": "SkillSpector",
+    "version": "2.12.0",
+    "commit": "d7338f58200a9ae2a24810cee08911ab68b107a7"
+  },
+  "mode": "report",
+  "llm_used": false,
+  "network": "blocked (dead local proxy)",
+  "generated_at": "2026-10-24T11:29:35+00:00",
+  "limits": {
+    "timeout_seconds": 180,
+    "max_files_per_target": 50,
+    "max_file_bytes": 1048576,
+    "max_report_bytes": 5242880
+  },
+  "targets": [
+    {
+      "id": "agents-md",
+      "path": "AGENTS.md",
+      "kind": "agent_rules",
+      "files": 1,
+      "status": "complete",
+      "detail": "",
+      "findings": [
+        {
+          "key": "1361abeab0e6ccb4",
+          "rule_id": "EA2",
+          "category": "Excessive Agency",
+          "severity": "MEDIUM",
+          "file": "AGENTS.md",
+          "lines": [
+            7
+          ],
+          "triage": null
+        }
+      ],
+      "exit_code": 0,
+      "report_bytes": 14104,
+      "duration_seconds": 5.07,
+      "score": 8,
+      "severity": "LOW",
+      "recommendation": "SAFE",
+      "completeness_status": "complete",
+      "is_complete": true,
+      "execution_successful": true,
+      "coverage_percent": 100.0,
+      "ledger_reasons": [],
+      "components": 1
+    },
+    {
+      "id": "agent-workflow",
+      "path": "docs/AGENT_WORKFLOW.md",
+      "kind": "agent_guidance",
+      "files": 1,
+      "status": "complete",
+      "detail": "",
+      "findings": [],
+      "exit_code": 0,
+      "report_bytes": 12461,
+      "duration_seconds": 5.04,
+      "score": 0,
+      "severity": "LOW",
+      "recommendation": "SAFE",
+      "completeness_status": "complete",
+      "is_complete": true,
+      "execution_successful": true,
+      "coverage_percent": 100.0,
+      "ledger_reasons": [],
+      "components": 1
+    },
+    {
+      "id": "agent-toolchain",
+      "path": "docs/AGENT_TOOLCHAIN.md",
+      "kind": "agent_guidance",
+      "files": 1,
+      "status": "complete",
+      "detail": "",
+      "findings": [],
+      "exit_code": 0,
+      "report_bytes": 12462,
+      "duration_seconds": 5.07,
+      "score": 0,
+      "severity": "LOW",
+      "recommendation": "SAFE",
+      "completeness_status": "complete",
+      "is_complete": true,
+      "execution_successful": true,
+      "coverage_percent": 100.0,
+      "ledger_reasons": [],
+      "components": 1
+    },
+    {
+      "id": "agent-toolchain-audit",
+      "path": "docs/AGENT_TOOLCHAIN_AUDIT.md",
+      "kind": "agent_guidance",
+      "files": 1,
+      "status": "complete",
+      "detail": "",
+      "findings": [],
+      "exit_code": 0,
+      "report_bytes": 12469,
+      "duration_seconds": 4.81,
+      "score": 0,
+      "severity": "LOW",
+      "recommendation": "SAFE",
+      "completeness_status": "complete",
+      "is_complete": true,
+      "execution_successful": true,
+      "coverage_percent": 100.0,
+      "ledger_reasons": [],
+      "components": 1
+    },
+    {
+      "id": "scientific-skills",
+      "path": "docs/SCIENTIFIC_SKILLS_CONFIGURATION.md",
+      "kind": "agent_guidance",
+      "files": 1,
+      "status": "complete",
+      "detail": "",
+      "findings": [],
+      "exit_code": 0,
+      "report_bytes": 12478,
+      "duration_seconds": 4.89,
+      "score": 0,
+      "severity": "LOW",
+      "recommendation": "SAFE",
+      "completeness_status": "complete",
+      "is_complete": true,
+      "execution_successful": true,
+      "coverage_percent": 100.0,
+      "ledger_reasons": [],
+      "components": 1
+    },
+    {
+      "id": "cybersecurity-skills",
+      "path": "docs/CYBERSECURITY_SKILLS_SELECTION.md",
+      "kind": "agent_guidance",
+      "files": 1,
+      "status": "complete",
+      "detail": "",
+      "findings": [],
+      "exit_code": 0,
+      "report_bytes": 12477,
+      "duration_seconds": 5.03,
+      "score": 0,
+      "severity": "LOW",
+      "recommendation": "SAFE",
+      "completeness_status": "complete",
+      "is_complete": true,
+      "execution_successful": true,
+      "coverage_percent": 100.0,
+      "ledger_reasons": [],
+      "components": 1
+    },
+    {
+      "id": "scripts",
+      "path": "scripts",
+      "kind": "agent_script",
+      "files": 13,
+      "status": "complete",
+      "detail": "",
+      "findings": [
+        {
+          "key": "779b0d6aca5eec7d",
+          "rule_id": "PE3",
+          "category": "Privilege Escalation",
+          "severity": "HIGH",
+          "file": "serve_local.ps1",
+          "lines": [
+            4
+          ],
+          "triage": null
+        },
+        {
+          "key": "475efe2b2932f6b8",
+          "rule_id": "PE3",
+          "category": "Privilege Escalation",
+          "severity": "HIGH",
+          "file": "verify_gateway.py",
+          "lines": [
+            13
+          ],
+          "triage": null
+        },
+        {
+          "key": "1f0f0b857781e17d",
+          "rule_id": "AE4",
+          "category": "analysis-evasion",
+          "severity": "MEDIUM",
+          "file": "debug_logs.ps1",
+          "lines": [
+            1
+          ],
+          "triage": null
+        },
+        {
+          "key": "9864d1c804a8fa35",
+          "rule_id": "AE4",
+          "category": "analysis-evasion",
+          "severity": "MEDIUM",
+          "file": "debug_scan.ps1",
+          "lines": [
+            1
+          ],
+          "triage": null
+        },
+        {
+          "key": "5a05309530dca327",
+          "rule_id": "AST4",
+          "category": "Dangerous Code Execution",
+          "severity": "MEDIUM",
+          "file": "skill_scan.py",
+          "lines": [
+            260
+          ],
+          "triage": null
+        },
+        {
+          "key": "696ab3c72c8028c3",
+          "rule_id": "AST4",
+          "category": "Dangerous Code Execution",
+          "severity": "MEDIUM",
+          "file": "skill_scan.py",
+          "lines": [
+            285
+          ],
+          "triage": null
+        },
+        {
+          "key": "2009c7eadbd26131",
+          "rule_id": "TT2",
+          "category": "Data Flow",
+          "severity": "MEDIUM",
+          "file": "skill_scan.py",
+          "lines": [
+            260
+          ],
+          "triage": null
+        },
+        {
+          "key": "40e009c84fa5feaa",
+          "rule_id": "TT2",
+          "category": "Data Flow",
+          "severity": "MEDIUM",
+          "file": "skill_scan.py",
+          "lines": [
+            285
+          ],
+          "triage": null
+        },
+        {
+          "key": "85ac3115f9af6cd7",
+          "rule_id": "TT2",
+          "category": "Data Flow",
+          "severity": "MEDIUM",
+          "file": "smoke_fresh_db.py",
+          "lines": [
+            18
+          ],
+          "triage": null
+        },
+        {
+          "key": "88956b1adb464154",
+          "rule_id": "TT2",
+          "category": "Data Flow",
+          "severity": "MEDIUM",
+          "file": "smoke_fresh_db.py",
+          "lines": [
+            23
+          ],
+          "triage": null
+        }
+      ],
+      "exit_code": 1,
+      "report_bytes": 30104,
+      "duration_seconds": 8.0,
+      "score": 73,
+      "severity": "HIGH",
+      "recommendation": "DO_NOT_INSTALL",
+      "completeness_status": "complete",
+      "is_complete": true,
+      "execution_successful": true,
+      "coverage_percent": 100.0,
+      "ledger_reasons": [],
+      "components": 13
+    },
+    {
+      "id": "ci-workflows",
+      "path": ".github/workflows",
+      "kind": "ci_workflow",
+      "files": 2,
+      "status": "complete",
+      "detail": "",
+      "findings": [
+        {
+          "key": "c2721df122b4d47c",
+          "rule_id": "TM2",
+          "category": "Tool Misuse",
+          "severity": "HIGH",
+          "file": "ci.yml",
+          "lines": [
+            25
+          ],
+          "triage": null
+        },
+        {
+          "key": "247711d5f05ce1aa",
+          "rule_id": "PE2",
+          "category": "Privilege Escalation",
+          "severity": "MEDIUM",
+          "file": "ci.yml",
+          "lines": [
+            25
+          ],
+          "triage": null
+        }
+      ],
+      "exit_code": 0,
+      "report_bytes": 16846,
+      "duration_seconds": 5.4,
+      "score": 29,
+      "severity": "MEDIUM",
+      "recommendation": "CAUTION",
+      "completeness_status": "complete",
+      "is_complete": true,
+      "execution_successful": true,
+      "coverage_percent": 100.0,
+      "ledger_reasons": [],
+      "components": 2
+    }
+  ],
+  "exclusions": [
+    {
+      "path": "tests/fixtures/skill_security/",
+      "reason": "Deliberately unsafe synthetic skills used by tests/test_skill_scan.py"
+    },
+    {
+      "path": "backend/services/ (LLM prompts, guardrails)",
+      "reason": "Production dataset-analysis code, not agent tooling; covered by the Aegis test suite and guardrail benchmark"
+    },
+    {
+      "path": "data/, evaluation/, research/, tests/fixtures/ (datasets)",
+      "reason": "Application datasets are scanned by Aegis itself, never by SkillSpector"
+    },
+    {
+      "path": "docs/ (other Markdown), anti-slop/",
+      "reason": "Project documentation and audit outputs, not instructions an agent executes"
+    },
+    {
+      "path": ".claude/, .agents/, skills/, MCP config on the owner's laptop",
+      "reason": "Not tracked in git, so not visible to this scan; scan locally with the same script"
+    }
+  ],
+  "stale_triage": [],
+  "gate": {
+    "passed": false,
+    "reasons": [
+      "scripts: PE3 in serve_local.ps1:4 is untriaged HIGH",
+      "scripts: PE3 in verify_gateway.py:13 is untriaged HIGH",
+      "ci-workflows: TM2 in ci.yml:25 is untriaged HIGH"
+    ],
+    "warnings": [
+      "agents-md: EA2 in AGENTS.md:7 is untriaged MEDIUM",
+      "scripts: AE4 in debug_logs.ps1:1 is untriaged MEDIUM",
+      "scripts: AE4 in debug_scan.ps1:1 is untriaged MEDIUM",
+      "scripts: AST4 in skill_scan.py:260 is untriaged MEDIUM",
+      "scripts: AST4 in skill_scan.py:285 is untriaged MEDIUM",
+      "scripts: TT2 in skill_scan.py:260 is untriaged MEDIUM",
+      "scripts: TT2 in skill_scan.py:285 is untriaged MEDIUM",
+      "scripts: TT2 in smoke_fresh_db.py:18 is untriaged MEDIUM",
+      "scripts: TT2 in smoke_fresh_db.py:23 is untriaged MEDIUM",
+      "ci-workflows: PE2 in ci.yml:25 is untriaged MEDIUM"
+    ]
+  }
+}
