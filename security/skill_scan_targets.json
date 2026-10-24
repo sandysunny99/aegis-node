@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "skillspector": {
+    "version": "2.12.0",
+    "commit": "d7338f58200a9ae2a24810cee08911ab68b107a7"
+  },
+  "limits": {
+    "timeout_seconds": 180,
+    "max_files_per_target": 50,
+    "max_file_bytes": 1048576,
+    "max_report_bytes": 5242880
+  },
+  "targets": [
+    {"id": "agents-md", "path": "AGENTS.md", "kind": "agent_rules",
+     "reason": "Antigravity agent rules: the only agent instruction file tracked in git"},
+    {"id": "agent-workflow", "path": "docs/AGENT_WORKFLOW.md", "kind": "agent_guidance",
+     "reason": "Harness workflow the agents are told to follow"},
+    {"id": "agent-toolchain", "path": "docs/AGENT_TOOLCHAIN.md", "kind": "agent_guidance",
+     "reason": "Manifest of agent tools and skills in use"},
+    {"id": "agent-toolchain-audit", "path": "docs/AGENT_TOOLCHAIN_AUDIT.md", "kind": "agent_guidance",
+     "reason": "Agent toolchain decisions, including enabled skill families"},
+    {"id": "scientific-skills", "path": "docs/SCIENTIFIC_SKILLS_CONFIGURATION.md", "kind": "agent_guidance",
+     "reason": "Which external research skills agents may use"},
+    {"id": "cybersecurity-skills", "path": "docs/CYBERSECURITY_SKILLS_SELECTION.md", "kind": "agent_guidance",
+     "reason": "Which external security skills agents may use"},
+    {"id": "scripts", "path": "scripts", "kind": "agent_script",
+     "reason": "Local scripts agents are asked to run (serve_local.ps1, smoke tests, ClamAV checks)"},
+    {"id": "ci-workflows", "path": ".github/workflows", "kind": "ci_workflow",
+     "reason": "Release automation that runs on every push and pull request"}
+  ],
+  "exclusions": [
+    {"path": "tests/fixtures/skill_security/",
+     "reason": "Deliberately unsafe synthetic skills used by tests/test_skill_scan.py"},
+    {"path": "backend/services/ (LLM prompts, guardrails)",
+     "reason": "Production dataset-analysis code, not agent tooling; covered by the Aegis test suite and guardrail benchmark"},
+    {"path": "data/, evaluation/, research/, tests/fixtures/ (datasets)",
+     "reason": "Application datasets are scanned by Aegis itself, never by SkillSpector"},
+    {"path": "docs/ (other Markdown), anti-slop/",
+     "reason": "Project documentation and audit outputs, not instructions an agent executes"},
+    {"path": ".claude/, .agents/, skills/, MCP config on the owner's laptop",
+     "reason": "Not tracked in git, so not visible to this scan; scan locally with the same script"}
+  ]
+}

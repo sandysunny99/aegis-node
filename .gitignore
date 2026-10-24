@@ -79,3 +79,6 @@ RENDER_*.env
 
 # ─── Build output (the Dockerfile rebuilds the SPA into backend/static) ─────
 backend/static/
+
+# ─── Agent-skill scan: routine summaries (committed baselines are named skillspector-baseline / -after-triage)
+reports/security/skillspector-summary.*

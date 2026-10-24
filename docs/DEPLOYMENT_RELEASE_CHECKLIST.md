@@ -27,3 +27,9 @@
 - **API Authentication:** Enforced via keys and Turnstile on mutation endpoints.
 - **CORS:** Strictly limited to `ALLOWED_ORIGINS`.
 - **Secret Handling:** All secrets are server-only. Frontend receives NO backend secrets.
+
+## Agent-skill security scan
+- **Status:** report-only. `.github/workflows/skill-scan.yml` runs SkillSpector statically on the targets in `security/skill_scan_targets.json` and never blocks a merge or deploy.
+- **Before a release:** read the job's sanitized summary (or run `python scripts/skill_scan.py --scanner <pinned skillspector> --mode gate` locally). Any target that is not `complete`, and any untriaged HIGH/CRITICAL finding, needs review before release.
+- **Blocking:** not yet. Switch the workflow to `--mode gate` only after the owner signs off `security/skill_scan_triage.json`. See `docs/security/SKILL_SECURITY_SCANNING.md`.
+- **Separate from datasets:** this scan never changes a dataset verdict and is not part of the Render image.
