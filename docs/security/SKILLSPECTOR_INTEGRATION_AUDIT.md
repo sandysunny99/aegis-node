@@ -1,6 +1,7 @@
 # SkillSpector integration audit
 
-Date: 2026-10-24. Branch: `claude/project-thread-6xpnu9`, cut from `main` at `1de487b`.
+Date: 2026-10-24. First run on `claude/project-thread-6xpnu9` (from `main` at `1de487b`);
+revised on `feat/skillspector-security-audit` (from `main` at `253c7ae`) after the owner's review.
 Scope: evaluate NVIDIA SkillSpector as a security scanner for the agent skills, rules and
 scripts used to build Aegis Node, and integrate it only where justified.
 
@@ -9,15 +10,22 @@ proposal for the owner. **Unverified** means stated by a source but not checked 
 
 ## 1. Result in one paragraph
 
-SkillSpector is useful to Aegis as an isolated, static, report-only development tool. It
-was installed outside the repository at a pinned commit, run with LLM analysis off and
-outbound HTTP blocked, and pointed at 8 approved targets (21 files). It found 0 critical,
-3 high and 10 medium findings. After manual review, 8 are false positives and 5 are
-accepted risks (owner sign-off still needed); none was a confirmed risk, so no Aegis code
-was changed because of a finding. A test-first wrapper (`scripts/skill_scan.py`, 35 tests)
-and a report-only GitHub Actions job were added. The production dataset scanner, backend
-dependencies, frontend dependencies, deploy config and any user-wide Claude or MCP
+SkillSpector is useful to Aegis as an isolated, static, **local-only**, report-only
+development tool. It was installed outside the repository at a pinned commit, run with LLM
+analysis off and outbound HTTP blocked, and pointed at 8 approved targets. The first run
+found 13 findings (0 critical, 3 high, 10 medium). On review, none was a confirmed risk;
+two scripts behind accepted risks were still hardened at the owner's request
+(`cleanup.ps1`, `verify_gateway.py`). The current run finds 14 findings covering 17 matches
+(4 high, 10 medium): 7 false positives and 7 accepted risks, all awaiting the owner's
+sign-off. A test-first wrapper (`scripts/skill_scan.py`) was added. The hosted CI job is
+deferred because the tool's environment is 217 MB and alpha. The production dataset
+scanner, backend and frontend dependencies, deploy config and any user-wide Claude or MCP
 configuration are unchanged.
+
+**Correction (2026-10-24).** The first version of this report said "8 false positives and
+5 accepted risks". That was wrong: the triage file it shipped with had 6 false positives
+and 7 accepted risks. The owner caught it. The totals below are now checked against the
+triage file and reports by `tests/test_skill_scan_records.py`.
 
 ## 2. Aegis baseline (Phase 1) - verified
 
@@ -142,32 +150,48 @@ files, MCP configuration.
 
 ### Findings and triage
 
-| Key | Target | Rule | Sev. | Location | Classification | Evidence |
-|---|---|---|---|---|---|---|
-| `779b0d6aca5eec7d` | scripts | PE3 | HIGH | `serve_local.ps1:4` | false positive | Line 4 is a comment that mentions `.env`; the file is never read |
-| `475efe2b2932f6b8` | scripts | PE3 | HIGH | `verify_gateway.py:13` | accepted risk | Loads `.env` to call Groq with a fixed prompt; real keys and paid calls, so agents run it only on request |
-| `c2721df122b4d47c` | ci-workflows | TM2 | HIGH | `ci.yml:25` | accepted risk | `sudo apt-get install libmagic1` on an ephemeral hosted runner, `contents: read` |
-| `247711d5f05ce1aa` | ci-workflows | PE2 | MEDIUM | `ci.yml:25` (x2) | accepted risk | Same line |
-| `1361abeab0e6ccb4` | agents-md | EA2 | MEDIUM | `AGENTS.md:7` | false positive | Matched inside "NEVER automatically execute" |
-| `1f0f0b857781e17d` | scripts | AE4 | MEDIUM | `debug_logs.ps1:1` | false positive | UTF-8 BOM; no finding without it (tested) |
-| `9864d1c804a8fa35` | scripts | AE4 | MEDIUM | `debug_scan.ps1:1` | false positive | Same BOM pattern |
-| `5a05309530dca327`, `696ab3c72c8028c3` | scripts | AST4 | MEDIUM | `skill_scan.py` | accepted risk | The wrapper must start the scanner; argument list, no shell, timeout |
-| `2009c7eadbd26131`, `40e009c84fa5feaa` | scripts | TT2 | MEDIUM | `skill_scan.py` | accepted risk | Inputs are the policy-validated path and constant flags |
-| `85ac3115f9af6cd7`, `88956b1adb464154` | scripts | TT2 | MEDIUM | `smoke_fresh_db.py:18,23` | false positive | Dataset id from 127.0.0.1 sent back to 127.0.0.1 |
+Two runs are recorded. A finding is one triage key: target, rule, file and matched text. When
+the same text matches on several lines, SkillSpector reports each match, and the wrapper groups
+them under one key with an occurrence count. A triage entry records how many matches it
+reviewed; if that number changes, the entry stops applying until it is reviewed again.
 
-Totals: 13 findings (0 critical, 3 high, 10 medium, 0 low); 0 confirmed, 0 likely,
-8 false positives, 5 accepted risks, 0 incomplete. The owner field of every entry says
-"proposed by Claude, awaiting owner review" until Sandeep confirms it.
+Baseline totals (first run, `reports/security/skillspector-baseline.*`, before any script
+change): 13 findings (14 matches): 0 critical, 3 high, 10 medium, 0 low; 6 false positives, 7 accepted risks, 0 confirmed, 0 likely, 0 incomplete.
+SkillSpector reported PE2 twice on `ci.yml:25` (once per `sudo`). That baseline file is
+older than the occurrence count, so it shows 13 grouped rows.
 
-### Manual-review items the scanner missed (need owner review)
+Current totals (`reports/security/skillspector-after-triage.*`, this branch): 14 findings (17 matches): 0 critical, 4 high, 10 medium, 0 low; 7 false positives, 7 accepted risks, 0 confirmed, 0 likely, 0 incomplete.
+The new finding is `dbe350a3ee7e62e3`: the opt-in text added to `verify_gateway.py` mentions
+`.env` three times.
 
-1. `scripts/cleanup.ps1` force-kills whatever listens on ports 8000 and 5173 and runs
-   `docker compose down -v`, which deletes the compose volumes (local SQLite history,
-   quarantine). Likely risk if an agent runs it unprompted. Suggested mitigation: a
-   confirmation prompt or a `-RemoveVolumes` switch. Not changed here, because it alters
-   script behaviour the owner relies on.
-2. `scripts/verify_gateway.py` makes real, billable Groq calls with the local keys. Covered
-   by the accepted-risk entry above; agents should only run it when asked.
+| Group | Keys (rule, location, matches) | Classification | Evidence and safeguard |
+|---|---|---|---|
+| `.env` named in text, not read | `779b0d6aca5eec7d` (PE3 HIGH, `serve_local.ps1:4`, 1); `dbe350a3ee7e62e3` (PE3 HIGH, `verify_gateway.py:3,28,87`, 3) | false positive | Comment, docstrings and a printed message; nothing reads the file there |
+| Paid Groq check reads `.env` | `475efe2b2932f6b8` (PE3 HIGH, `verify_gateway.py:32`, 1) | accepted risk | New safeguard: does nothing and loads nothing without `--confirm-paid-calls`; keys never printed; never run by tests, CI or the scan |
+| CI installs a package as root | `c2721df122b4d47c` (TM2 HIGH, `ci.yml:25`, 1); `247711d5f05ce1aa` (PE2 MEDIUM, `ci.yml:25`, 2) | accepted risk | Ephemeral GitHub-hosted runner, `permissions: contents: read`, the job references no secrets (only the separate gitleaks job uses `GITHUB_TOKEN`), no deploy step |
+| Wrapper starts the scanner | `5a05309530dca327`, `696ab3c72c8028c3` (AST4 MEDIUM, `skill_scan.py`, 1 each) | accepted risk | Argument list, `shell=False`, stdin closed, timeout, `--no-llm`, report size cap; tests check argv |
+| Environment flows into the scanner call | `2009c7eadbd26131`, `40e009c84fa5feaa` (TT2 MEDIUM, `skill_scan.py`, 1 each) | accepted risk | SkillSpector traces `env` from `os.environ.get`. Only `PATH` (plus `SYSTEMROOT`, `WINDIR`, `COMSPEC`, `PATHEXT` on Windows) is copied from the host; the rest is constant and proxies point at 127.0.0.1:9. The target path comes from the policy and passes `_resolve_target`. A test asserts no `KEY`/`TOKEN`/`SECRET` variable reaches the scanner |
+| Negated rule text | `1361abeab0e6ccb4` (EA2 MEDIUM, `AGENTS.md:7`, 1) | false positive | Matched inside "NEVER automatically execute" |
+| UTF-8 BOM | `1f0f0b857781e17d` (AE4 MEDIUM, `debug_logs.ps1:1`), `9864d1c804a8fa35` (AE4 MEDIUM, `debug_scan.ps1:1`) | false positive | Two-line ASCII scripts; same file without the BOM gives no AE4 (tested) |
+| Local round trip | `85ac3115f9af6cd7`, `88956b1adb464154` (TT2 MEDIUM, `smoke_fresh_db.py:18,23`) | false positive | Dataset id from 127.0.0.1 sent back to 127.0.0.1 |
+
+Every entry's owner field reads "proposed by Claude, awaiting owner review". None has been
+approved by the owner.
+
+### Manual-review items the scanner missed
+
+1. `scripts/cleanup.ps1` used to force-kill whatever listened on ports 8000 and 5173 and run
+   `docker compose down -v`, deleting the Aegis volumes. **Fixed at the owner's request:** the
+   default now only runs `docker compose down`; `-StopListeners` offers to stop
+   python/uvicorn/node dev servers one at a time (no `-Force`, never without a console);
+   `-RemoveVolumes` lists the declared Aegis volumes that exist and deletes exactly those
+   after the typed phrase `DELETE AEGIS DATA` (refused without a console unless
+   `-ConfirmDeletion` carries it); `-DryRun` changes nothing. `tests/test_cleanup_script.py`
+   runs the real script under PowerShell with stubbed docker and process commands: all 11
+   behaviour and static checks failed on the old script and pass now. The interactive
+   prompts themselves are not exercised by the tests.
+2. `scripts/verify_gateway.py` makes real, billable Groq calls with the local keys. Now
+   gated by `--confirm-paid-calls` (accepted-risk entry above).
 3. `scripts/internal_eicar_test.ps1` writes the EICAR test string (hex-encoded) and uploads it
    to the local server. Intended test behaviour; noted because SkillSpector does not decode it.
 
@@ -176,7 +200,7 @@ Totals: 13 findings (0 critical, 3 high, 10 medium, 0 low); 0 confirmed, 0 likel
 | Option | Decision | Why |
 |---|---|---|
 | A. Isolated dev tool | **Adopted** | No production change, no new Aegis dependency, easy to remove |
-| B. CI gate | **Adopted as report-only** (`.github/workflows/skill-scan.yml`) | Runs on PRs that touch agent files or scripts, and on demand; never blocks. Promote to blocking after the owner signs off the triage (section 9) |
+| B. CI gate | **Deferred** | The owner declined installing the 217 MB alpha environment in hosted CI for now (50 MB threshold). The reviewed workflow is kept inactive at `docs/security/deferred/skill-scan.workflow.yml.txt` |
 | C. MCP server for Claude Code | **Not adopted now** | Aegis has no skills or MCP servers in git to gate; the stdio transport still has the initialize hang (issue #199, per README); HTTP has no auth. No global or project MCP config was written |
 
 Not done on purpose: no SkillSpector source or rules copied into Aegis; no change to the
@@ -200,9 +224,10 @@ and because suppressing in the scanner lowers its raw score, which the sanitized
 - Network during install: GitHub (clone) and PyPI (locked wheels). During scans: none
   (dead proxy), verified by design of the env and covered by a test that checks the
   scanner's environment.
-- **Needs owner approval:** the tool is 217 MB with its dependencies, above the project's
-  50 MB review threshold, and is alpha. It stays out of the Aegis runtime either way; the
-  question is only whether the CI job may install it.
+- **Owner decision (2026-10-24): not in hosted CI for now.** The tool is 217 MB with its
+  dependencies, above the project's 50 MB review threshold, and alpha. It runs only in a
+  local isolated venv. Later options for review: a pre-provisioned self-hosted runner with
+  the venv cached, a documented exception, or a lighter scanner.
 
 ## 8. Resource bounds (Phase 9)
 
@@ -215,19 +240,24 @@ after each target, no URLs, no LLM.
 
 ## 9. Tests (Phase 7) - verified
 
-`tests/test_skill_scan.py`: 35 tests (34 with a fake scanner, 1 against the real pinned
-SkillSpector when `SKILLSPECTOR_BIN` is set). Written first and run against a naive wrapper
-that trusted the exit code and recommendation: **32 failed, 2 passed, 1 skipped**. After the
-wrapper was implemented: **35 passed** (with the real scanner), 34 passed and 1 skipped without
-it. Coverage of the 10 required cases: benign, prompt injection, credential exposure,
-malformed report (6 shapes) and oversized report, process failure, exit 2 with report,
-timeout, incomplete analysis with a SAFE recommendation, triage with reason and owner,
-triage without reason, confirmed risk, mismatched triage, unapproved paths (7 shapes),
-symlink, file-count cap, shipped baseline, argument-list and secret-free environment,
-reviewer-manipulation text (gate fails, text not printed or written), no snippets or
-absolute paths in outputs, pinned-version mismatch, LLM-mode report.
+`tests/test_skill_scan.py`: 37 tests (36 with a fake scanner, 1 against the real pinned
+SkillSpector when `SKILLSPECTOR_BIN` is set). The first 34 were written before the wrapper
+and run against a naive version that trusted the exit code and recommendation: **32 failed,
+2 passed, 1 skipped**. Two were added with the occurrence-count rule. Coverage of the 10
+required cases: benign, prompt injection, credential exposure, malformed report (6 shapes)
+and oversized report, process failure, exit 2 with report, timeout, incomplete analysis
+with a SAFE recommendation, triage with reason and owner, triage without reason or
+occurrence count, confirmed risk, mismatched triage, a new match under a reviewed key,
+unapproved paths (7 shapes), symlink, file-count cap, shipped baseline, argument list and
+secret-free environment, reviewer-manipulation text (gate fails, text not printed or
+written), no snippets or absolute paths in outputs, pinned-version mismatch, LLM-mode report.
 
-Full Aegis suite and checks for this change: see section 11.
+`tests/test_skill_scan_records.py` checks the committed records against each other: triage
+file, both sanitized reports, and the totals lines in section 5 of this file.
+
+`tests/test_cleanup_script.py`: 13 tests (3 static, 8 under PowerShell with stubs, 2 for
+`verify_gateway.py`). The PowerShell ones skip when `pwsh` is missing; GitHub's Ubuntu
+runners have it.
 
 ## 10. Separation from dataset verdicts (Phase 8)
 
@@ -240,36 +270,25 @@ Aegis's prompt-injection detectors needs its own approved evaluation on syntheti
 
 | Area | Changed? |
 |---|---|
-| Production dataset scanner, backend code | No |
+| Production dataset scanner, `backend/`, `scanner/` | No |
 | Backend dependencies (`requirements*.txt`) | No |
-| Frontend dependencies | No |
+| Frontend code and dependencies | No |
 | `render.yaml`, Dockerfile, deploy config | No |
-| CI | New report-only workflow `skill-scan.yml`; `ci.yml` unchanged. Inert until the branch is pushed and merged |
+| CI | No. `ci.yml` unchanged; the SkillSpector workflow is deferred (not in `.github/workflows/`). The new tests run in the existing pytest job |
+| Local scripts | `scripts/cleanup.ps1` (safe default) and `scripts/verify_gateway.py` (opt-in) |
 | User-wide Claude or MCP configuration | No (none read or written) |
 
-Files added: `scripts/skill_scan.py`, `security/skill_scan_targets.json`,
-`security/skill_scan_triage.json`, `tests/test_skill_scan.py`,
-`tests/fixtures/skill_security/` (4 synthetic skills), `.github/workflows/skill-scan.yml`,
-`reports/security/skillspector-{baseline,after-triage}.{json,md}`, this file,
-`docs/security/AGENT_SKILL_THREAT_MODEL.md`, `docs/security/SKILL_SECURITY_SCANNING.md`.
-Files updated: `docs/DEPENDENCIES.md`, `docs/DEPLOYMENT_RELEASE_CHECKLIST.md`,
-`docs/DECISIONS.md`, `.gitignore`.
-
-Verification for the commit (cloud container, Python 3.12): full pytest **604 passed, 2
-skipped** (the 2 skips predate this change; 571 tests before plus 35 new, with
-`SKILLSPECTOR_BIN` set); `ruff check .` clean; gitleaks 8.24.2 `dir` and `git` (86 commits):
-no leaks; workflow YAML parses. Frontend lint and build not run: no frontend file changed.
-The CI workflow itself was not executed (no runner here); its install commands match the
-ones run locally.
+Commits on `feat/skillspector-security-audit`: the original SkillSpector commit
+(cherry-picked from `3ed885e`), the script hardening, and the triage reconciliation with the
+CI deferral. Test results for the branch are in the thread report and the last commit message.
 
 ## 12. Remaining work and owner decisions
 
-1. Confirm or change the 13 triage entries (owner field says "awaiting owner review").
-2. Decide on `scripts/cleanup.ps1` (`docker compose down -v` without a prompt).
-3. Approve or reject installing the 217 MB alpha tool in CI (section 7).
-4. Scan the laptop-only agent files (`.claude/`, skills, MCP settings) locally, or commit the
+1. Review the 14 triage entries (7 false positives, 7 accepted risks) and change their owner
+   field when you accept them.
+2. Decide later whether SkillSpector may run in CI (self-hosted runner, exception, or not).
+3. Scan the laptop-only agent files (`.claude/`, skills, MCP settings) locally, or commit the
    ones that should be shared.
-5. After 1 and 3, decide when to switch the workflow from `--mode report` to `--mode gate`.
-6. Re-pin deliberately: when moving to a newer SkillSpector, rerun, compare with
+4. Re-pin deliberately: when moving to a newer SkillSpector, rerun, compare with
    `reports/security/skillspector-after-triage.json`, and re-triage changed keys.
-7. Not pushed. Nothing deployed.
+5. Nothing deployed. `main` untouched.

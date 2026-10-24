@@ -7,7 +7,7 @@
   "mode": "gate",
   "llm_used": false,
   "network": "blocked (dead local proxy)",
-  "generated_at": "2026-10-24T11:30:52+00:00",
+  "generated_at": "2026-10-24T11:55:37+00:00",
   "limits": {
     "timeout_seconds": 180,
     "max_files_per_target": 50,
@@ -32,13 +32,14 @@
           "lines": [
             7
           ],
+          "occurrences": 1,
           "triage": "false_positive",
           "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)"
         }
       ],
       "exit_code": 0,
       "report_bytes": 14104,
-      "duration_seconds": 5.06,
+      "duration_seconds": 5.62,
       "score": 8,
       "severity": "LOW",
       "recommendation": "SAFE",
@@ -59,7 +60,7 @@
       "findings": [],
       "exit_code": 0,
       "report_bytes": 12461,
-      "duration_seconds": 4.96,
+      "duration_seconds": 5.09,
       "score": 0,
       "severity": "LOW",
       "recommendation": "SAFE",
@@ -80,7 +81,7 @@
       "findings": [],
       "exit_code": 0,
       "report_bytes": 12462,
-      "duration_seconds": 4.95,
+      "duration_seconds": 5.26,
       "score": 0,
       "severity": "LOW",
       "recommendation": "SAFE",
@@ -101,7 +102,7 @@
       "findings": [],
       "exit_code": 0,
       "report_bytes": 12469,
-      "duration_seconds": 4.98,
+      "duration_seconds": 5.2,
       "score": 0,
       "severity": "LOW",
       "recommendation": "SAFE",
@@ -122,7 +123,7 @@
       "findings": [],
       "exit_code": 0,
       "report_bytes": 12478,
-      "duration_seconds": 4.87,
+      "duration_seconds": 5.16,
       "score": 0,
       "severity": "LOW",
       "recommendation": "SAFE",
@@ -143,7 +144,7 @@
       "findings": [],
       "exit_code": 0,
       "report_bytes": 12477,
-      "duration_seconds": 4.87,
+      "duration_seconds": 5.05,
       "score": 0,
       "severity": "LOW",
       "recommendation": "SAFE",
@@ -171,6 +172,7 @@
           "lines": [
             4
           ],
+          "occurrences": 1,
           "triage": "false_positive",
           "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)"
         },
@@ -181,9 +183,25 @@
           "severity": "HIGH",
           "file": "verify_gateway.py",
           "lines": [
-            13
+            32
           ],
+          "occurrences": 1,
           "triage": "accepted_risk",
+          "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)"
+        },
+        {
+          "key": "dbe350a3ee7e62e3",
+          "rule_id": "PE3",
+          "category": "Privilege Escalation",
+          "severity": "HIGH",
+          "file": "verify_gateway.py",
+          "lines": [
+            3,
+            28,
+            87
+          ],
+          "occurrences": 3,
+          "triage": "false_positive",
           "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)"
         },
         {
@@ -195,6 +213,7 @@
           "lines": [
             1
           ],
+          "occurrences": 1,
           "triage": "false_positive",
           "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)"
         },
@@ -207,6 +226,7 @@
           "lines": [
             1
           ],
+          "occurrences": 1,
           "triage": "false_positive",
           "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)"
         },
@@ -217,8 +237,9 @@
           "severity": "MEDIUM",
           "file": "skill_scan.py",
           "lines": [
-            260
+            264
           ],
+          "occurrences": 1,
           "triage": "accepted_risk",
           "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)"
         },
@@ -229,8 +250,9 @@
           "severity": "MEDIUM",
           "file": "skill_scan.py",
           "lines": [
-            285
+            289
           ],
+          "occurrences": 1,
           "triage": "accepted_risk",
           "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)"
         },
@@ -241,8 +263,9 @@
           "severity": "MEDIUM",
           "file": "skill_scan.py",
           "lines": [
-            260
+            264
           ],
+          "occurrences": 1,
           "triage": "accepted_risk",
           "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)"
         },
@@ -253,8 +276,9 @@
           "severity": "MEDIUM",
           "file": "skill_scan.py",
           "lines": [
-            285
+            289
           ],
+          "occurrences": 1,
           "triage": "accepted_risk",
           "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)"
         },
@@ -267,6 +291,7 @@
           "lines": [
             18
           ],
+          "occurrences": 1,
           "triage": "false_positive",
           "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)"
         },
@@ -279,14 +304,15 @@
           "lines": [
             23
           ],
+          "occurrences": 1,
           "triage": "false_positive",
           "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)"
         }
       ],
       "exit_code": 1,
-      "report_bytes": 30104,
-      "duration_seconds": 7.57,
-      "score": 73,
+      "report_bytes": 34457,
+      "duration_seconds": 9.0,
+      "score": 78,
       "severity": "HIGH",
       "recommendation": "DO_NOT_INSTALL",
       "completeness_status": "complete",
@@ -300,7 +326,7 @@
       "id": "ci-workflows",
       "path": ".github/workflows",
       "kind": "ci_workflow",
-      "files": 2,
+      "files": 1,
       "status": "complete",
       "detail": "",
       "findings": [
@@ -313,6 +339,7 @@
           "lines": [
             25
           ],
+          "occurrences": 1,
           "triage": "accepted_risk",
           "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)"
         },
@@ -325,13 +352,14 @@
           "lines": [
             25
           ],
+          "occurrences": 2,
           "triage": "accepted_risk",
           "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)"
         }
       ],
       "exit_code": 0,
-      "report_bytes": 16846,
-      "duration_seconds": 5.49,
+      "report_bytes": 16622,
+      "duration_seconds": 5.7,
       "score": 29,
       "severity": "MEDIUM",
       "recommendation": "CAUTION",
@@ -340,7 +368,7 @@
       "execution_successful": true,
       "coverage_percent": 100.0,
       "ledger_reasons": [],
-      "components": 2
+      "components": 1
     }
   ],
   "exclusions": [
@@ -366,6 +394,7 @@
     }
   ],
   "stale_triage": [],
+  "changed_triage": [],
   "gate": {
     "passed": true,
     "reasons": [],

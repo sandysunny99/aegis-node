@@ -57,6 +57,15 @@ live inside the Docker VM, so Windows Defender cannot rewrite EICAR/malware samp
 it does on a `./data` bind mount, and data survives container restarts (unlike tmpfs). The Render free-tier blueprint uses ephemeral `/tmp` storage;
 use a persistent disk and point `DATABASE_URL` and `DATA_DIR` at that disk for durable production data.
 
+### Stopping the local stack
+
+`.\scripts\cleanup.ps1` runs `docker compose down` and keeps every volume (scan history,
+artifacts, ClamAV database). `-DryRun` shows what it would do. `-StopListeners` offers to stop
+python/uvicorn/node dev servers on ports 8000 and 5173, one confirmation per process.
+Deleting the Aegis volumes is a separate step: `-RemoveVolumes` lists the volumes and asks
+you to type `DELETE AEGIS DATA`; without a console it is refused unless
+`-ConfirmDeletion "DELETE AEGIS DATA"` is passed.
+
 ### Migrating an existing local `./data` directory
 
 The Compose configuration uses named volumes (`aegis_node_artifacts` for artifacts, `aegis_node_db` for

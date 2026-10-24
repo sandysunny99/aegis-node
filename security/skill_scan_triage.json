@@ -6,6 +6,7 @@
       "target": "agents-md",
       "rule_id": "EA2",
       "file": "AGENTS.md",
+      "occurrences": 1,
       "classification": "false_positive",
       "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
       "reviewed": "2026-10-24",
@@ -16,6 +17,7 @@
       "target": "scripts",
       "rule_id": "PE3",
       "file": "serve_local.ps1",
+      "occurrences": 1,
       "classification": "false_positive",
       "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
       "reviewed": "2026-10-24",
@@ -26,16 +28,18 @@
       "target": "scripts",
       "rule_id": "PE3",
       "file": "verify_gateway.py",
+      "occurrences": 1,
       "classification": "accepted_risk",
       "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
       "reviewed": "2026-10-24",
-      "reason": "Manual check script: loads the local .env so it can call Groq directly and via the Cloudflare AI Gateway with a fixed prompt ('Analyze this: Clean file.'). It reads real keys and makes paid external calls, so agents must only run it when the owner asks. No repo or dataset content is sent."
+      "reason": "Line 32 is load_dotenv() in _load_backend(), which runs only after --confirm-paid-calls (added 2026-10-24, tested in tests/test_cleanup_script.py). It loads real keys to make billable Groq calls with a fixed prompt; keys are never printed; no repo or dataset content is sent. Agents run it only when the owner asks."
     },
     {
       "key": "1f0f0b857781e17d",
       "target": "scripts",
       "rule_id": "AE4",
       "file": "debug_logs.ps1",
+      "occurrences": 1,
       "classification": "false_positive",
       "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
       "reviewed": "2026-10-24",
@@ -46,6 +50,7 @@
       "target": "scripts",
       "rule_id": "AE4",
       "file": "debug_scan.ps1",
+      "occurrences": 1,
       "classification": "false_positive",
       "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
       "reviewed": "2026-10-24",
@@ -56,46 +61,51 @@
       "target": "scripts",
       "rule_id": "AST4",
       "file": "skill_scan.py",
+      "occurrences": 1,
       "classification": "accepted_risk",
       "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
       "reviewed": "2026-10-24",
-      "reason": "The SkillSpector wrapper must start the pinned scanner (version probe). It uses an argument list, no shell, a minimal environment without keys, a timeout and stdin closed."
+      "reason": "Version probe of the pinned scanner: subprocess.run with an argument list ([scanner, '--version']), shell=False, stdin closed, timeout, minimal env. tests/test_skill_scan.py checks argv and env."
     },
     {
       "key": "696ab3c72c8028c3",
       "target": "scripts",
       "rule_id": "AST4",
       "file": "skill_scan.py",
+      "occurrences": 1,
       "classification": "accepted_risk",
       "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
       "reviewed": "2026-10-24",
-      "reason": "The scan call of the wrapper: argument list, no shell, --no-llm, minimal environment, dead proxy for egress, timeout, bounded report size. Covered by tests/test_skill_scan.py."
+      "reason": "Scan call: argument list [scanner, 'scan', <policy-validated path>, '--no-llm', '--format', 'json'], shell=False, stdin closed, timeout, dead proxy, report size cap. tests/test_skill_scan.py covers each control."
     },
     {
       "key": "2009c7eadbd26131",
       "target": "scripts",
       "rule_id": "TT2",
       "file": "skill_scan.py",
+      "occurrences": 1,
       "classification": "accepted_risk",
       "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
       "reviewed": "2026-10-24",
-      "reason": "Taint flow into the version-probe subprocess call. The inputs are the configured scanner path and a constant flag; no network-derived data reaches the call."
+      "reason": "SkillSpector traces 'env' from os.environ.get into subprocess.run. The only host values copied by scanner_env() are PATH and, on Windows, SYSTEMROOT/WINDIR/COMSPEC/PATHEXT; everything else is constant. A test asserts no KEY/TOKEN/SECRET variable reaches the scanner."
     },
     {
       "key": "40e009c84fa5feaa",
       "target": "scripts",
       "rule_id": "TT2",
       "file": "skill_scan.py",
+      "occurrences": 1,
       "classification": "accepted_risk",
       "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
       "reviewed": "2026-10-24",
-      "reason": "Taint flow into the scan subprocess call. The target path comes from the reviewed policy file and is validated (relative, inside repo, no symlinks) before use."
+      "reason": "Same 'env' flow into the scan call: PATH (+ Windows SYSTEMROOT/WINDIR/COMSPEC/PATHEXT) from the host, the rest constant, proxies forced to 127.0.0.1:9. The target path comes from the policy file and passes _resolve_target (relative, in repo, no symlinks, exists)."
     },
     {
       "key": "85ac3115f9af6cd7",
       "target": "scripts",
       "rule_id": "TT2",
       "file": "smoke_fresh_db.py",
+      "occurrences": 1,
       "classification": "false_positive",
       "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
       "reviewed": "2026-10-24",
@@ -106,6 +116,7 @@
       "target": "scripts",
       "rule_id": "TT2",
       "file": "smoke_fresh_db.py",
+      "occurrences": 1,
       "classification": "false_positive",
       "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
       "reviewed": "2026-10-24",
@@ -116,20 +127,33 @@
       "target": "ci-workflows",
       "rule_id": "TM2",
       "file": "ci.yml",
+      "occurrences": 1,
       "classification": "accepted_risk",
       "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
       "reviewed": "2026-10-24",
-      "reason": "'sudo apt-get update && sudo apt-get install -y libmagic1' on an ephemeral GitHub-hosted runner, needed for MIME detection tests. The job has contents: read only and no deploy step."
+      "reason": "'sudo apt-get update && sudo apt-get install -y libmagic1' in the backend job of ci.yml: root on an ephemeral GitHub-hosted runner to install one Debian package. Workflow permissions are contents: read; this job references no secrets (only the separate gitleaks job uses GITHUB_TOKEN); no deploy step."
     },
     {
       "key": "247711d5f05ce1aa",
       "target": "ci-workflows",
       "rule_id": "PE2",
       "file": "ci.yml",
+      "occurrences": 2,
       "classification": "accepted_risk",
       "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
       "reviewed": "2026-10-24",
-      "reason": "Same sudo apt-get line as the TM2 entry: root on a throwaway hosted runner to install one Debian package."
+      "reason": "Same sudo apt-get line as the TM2 entry (SkillSpector reports PE2 twice on it, once per sudo). Elevated install on a disposable hosted runner, contents: read, no secrets in the job."
+    },
+    {
+      "key": "dbe350a3ee7e62e3",
+      "target": "scripts",
+      "rule_id": "PE3",
+      "file": "verify_gateway.py",
+      "occurrences": 3,
+      "classification": "false_positive",
+      "owner": "Sandeep (proposed by Claude 2026-10-24, awaiting owner review)",
+      "reviewed": "2026-10-24",
+      "reason": "Lines 3, 28 and 87 are the docstring, a function docstring and a printed message that mention .env; none reads it. The real read (line 32) is a separate accepted-risk entry."
     }
   ]
 }

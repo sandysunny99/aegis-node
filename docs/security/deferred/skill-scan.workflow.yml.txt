@@ -1,3 +1,6 @@
+# DEFERRED, NOT ACTIVE. Moved out of .github/workflows on 2026-10-24: the owner has not approved
+# installing the ~217 MB alpha SkillSpector environment in hosted CI (50 MB review threshold).
+# Kept as a reviewed starting point for a later exception. See SKILL_SECURITY_SCANNING.md.
 # Report-only SkillSpector scan of the agent skills, rules and scripts listed in
 # security/skill_scan_targets.json. It never blocks a merge, never deploys and has no
 # access to repository secrets. See docs/security/SKILL_SECURITY_SCANNING.md.

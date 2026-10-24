@@ -223,6 +223,10 @@ def load_triage(triage_path: Path, policy: dict) -> dict:
         _text(entry, "reason", where, min_len=15)
         if not _DATE_RE.match(_text(entry, "reviewed", where)):
             raise PolicyError(f"{where}: reviewed must be YYYY-MM-DD")
+        occurrences = entry.get("occurrences")
+        if not isinstance(occurrences, int) or isinstance(occurrences, bool) or occurrences < 1:
+            raise PolicyError(f"{where}: occurrences must be the positive number of matches "
+                              "that were reviewed")
         entries[key] = entry
     return entries
 
@@ -396,7 +400,8 @@ def group_findings(target_id: str, issues: list[dict]) -> list[dict]:
         entry = grouped.setdefault(key, {
             "key": key, "rule_id": issue["rule_id"], "category": issue["category"],
             "severity": issue["severity"], "file": issue["file"], "lines": [],
-            "triage": None})
+            "occurrences": 0, "triage": None})
+        entry["occurrences"] += 1
         if issue["line"] is not None and issue["line"] not in entry["lines"]:
             entry["lines"].append(issue["line"])
         if SEVERITIES.index(issue["severity"]) > SEVERITIES.index(entry["severity"]):
@@ -447,20 +452,30 @@ def scan_target(target: dict, policy: dict, command: list[str]) -> dict:
 # Triage, gate and output
 # ---------------------------------------------------------------------------
 
-def apply_triage(results: list[dict], triage: dict) -> list[str]:
-    used = set()
+def apply_triage(results: list[dict], triage: dict) -> tuple[list[str], list[str]]:
+    """Attach reviewed classifications. Returns (stale keys, keys whose occurrences changed).
+
+    One key can cover several identical matches in a file. A triage entry records how many
+    it reviewed; if the count changes, the entry no longer applies and must be re-reviewed,
+    so a new occurrence cannot hide behind an old review.
+    """
+    used, changed = set(), []
     for target in results:
         for finding in target["findings"]:
             entry = triage.get(finding["key"])
-            if entry and entry["target"] == target["id"] and \
-                    entry["rule_id"] == finding["rule_id"] and entry["file"] == finding["file"]:
-                finding["triage"] = entry["classification"]
-                finding["owner"] = entry["owner"]
-                used.add(finding["key"])
-    return sorted(set(triage) - used)
+            if not entry or entry["target"] != target["id"] or \
+                    entry["rule_id"] != finding["rule_id"] or entry["file"] != finding["file"]:
+                continue
+            used.add(finding["key"])
+            if entry["occurrences"] != finding["occurrences"]:
+                changed.append(finding["key"])
+                continue
+            finding["triage"] = entry["classification"]
+            finding["owner"] = entry["owner"]
+    return sorted(set(triage) - used), sorted(changed)
 
 
-def decide(results: list[dict], stale: list[str]) -> dict:
+def decide(results: list[dict], stale: list[str], changed: list[str] = ()) -> dict:
     reasons, warnings = [], []
     for target in results:
         if target["status"] != "complete":
@@ -479,6 +494,8 @@ def decide(results: list[dict], stale: list[str]) -> dict:
                 label = "untriaged" if f["triage"] is None else f["triage"]
                 warnings.append(f"{where} is {label} {f['severity']}")
     warnings.extend(f"triage entry {key} matched no finding" for key in stale)
+    warnings.extend(f"triage entry {key} reviewed a different number of occurrences; "
+                    "re-review it" for key in changed)
     return {"passed": not reasons, "reasons": reasons, "warnings": warnings}
 
 
@@ -501,12 +518,13 @@ def _markdown(summary: dict) -> str:
                      f"{t.get('score', '-')} | {t.get('recommendation', '-')} | "
                      f"{len(t['findings'])} |")
     lines += ["", "## Findings", "",
-              "| Target | Rule | Category | Severity | File:lines | Key | Triage |",
-              "|---|---|---|---|---|---|---|"]
+              "| Target | Rule | Category | Severity | File:lines | Matches | Key | Triage |",
+              "|---|---|---|---|---|---|---|---|"]
     for t in summary["targets"]:
         for f in t["findings"]:
             lines.append(f"| {t['id']} | {f['rule_id']} | {f['category']} | {f['severity']} | "
-                         f"`{f['file']}`:{','.join(map(str, f['lines']))} | `{f['key']}` | "
+                         f"`{f['file']}`:{','.join(map(str, f['lines']))} | {f['occurrences']} | "
+                         f"`{f['key']}` | "
                          f"{f['triage'] or 'untriaged'} |")
     lines += ["", "## Gate reasons", ""] + [f"- {r}" for r in gate["reasons"] or ["none"]]
     lines += ["", "## Warnings", ""] + [f"- {w}" for w in gate["warnings"] or ["none"]]
@@ -536,15 +554,15 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     results = [scan_target(t, policy, command) for t in policy["targets"]]
-    stale = apply_triage(results, triage)
-    gate = decide(results, stale)
+    stale, changed = apply_triage(results, triage)
+    gate = decide(results, stale, changed)
     summary = {
         "tool": {"name": "SkillSpector", "version": policy["version"],
                  "commit": policy["commit"]},
         "mode": args.mode, "llm_used": False, "network": "blocked (dead local proxy)",
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "limits": policy["limits"], "targets": results, "exclusions": policy["exclusions"],
-        "stale_triage": stale, "gate": gate,
+        "stale_triage": stale, "changed_triage": changed, "gate": gate,
     }
     args.out.mkdir(parents=True, exist_ok=True)
     (args.out / "skillspector-summary.json").write_text(

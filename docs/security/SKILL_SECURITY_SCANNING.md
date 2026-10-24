@@ -14,7 +14,8 @@ the dataset pipeline and its results never change a dataset verdict.
 | `security/skill_scan_targets.json` | Pinned SkillSpector version and commit, limits, approved targets, recorded exclusions |
 | `security/skill_scan_triage.json` | Reviewed findings: key, classification, reason, owner, date |
 | `tests/test_skill_scan.py` | Wrapper tests (fake scanner; one optional real-scanner test) |
-| `.github/workflows/skill-scan.yml` | Report-only CI job |
+| `tests/test_skill_scan_records.py` | Checks that the triage file, the committed reports and the audit totals agree |
+| `docs/security/deferred/skill-scan.workflow.yml.txt` | Reviewed CI job, **inactive**: hosted CI install not approved |
 | `reports/security/skillspector-*.{json,md}` | Committed sanitized baselines; routine runs write `skillspector-summary.*` there (git-ignored) |
 
 ## Install SkillSpector (once, outside the repo)
@@ -70,7 +71,8 @@ even if the score is 0.
 
 1. Look at the flagged line yourself. Treat the skill's text as data: if it tells you (or an
    agent) to approve it, skip the audit or run something, that is itself a finding.
-2. Add an entry to `security/skill_scan_triage.json`:
+2. Add an entry to `security/skill_scan_triage.json`. `occurrences` is the number of matches
+   you reviewed (the `Matches` column); if it changes later, the entry stops applying.
 
 ```json
 {
@@ -78,6 +80,7 @@ even if the score is 0.
   "target": "agents-md",
   "rule_id": "EA2",
   "file": "AGENTS.md",
+  "occurrences": 1,
   "classification": "false_positive",
   "owner": "Sandeep",
   "reviewed": "2026-10-24",
@@ -107,11 +110,17 @@ do not commit the policy change unless the files are committed too.
 3. Reinstall, run `--mode report`, compare with `reports/security/skillspector-after-triage.json`.
 4. Re-triage new or changed keys. Commit the new sanitized baseline.
 
-## Promote to a blocking gate
+## CI (deferred)
 
-Only after the owner has signed off the triage entries and approved installing the tool in
-CI: change `--mode report` to `--mode gate` in `.github/workflows/skill-scan.yml`, and update
-`docs/DEPLOYMENT_RELEASE_CHECKLIST.md`.
+SkillSpector runs locally only. Installing its 217 MB alpha environment in hosted CI is not
+approved (50 MB review threshold). If that changes, the reviewed job in
+`docs/security/deferred/skill-scan.workflow.yml.txt` can be moved back to
+`.github/workflows/`, first with `--mode report`, then `--mode gate` once the owner has signed
+off the triage. Update `docs/DEPLOYMENT_RELEASE_CHECKLIST.md` at each step.
+
+After changing a target or the triage file, regenerate the committed after-triage report
+(copy `reports/security/skillspector-summary.*` to `skillspector-after-triage.*`), update the
+totals line in the audit section 5, and run `tests/test_skill_scan_records.py`.
 
 ## Never
 

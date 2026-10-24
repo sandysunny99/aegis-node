@@ -29,7 +29,7 @@
 - **Secret Handling:** All secrets are server-only. Frontend receives NO backend secrets.
 
 ## Agent-skill security scan
-- **Status:** report-only. `.github/workflows/skill-scan.yml` runs SkillSpector statically on the targets in `security/skill_scan_targets.json` and never blocks a merge or deploy.
-- **Before a release:** read the job's sanitized summary (or run `python scripts/skill_scan.py --scanner <pinned skillspector> --mode gate` locally). Any target that is not `complete`, and any untriaged HIGH/CRITICAL finding, needs review before release.
-- **Blocking:** not yet. Switch the workflow to `--mode gate` only after the owner signs off `security/skill_scan_triage.json`. See `docs/security/SKILL_SECURITY_SCANNING.md`.
+- **Status:** local and report-only. There is no CI job: installing SkillSpector (217 MB, alpha) in hosted CI is not approved. Run it locally on the targets in `security/skill_scan_targets.json`; it never blocks a merge or deploy.
+- **Before a release:** run `python scripts/skill_scan.py --scanner <pinned skillspector> --mode gate` locally and read the sanitized summary. Any target that is not `complete`, and any untriaged HIGH/CRITICAL finding, needs review before release.
+- **Blocking:** no. A CI gate needs both an approved CI install and the owner's sign-off of `security/skill_scan_triage.json`. See `docs/security/SKILL_SECURITY_SCANNING.md`.
 - **Separate from datasets:** this scan never changes a dataset verdict and is not part of the Render image.
