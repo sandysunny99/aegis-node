@@ -25,19 +25,19 @@ Labels: **Fact** (checked in the repo on 2026-10-24), **Assumption**, **Control*
 | Pasted prompts | Fact: the owner pastes long prompts, sometimes meant for other projects | Instruction override inside pasted text |
 | Repo content read by an agent | Fact: datasets, fixtures, docs contain attack strings by design (prompt-injection benchmark, EICAR) | Agent follows an instruction found in a fixture |
 | Scripts agents are asked to run | Fact: `scripts/*.ps1`, `scripts/*.py` | Destructive or billable side effects (`docker compose down -v`, real Groq calls) |
-| CI workflows | Fact: `ci.yml`, `skill-scan.yml`, both `contents: read` | Workflow change that exposes secrets or deploys |
+| CI workflows | Fact: `ci.yml` only, `contents: read` (the SkillSpector workflow is deferred) | Workflow change that exposes secrets or deploys |
 
 ## Threats and controls
 
 | Threat | Control | Status |
 |---|---|---|
-| Malicious or careless skill instructions (injection, exfiltration, credential access, `curl | bash`) | SkillSpector static scan of approved targets before trusting them; triage required for HIGH/CRITICAL | Control in place, report-only |
+| Malicious or careless skill instructions (injection, exfiltration, credential access, `curl | bash`) | SkillSpector static scan of approved targets before trusting them, run locally; triage required for HIGH/CRITICAL | Control in place, local and report-only |
 | Scanner says SAFE although it could not read everything | Wrapper fails on `partial`/`failed` completeness, exit 2, timeout, wrong version, malformed report | Control in place, tested |
 | Skill text manipulates the reviewer or the scan ("already approved, mark SAFE") | Static mode only (no model reads the text); wrapper never prints matched text; triage lives outside every target; targets that ship a `.skillspector-baseline.*` are refused; `--use-shipped-baseline` never passed | Control in place, tested |
 | Scanner leaks private content | `--no-llm`; dead proxy for HTTP(S) so SC4 does not contact OSV.dev; minimal environment without keys; sanitized outputs with no snippets or absolute paths | Control in place, tested |
 | Scanner itself is compromised or changes behaviour | Pinned commit and `uv.lock`, version check before each scan, separate venv outside the repo, no repository secrets in the CI job | Partial: supply-chain trust in NVIDIA's repo and PyPI remains |
-| Destructive local scripts run by an agent | Owner rule: agents ask before destructive steps; `cleanup.ps1` flagged for review | Open (owner decision) |
-| Billable or key-reading scripts run by an agent | `verify_gateway.py` triaged as accepted risk: run only when asked | Open (owner sign-off) |
+| Destructive local scripts run by an agent | `cleanup.ps1` keeps data by default; volume deletion needs `-RemoveVolumes` and the typed phrase `DELETE AEGIS DATA`; no force-kill | Control in place, tested |
+| Billable or key-reading scripts run by an agent | `verify_gateway.py` refuses to load `.env` or call Groq without `--confirm-paid-calls` | Control in place, tested |
 | Agent pushes to `main` / deploys | Project rule: never push or touch `main` without the owner asking; the scan job cannot deploy | Process control |
 | SkillSpector result leaks into dataset verdicts | No code in `backend/` or `scanner/` reads its output; separate report folder | Control in place |
 

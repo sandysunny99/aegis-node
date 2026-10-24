@@ -189,6 +189,8 @@ def test_verify_gateway_loads_backend_only_after_opt_in(monkeypatch):
     spec = importlib.util.spec_from_file_location("verify_gateway",
                                                   ROOT / "scripts" / "verify_gateway.py")
     module = importlib.util.module_from_spec(spec)
+    # scripts/ is a SkillSpector target; do not leave a __pycache__ there.
+    monkeypatch.setattr(sys, "dont_write_bytecode", True)
     spec.loader.exec_module(module)
     loaded = []
     monkeypatch.setattr(module, "_load_backend", lambda: loaded.append(True))

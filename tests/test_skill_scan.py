@@ -276,7 +276,7 @@ def test_false_positive_with_reason_and_owner_passes(tmp_path):
     key = _first_key(tmp_path, repo, report)
     repo = _repo(tmp_path / "second", triage=[{
         "key": key, "target": "benign", "rule_id": "EA2", "file": "SKILL.md",
-        "classification": "false_positive", "owner": "Sandeep", "reviewed": "2026-10-24",
+        "classification": "false_positive", "owner": "Sandeep", "reviewed": "2026-10-24", "occurrences": 1,
         "reason": "The match is inside a sentence that forbids automatic execution.",
     }])
     code, summary, _ = _run(tmp_path, repo, _fake_scanner(tmp_path, report=report))
@@ -289,7 +289,7 @@ def test_false_positive_with_reason_and_owner_passes(tmp_path):
 def test_triage_entry_without_reason_is_rejected(tmp_path):
     repo = _repo(tmp_path, triage=[{
         "key": "0" * 16, "target": "benign", "rule_id": "EA2", "file": "SKILL.md",
-        "classification": "false_positive", "owner": "Sandeep", "reviewed": "2026-10-24",
+        "classification": "false_positive", "owner": "Sandeep", "reviewed": "2026-10-24", "occurrences": 1,
         "reason": "",
     }])
     code, summary, _ = _run(tmp_path, repo, _fake_scanner(tmp_path))
@@ -303,7 +303,7 @@ def test_confirmed_risk_still_fails_gate(tmp_path):
     key = _first_key(tmp_path, repo, report)
     repo = _repo(tmp_path / "second", triage=[{
         "key": key, "target": "benign", "rule_id": "P1", "file": "SKILL.md",
-        "classification": "confirmed_risk", "owner": "Sandeep", "reviewed": "2026-10-24",
+        "classification": "confirmed_risk", "owner": "Sandeep", "reviewed": "2026-10-24", "occurrences": 1,
         "reason": "Real instruction override; fix pending in the skill text.",
     }])
     code, summary, _ = _run(tmp_path, repo, _fake_scanner(tmp_path, report=report))
@@ -317,13 +317,44 @@ def test_triage_for_other_rule_does_not_suppress(tmp_path):
     key = _first_key(tmp_path, repo, report)
     repo = _repo(tmp_path / "second", triage=[{
         "key": key, "target": "benign", "rule_id": "E2", "file": "SKILL.md",
-        "classification": "false_positive", "owner": "Sandeep", "reviewed": "2026-10-24",
+        "classification": "false_positive", "owner": "Sandeep", "reviewed": "2026-10-24", "occurrences": 1,
         "reason": "Entry written for a different rule; must not match P1.",
     }])
     code, summary, _ = _run(tmp_path, repo, _fake_scanner(tmp_path, report=report))
     assert code == 1
     assert _one(summary)["findings"][0]["triage"] is None
     assert summary["stale_triage"]
+
+
+def test_new_occurrence_under_a_triaged_key_needs_re_review(tmp_path):
+    one = _report([_issue("PE3", "HIGH", "SKILL.md", 3, ".env ")])
+    repo = _repo(tmp_path)
+    key = _first_key(tmp_path, repo, one)
+    triage = [{
+        "key": key, "target": "benign", "rule_id": "PE3", "file": "SKILL.md",
+        "classification": "false_positive", "owner": "Sandeep", "reviewed": "2026-10-24",
+        "occurrences": 1, "reason": "A comment that mentions .env; nothing reads the file.",
+    }]
+    repo = _repo(tmp_path / "second", triage=triage)
+    code, _, _ = _run(tmp_path, repo, _fake_scanner(tmp_path, report=one))
+    assert code == 0
+    # Same matched text appears on a second line: the old review must not cover it.
+    two = _report([_issue("PE3", "HIGH", "SKILL.md", 3, ".env "),
+                   _issue("PE3", "HIGH", "SKILL.md", 40, ".env ")])
+    code, summary, _ = _run(tmp_path, repo, _fake_scanner(tmp_path, report=two))
+    assert code == 1
+    assert summary["changed_triage"] == [key]
+    assert _one(summary)["findings"][0]["triage"] is None
+
+
+def test_triage_entry_without_occurrences_is_rejected(tmp_path):
+    repo = _repo(tmp_path, triage=[{
+        "key": "0" * 16, "target": "benign", "rule_id": "EA2", "file": "SKILL.md",
+        "classification": "false_positive", "owner": "Sandeep", "reviewed": "2026-10-24",
+        "reason": "A long enough reason for the validator.",
+    }])
+    code, summary, _ = _run(tmp_path, repo, _fake_scanner(tmp_path))
+    assert code == 2
 
 
 # ---------------------------------------------------------------------------
