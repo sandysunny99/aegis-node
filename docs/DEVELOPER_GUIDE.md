@@ -17,6 +17,9 @@
    - `cd frontend`
    - `npm install`
    - `npm run dev`
+3. **Local scripts with side effects:**
+   - `scripts/cleanup.ps1` stops the Compose stack and keeps data; volume deletion needs `-RemoveVolumes` and the typed phrase `DELETE AEGIS DATA` (see README).
+   - `scripts/verify_gateway.py` reads the real `.env` and makes billable Groq calls, so it refuses to run without `--confirm-paid-calls`. Agents run it only when the owner asks.
 
 ## Regression & Testing
 Run the following commands to ensure system integrity:

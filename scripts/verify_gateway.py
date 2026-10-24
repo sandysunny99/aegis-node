@@ -1,3 +1,12 @@
+"""Manual check of Groq direct and via the Cloudflare AI Gateway.
+
+This reads the real keys in the local .env and makes billable Groq calls, so it does
+nothing unless run with --confirm-paid-calls. Never run it from tests, CI or an agent
+without the owner asking. It prints only status, model name and error text, never keys.
+
+Usage (from the repo root): python scripts/verify_gateway.py --confirm-paid-calls
+"""
+
 import sys
 from pathlib import Path
 
@@ -6,17 +15,27 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "backend"))
 
 import logging
 import os
-import sys
 
-from dotenv import load_dotenv
-
-load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
-
-from config import settings
-from services.llm_service import _call_groq
+CONFIRM_FLAG = "--confirm-paid-calls"
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+settings = None
+_call_groq = None
+
+
+def _load_backend():
+    """Load .env and the backend only after the caller opted in to paid calls."""
+    global settings, _call_groq
+    from dotenv import load_dotenv
+
+    load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
+
+    from config import settings as loaded_settings
+    from services.llm_service import _call_groq as loaded_call
+
+    settings, _call_groq = loaded_settings, loaded_call
+
 
 def test_direct_mode():
     print("==================================================")
@@ -63,7 +82,17 @@ def test_gateway_mode():
         print(f"gateway_request = FAIL ({e})")
         return False
 
-if __name__ == "__main__":
+def main(argv: list[str]) -> int:
+    if CONFIRM_FLAG not in argv:
+        print("verify_gateway: this reads the local .env and makes billable Groq calls.")
+        print(f"Nothing was loaded or sent. Re-run with {CONFIRM_FLAG} to proceed.")
+        return 2
+    _load_backend()
     test_direct_mode()
     test_gateway_mode()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
 
