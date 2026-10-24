@@ -123,7 +123,8 @@ export async function getLlmProviders() {
 }
 
 export async function getAnalysis(datasetId) {
-  return request(`/api/v1/datasets/${datasetId}/analysis`);
+  // optional=true: the server answers null instead of a 404 when no analysis exists yet.
+  return request(`/api/v1/datasets/${datasetId}/analysis?optional=true`);
 }
 
 export async function remediateDataset(datasetId) {

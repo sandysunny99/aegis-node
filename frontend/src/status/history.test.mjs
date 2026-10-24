@@ -39,6 +39,12 @@ test('events describe what ran, and failures stay failures', () => {
   assert.equal(det.title, 'Antivirus (ClamAV): unavailable');
   assert.equal(det.tone, 'risk');
 
+  const md = describeEvent({ event_type: 'DETECTOR_COMPLETED', outcome: 'ok', detail: { detector: 'clamav', state: 'unavailable', provider: 'metadefender', reason: 'METADEFENDER_HASH_NOT_FOUND' } });
+  assert.equal(md.title, 'Antivirus (MetaDefender): no record of this file');
+  assert.equal(md.tone, 'risk');
+  const rest = describeEvent({ event_type: 'DETECTOR_COMPLETED', outcome: 'ok', detail: { detector: 'clamav', state: 'ran', provider: 'clamav_rest' } });
+  assert.equal(rest.title, 'Antivirus (ClamAV): ran');
+
   const ti = describeEvent({ event_type: 'THREAT_INTEL_LOOKUP_FAILED', outcome: 'failed', detail: { provider: 'virustotal', lookups: 1, result_states: { TIMEOUT: 1 } } });
   assert.equal(ti.title, 'VirusTotal lookup failed');
   assert.equal(ti.text, '1 lookup: 1 timeout');

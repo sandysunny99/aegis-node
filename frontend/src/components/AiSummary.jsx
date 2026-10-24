@@ -27,7 +27,7 @@ export default function AiSummary({ datasetId, onAnalysis }) {
   const load = useCallback(() => {
     setState('loading');
     getAnalysis(datasetId)
-      .then((res) => { setData(res); setState('ready'); })
+      .then((res) => { setData(res ?? null); setState(res ? 'ready' : 'empty'); })
       .catch((err) => {
         if (isNotFound(err)) { setData(null); setState('empty'); }
         else { setError(err.message); setState('error'); }

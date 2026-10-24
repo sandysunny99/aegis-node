@@ -32,7 +32,9 @@ def _is_configured(provider_id: str) -> bool:
     elif provider_id == "xai":
         return bool(settings.xai_api_key)
     elif provider_id == "ollama":
-        return True
+        # A production host has no local Ollama; offer it only when it points elsewhere.
+        local = any(h in (settings.ollama_base_url or "") for h in ("localhost", "127.0.0.1", "[::1]"))
+        return not (local and (settings.app_env or "").lower() == "production")
     return False
 
 def get_registry() -> dict:

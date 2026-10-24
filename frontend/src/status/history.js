@@ -68,6 +68,13 @@ export function enrichmentLabel(status) {
   return enrichmentSummary({ enrichment_status: status }).word ?? status;
 }
 
+const AV_NAMES = { clamav: 'ClamAV', clamav_rest: 'ClamAV', metadefender: 'MetaDefender' };
+const AV_REASONS = {
+  METADEFENDER_HASH_NOT_FOUND: 'no record of this file',
+  RATE_LIMITED: 'rate limited',
+  AUTH: 'key rejected',
+  UNREACHABLE: 'unreachable',
+};
 const DETECTORS = { clamav: 'Antivirus (ClamAV)', yara: 'YARA rules', heuristics: 'Heuristic checks', content_rules: 'Content rules' };
 const DETECTOR_STATES = { ran: 'ran', unavailable: 'unavailable', disabled: 'switched off', incomplete: 'incomplete' };
 const PROVIDERS = { virustotal: 'VirusTotal', urlhaus: 'URLhaus', abuseipdb: 'AbuseIPDB' };
@@ -90,10 +97,12 @@ export function describeEvent(event) {
     case 'SCAN_STARTED':
       return { ...base, title: 'Scan started', text: `Profile: ${notRecorded(d.profile)}. Antivirus: ${notRecorded(d.av_provider)}.` };
     case 'DETECTOR_COMPLETED': {
-      const state = DETECTOR_STATES[d.state] ?? words(d.state ?? 'unknown');
+      const isAv = d.detector === 'clamav';
+      const state = (isAv && d.state !== 'ran' && AV_REASONS[d.reason]) || DETECTOR_STATES[d.state] || words(d.state ?? 'unknown');
+      const name = isAv && d.provider ? `Antivirus (${AV_NAMES[d.provider] ?? d.provider})` : (DETECTORS[d.detector] ?? d.detector);
       return {
         ...base,
-        title: `${DETECTORS[d.detector] ?? d.detector}: ${state}`,
+        title: `${name}: ${state}`,
         tone: failed ? 'breach' : d.state === 'ran' ? 'neutral' : 'risk',
       };
     }

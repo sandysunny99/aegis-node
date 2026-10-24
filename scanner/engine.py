@@ -54,6 +54,7 @@ class ScanEngineResult:
     clamav_available: bool = False
     clamav_status: str = "skipped"        # clean | infected | skipped | error
     clamav_virus_name: str | None = None
+    clamav_error: str | None = None        # provider's reason when it gave no result
 
     # YARA (Stage 1.5)
     yara_available: bool = False
@@ -274,6 +275,7 @@ def run_scan(file_path: str) -> ScanEngineResult:
 
     if not clam.available:
         result.clamav_status = "skipped"
+        result.clamav_error = clam.error
         logger.warning("ClamAV offline — skipping virus stage for %s", path.name)
     elif clam.infected:
         result.clamav_status = "infected"

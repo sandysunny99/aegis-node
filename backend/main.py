@@ -190,9 +190,13 @@ def _health_payload(av_status: dict) -> dict:
 
 
 @app.get("/health", tags=["system"])
-@limiter.limit("60/minute")
+@limiter.exempt
 async def health(request: Request) -> dict:
-    """Public health probe with UI status fields (AV status cached, see S8)."""
+    """
+    Public health probe with UI status fields (AV status cached, see S8). Not rate
+    limited: Render's health check comes from a few internal addresses and a 429
+    here marks the instance unavailable.
+    """
     return _health_payload(await run_in_threadpool(_cached_av_status))
 
 
@@ -229,12 +233,16 @@ if _STATIC_DIR.exists():
     # rebuild; the hashed /assets files can be cached as usual.
     _INDEX_HEADERS = {"Cache-Control": "no-cache"}
 
+    # The page shell is static and cheap; the 200/hour default limit would lock out a user
+    # who reloads the app often, so only the API routes are rate limited.
     @app.get("/", include_in_schema=False)
+    @limiter.exempt
     async def serve_root():
         """Serve React index.html at root."""
         return FileResponse(str(_STATIC_DIR / "index.html"), headers=_INDEX_HEADERS)
 
     @app.get("/{full_path:path}", include_in_schema=False)
+    @limiter.exempt
     async def serve_spa(full_path: str):
         """
         SPA catch-all: serve index.html for any path not matched by API routers.

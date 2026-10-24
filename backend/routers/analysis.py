@@ -150,19 +150,23 @@ async def analyse_dataset(
 
 @router.get(
     "/{dataset_id}/analysis",
-    response_model=AnalysisResponse,
+    response_model=AnalysisResponse | None,
     summary="Get the latest AI analysis for a dataset",
 )
 @limiter.limit("60/minute")
 def get_analysis(
     request: Request,
     dataset_id: str,
+    optional: bool = False,
     db: Session = Depends(get_db),  # noqa: B008
     _auth: None = Depends(require_api_key),  # noqa: B008
-) -> AnalysisResponse:
+) -> AnalysisResponse | None:
+    """404 when none exists, or null with ?optional=true (the UI's "not run yet" state)."""
     record = get_dataset_by_public_id(db, dataset_id)
 
     if not record.llm_analyses:
+        if optional:
+            return None
         raise HTTPException(status_code=404, detail="No AI analysis found. Run /analyse first.")
 
     latest = sorted(record.llm_analyses, key=lambda a: a.created_at)[-1]
