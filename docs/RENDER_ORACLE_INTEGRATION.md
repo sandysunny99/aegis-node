@@ -49,6 +49,8 @@ Peak MiB; baseline after start ≈115 MiB. No container was OOM-killed. The larg
 
 ## 4. Decision needed
 
+**Decision 27 Oct 2026 (owner): run without ClamAV for now.** `AV_REQUIRED=false` in `render.yaml`. MetaDefender (hash lookup) and the threat-intelligence providers (VirusTotal, Hybrid Analysis, MalwareBazaar, ThreatFox, YARAify, OTX, CIRCL, URLhaus, urlscan.io) answer instead; scans carry `AV_SIGNATURE_SCAN_OFF` and stay `clean_with_limitations`, never `clean_verified`, because no engine read the file. The Oracle gateway (`deploy/oracle-clamav/setup-vm.sh`) stays available: deploy it, set `CLAMAV_API_URL`, `CLAMAV_API_TOKEN`, `AV_PROVIDER=clamav_rest` and `AV_REQUIRED=true`.
+
 `render.yaml` currently sets `AV_PROVIDER=metadefender`. MetaDefender is now hash-only, so on Render almost every dataset returns `METADEFENDER_HASH_NOT_FOUND` and is `clean_limited`. Switching to the Oracle gateway needs the VM to exist first. Options:
 
 1. Keep MetaDefender until the VM is live, then switch (recommended).

@@ -44,7 +44,9 @@ logger = logging.getLogger("aegis.remediation")
 _SAFE_FILENAME_RE = re.compile(r'[^\w.\-]')   # Allow only word chars, dots, hyphens
 
 # A re-scan that carries any of these could not prove the sanitized copy clean.
-_UNVERIFIED_LIMITATION_PREFIXES = ("CLAMAV_UNAVAILABLE", "PARSER_LIMITATION", "DETECTOR_UNAVAILABLE")
+_UNVERIFIED_LIMITATION_PREFIXES = (
+    "CLAMAV_UNAVAILABLE", "AV_SIGNATURE_SCAN_OFF", "PARSER_LIMITATION", "DETECTOR_UNAVAILABLE",
+)
 
 
 def remediation_outcome(rescan, remaining_actionable: int) -> tuple[str, str]:

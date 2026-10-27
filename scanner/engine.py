@@ -194,8 +194,9 @@ def _determine_verdict(
     all_findings = content_result.findings + heur_findings + yara_findings
 
     if not clamav_result.available:
-        if "CLAMAV_UNAVAILABLE" not in limitations:
-            limitations.append("CLAMAV_UNAVAILABLE")
+        code = "CLAMAV_UNAVAILABLE" if getattr(settings, "av_required", True) is not False else "AV_SIGNATURE_SCAN_OFF"
+        if code not in limitations:
+            limitations.append(code)
 
     if content_result.coverage_status == "PARTIAL":
         if "PARTIAL_DATASET_SCAN" not in limitations:

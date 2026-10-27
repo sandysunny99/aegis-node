@@ -112,3 +112,23 @@ def test_row_cap_defaults_to_100k_and_reads_scan_max_rows(monkeypatch):
     assert cc._env_int("SCAN_MAX_ROWS_TEST", 100_000) == 2500
     monkeypatch.setenv("SCAN_MAX_ROWS_TEST", "junk")
     assert cc._env_int("SCAN_MAX_ROWS_TEST", 100_000) == 100_000
+
+
+def test_optional_antivirus_is_reported_as_off_but_never_verified(monkeypatch):
+    from services.av_providers.base import AVScanResult
+
+    class _NoResult:
+        def scan_file(self, path):
+            return AVScanResult(available=False, infected=False, virus_name=None, raw_response="",
+                                error="METADEFENDER_HASH_NOT_FOUND")
+
+        def ping(self):
+            return True
+
+    monkeypatch.setattr(settings, "av_required", False)
+    monkeypatch.setattr("scanner.engine.get_av_provider", lambda: _NoResult())
+    ds = client.post("/api/v1/datasets/upload", files={"file": ("d.csv", b"id,n\n1,a\n", "text/csv")}).json()["dataset_id"]
+    scan = client.post(f"/api/v1/datasets/{ds}/scan").json()
+    assert "AV_SIGNATURE_SCAN_OFF" in scan["verification_limitations"]
+    assert "CLAMAV_UNAVAILABLE" not in scan["verification_limitations"]
+    assert scan["verdict"] == "clean_with_limitations"

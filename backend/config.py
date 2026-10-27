@@ -111,7 +111,7 @@ class Settings(BaseSettings):
 
     # ─── LLM (Google Gemini) ──────────────────────────────────────────────────
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.0-flash"   # Fixed: was gemini-flash-latest (invalid)
+    gemini_model: str = "gemini-3.5-flash-lite"  # gemini-2.0-flash was shut down (Google model list, 27 Oct 2026)   # Fixed: was gemini-flash-latest (invalid)
     gemini_timeout_seconds: int = 30
 
     # ─── LLM (Groq Cloud — cloud inference; free tier availability is subject to current provider terms)
@@ -123,7 +123,7 @@ class Settings(BaseSettings):
     # ─── LLM (NVIDIA NIM) ─────────────────────────────────────────────────────
     nvidia_api_key: str = ""
     nvidia_model: str = "openai/gpt-oss-20b"
-    nvidia_timeout_seconds: int = 30
+    nvidia_timeout_seconds: int = 60  # gpt-oss-20b on the hosted NIM endpoint often needs >30 s
     fallback_nvidia_api_key: str = ""
 
     # ─── LLM (Hugging Face) ───────────────────────────────────────────────────
@@ -141,7 +141,7 @@ class Settings(BaseSettings):
 
     # ─── LLM (xAI / Grok — OpenAI-compatible API) ────────────────────────────
     xai_api_key: str = ""
-    xai_model: str = "grok-2-latest"
+    xai_model: str = "grok-4.3"  # grok-2-latest is no longer listed (docs.x.ai/docs/models, 27 Oct 2026)
     xai_timeout_seconds: int = 30
 
     # ─── LLM (Ollama — self-hosted local inference; no API key required) ───────
@@ -168,6 +168,11 @@ class Settings(BaseSettings):
     # Used only when AV_PROVIDER gives no result (e.g. the Oracle ClamAV gateway is down):
     # "metadefender" or empty for none. A fallback never turns an unreachable scan into clean.
     av_fallback_provider: str = ""
+    # False when the deployment deliberately runs without a signature engine (Render:
+    # MetaDefender hash lookup plus threat intelligence, no ClamAV server). A missing
+    # antivirus result is then AV_SIGNATURE_SCAN_OFF instead of CLAMAV_UNAVAILABLE. It is
+    # still a limitation: without a signature scan a dataset is never clean_verified.
+    av_required: bool = True
     clamav_api_url: str = "http://localhost:3000"
     clamav_mock_mode: bool = False
     # Bearer token for the authenticated HTTPS ClamAV gateway on the owner's VM.
