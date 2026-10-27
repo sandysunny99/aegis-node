@@ -29,6 +29,7 @@ _MB_URL = "https://mb-api.abuse.ch/api/v1/"
 _TF_URL = "https://threatfox-api.abuse.ch/api/v1/"
 _CIRCL_URL = "https://hashlookup.circl.lu/lookup/sha256/"
 _YARAIFY_URL = "https://yaraify-api.abuse.ch/api/v1/"
+_HA_OVERVIEW = "https://hybrid-analysis.com/api/v2/overview/"
 _URLSCAN_SEARCH = "https://urlscan.io/api/v1/search/"
 _URLSCAN_RESULT = "https://urlscan.io/api/v1/result/"
 _URLSCAN_MAX_URLS = 5          # per scan: urlscan quotas are small
@@ -63,7 +64,14 @@ def enabled_providers() -> list[str]:
         providers.append("yaraify")
     if getattr(settings, "enable_urlscan", False) is True and _urlscan_key():
         providers.append("urlscan")
+    if getattr(settings, "enable_hybrid_analysis", False) is True and _ha_key():
+        providers.append("hybrid_analysis")
     return providers
+
+
+def _ha_key() -> str:
+    key = getattr(settings, "hybrid_analysis_api_key", None)
+    return key.strip() if isinstance(key, str) else ""
 
 
 def _urlscan_key() -> str:
@@ -113,7 +121,7 @@ def _evidence(provider: str, kind: str, indicator: str, state: str, *, category=
         indicator_type=kind,
         indicator=indicator,
         reputation=reputation,
-        severity="critical" if reputation == "malicious" else "informational",
+        severity={"malicious": "critical", "suspicious": "high"}.get(reputation, "informational"),
         category=category,
         reference_url=reference,
         confidence=confidence,
@@ -306,3 +314,39 @@ async def urlscan_url(url: str) -> NormalizedTIEvidence | None:
         return _evidence("urlscan", "url", url, "MATCH", category=category,
                          reference=f"https://urlscan.io/result/{scan_id}/")
     return await _cached("urlscan", "url", url, fetch)
+
+
+async def hybrid_analysis_hash(sha256: str) -> NormalizedTIEvidence | None:
+    """
+    Hybrid Analysis overview of a SHA-256 (GET only). Never uploads or submits a file.
+    "malicious" and "suspicious" are matches; "whitelisted" is a known-good annotation
+    that fusion ignores; "no specific threat", no verdict or an unknown hash are NO_MATCH.
+    """
+    sha256 = (sha256 or "").strip().lower()
+    if "hybrid_analysis" not in enabled_providers() or not _SHA256_RE.fullmatch(sha256):
+        return None
+    headers = {"api-key": _ha_key(), "User-Agent": "Falcon Sandbox", "Accept": "application/json"}
+
+    async def fetch():
+        state, payload = await _request("GET", f"{_HA_OVERVIEW}{sha256}", headers=headers)
+        if state == "NOT_FOUND":
+            return _evidence("hybrid_analysis", "sha256", sha256, "NO_MATCH")
+        if state != "OK":
+            return _evidence("hybrid_analysis", "sha256", sha256, state)
+        verdict = str(payload.get("verdict") or "").strip().lower()
+        family = payload.get("vx_family")
+        score = payload.get("threat_score")
+        reference = f"https://hybrid-analysis.com/sample/{sha256}"
+        confidence = f"threat_score:{score}" if isinstance(score, (int, float)) and not isinstance(score, bool) else None
+        category = str(family)[:80] if family else None
+        if verdict == "malicious":
+            return _evidence("hybrid_analysis", "sha256", sha256, "MATCH", category=category,
+                             reference=reference, confidence=confidence)
+        if verdict == "suspicious":
+            return _evidence("hybrid_analysis", "sha256", sha256, "MATCH", reputation="suspicious",
+                             category=category, reference=reference, confidence=confidence)
+        if verdict == "whitelisted":
+            return _evidence("hybrid_analysis", "sha256", sha256, "MATCH", reputation="known_good",
+                             category="whitelisted", reference=reference)
+        return _evidence("hybrid_analysis", "sha256", sha256, "NO_MATCH")
+    return await _cached("hybrid_analysis", "sha256", sha256, fetch)

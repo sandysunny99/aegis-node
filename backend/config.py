@@ -209,6 +209,10 @@ class Settings(BaseSettings):
     enable_yaraify: bool = False
     enable_urlscan: bool = False
     urlscan_api_key: str | None = None
+    # Hybrid Analysis (27 Oct 2026): GET /api/v2/overview/<sha256> only; never uploads or
+    # submits a file for sandboxing.
+    enable_hybrid_analysis: bool = False
+    hybrid_analysis_api_key: str | None = None
     threat_intel_timeout_seconds: float = 8.0
 
     enable_phishtank: bool = False

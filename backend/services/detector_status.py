@@ -92,6 +92,8 @@ def detector_report(av_status: dict) -> dict:
                lookup="sha256 only; known-good annotation"),
         _entry("yaraify", "L4", "yaraify" in lookups.enabled_providers(), True,
                lookup="sha256 only; never the file"),
+        _entry("hybrid_analysis", "L4", "hybrid_analysis" in lookups.enabled_providers(), True,
+               lookup="sha256 only; never uploads or submits"),
         _entry("urlscan", "L4", "urlscan" in lookups.enabled_providers(), True,
                lookup="extracted URLs; searches existing scans, never submits"),
     ]

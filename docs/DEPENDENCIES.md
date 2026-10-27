@@ -32,6 +32,7 @@ The 3D packages load in a lazy chunk, so they are not part of the initial landin
 |---|---|---|---|---|
 | YARAify (abuse.ch) | file SHA-256 only (`lookup_hash`) | `ABUSECH_AUTH_KEY`, or `URL_HAUS_KEY` / `URLHAUS_AUTH_KEY` | 27 Oct 2026 | Never uploads the file. abuse.ch terms: free for not-for-profit use |
 | urlscan.io | URLs extracted from the file, as a search of existing scans | `URLSCAN_KEY` or `URLSCAN_API_KEY` | 27 Oct 2026 | Search and result API only; never submits a scan. At most 5 URLs per scan |
+| Hybrid Analysis | file SHA-256 only (`GET /api/v2/overview/<sha256>`) | `HYBRID_ANALYSIS_API_KEY` | 27 Oct 2026 | Never uploads or submits a file; whitelisted is a known-good annotation that never changes a verdict |
 | Maldatabase | not wired | `MALDATABASE_API_KEY` (unused) | — | Its API (https://maldatabase.com/api-doc.html, read 27 Oct 2026) offers only a daily bulk feed download, no per-hash lookup |
 
 ## Oracle scan VM (deploy/oracle-clamav, not part of the Render image)

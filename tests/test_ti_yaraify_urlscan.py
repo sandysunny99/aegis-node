@@ -23,7 +23,7 @@ SCAN_ID = "0199a1b2-c3d4-4e5f-8a9b-0c1d2e3f4a5b"
 def isolated(monkeypatch):
     lookups.clear_cache()
     for flag in ("enable_malwarebazaar", "enable_threatfox", "enable_circl_hashlookup",
-                 "enable_yaraify", "enable_urlscan"):
+                 "enable_yaraify", "enable_urlscan", "enable_hybrid_analysis"):
         monkeypatch.setattr(settings, flag, False)
     monkeypatch.setattr(settings, "abusech_auth_key", "test-abusech-key")
     monkeypatch.setattr(settings, "urlscan_api_key", "test-urlscan-key")
@@ -157,3 +157,47 @@ def test_dashboard_key_names_are_read(monkeypatch):
     cfg = Settings(_env_file=None, urlhaus_auth_key=None, urlscan_api_key=None)
     assert cfg.urlhaus_auth_key == "abusech-from-dashboard"
     assert cfg.urlscan_api_key == "urlscan-from-dashboard"
+
+
+# ─── Hybrid Analysis ─────────────────────────────────────────────────────────
+
+def _ha(monkeypatch, body, status=200):
+    monkeypatch.setattr(settings, "enable_hybrid_analysis", True)
+    monkeypatch.setattr(settings, "hybrid_analysis_api_key", "test-ha-key")
+    return _serve(monkeypatch, lambda r: httpx.Response(status, json=body))
+
+
+def test_hybrid_analysis_off_without_key(monkeypatch):
+    monkeypatch.setattr(settings, "enable_hybrid_analysis", True)
+    monkeypatch.setattr(settings, "hybrid_analysis_api_key", "")
+    seen = _serve(monkeypatch, lambda r: httpx.Response(500))
+    assert run(lookups.hybrid_analysis_hash(SHA)) is None
+    assert seen == []
+
+
+def test_hybrid_analysis_only_reads_the_overview(monkeypatch):
+    seen = _ha(monkeypatch, {}, status=404)
+    assert run(lookups.hybrid_analysis_hash(SHA)).result_state == "NO_MATCH"
+    req = seen[0]
+    assert req.method == "GET"
+    assert str(req.url) == f"https://hybrid-analysis.com/api/v2/overview/{SHA}"
+    assert req.headers["api-key"] == "test-ha-key"
+    assert req.headers["User-Agent"] == "Falcon Sandbox"
+
+
+@pytest.mark.parametrize(("verdict", "state", "reputation"), [
+    ("malicious", "MATCH", "malicious"),
+    ("suspicious", "MATCH", "suspicious"),
+    ("whitelisted", "MATCH", "known_good"),
+    ("no specific threat", "NO_MATCH", "unknown"),
+    (None, "NO_MATCH", "unknown"),
+])
+def test_hybrid_analysis_verdicts(monkeypatch, verdict, state, reputation):
+    _ha(monkeypatch, {"sha256": SHA, "verdict": verdict, "threat_score": 90, "vx_family": "Emotet"})
+    ev = run(lookups.hybrid_analysis_hash(SHA))
+    assert (ev.result_state, ev.reputation) == (state, reputation)
+
+
+def test_hybrid_analysis_rejected_key_is_unauthorized(monkeypatch):
+    _ha(monkeypatch, {"message": "Your API key is incompatible with API v2."}, status=403)
+    assert run(lookups.hybrid_analysis_hash(SHA)).result_state == "UNAUTHORIZED"

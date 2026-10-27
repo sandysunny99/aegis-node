@@ -218,7 +218,7 @@ async def _fused_report(result, file_path: str, evidence: list[NormalizedTIEvide
 
     # Approved lookup-only providers (each returns None when disabled).
     for lookup in (lookups.malwarebazaar_hash, lookups.threatfox_hash, lookups.circl_hash,
-                   lookups.yaraify_hash):
+                   lookups.yaraify_hash, lookups.hybrid_analysis_hash):
         ev = await lookup(result.sha256_hash)
         if ev is not None:
             evidence.append(ev)

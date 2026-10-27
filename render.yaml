@@ -117,6 +117,11 @@ services:
         value: "true"
       - key: ENABLE_URLSCAN
         value: "true"
+      # Hybrid Analysis (HYBRID_ANALYSIS_API_KEY): SHA-256 overview only, never uploads.
+      - key: ENABLE_HYBRID_ANALYSIS
+        value: "true"
+      - key: HYBRID_ANALYSIS_API_KEY
+        sync: false
       - key: ABUSECH_AUTH_KEY
         sync: false
       - key: VIRUSTOTAL_API_KEY
