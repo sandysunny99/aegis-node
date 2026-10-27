@@ -370,6 +370,14 @@ class Settings(BaseSettings):
         if not self.fallback_cloudflare_api_token:
             self.fallback_cloudflare_api_token = _read_secret_file("FALLBACK_CLOUDFLARE_API_TOKEN")
 
+        # A key pasted with a trailing newline breaks the HTTP header it goes into (and
+        # the error then quoted the key). Trim every secret-like setting.
+        for name in type(self).model_fields:
+            if name.endswith(("_key", "_token", "_secret", "_secret_key")):
+                value = getattr(self, name)
+                if isinstance(value, str) and value != value.strip():
+                    setattr(self, name, value.strip())
+
         if not self.database_url.strip():
             self.database_url = "sqlite:///" + (Path(self.data_dir).resolve() / "aegis_node.db").as_posix()
 

@@ -254,6 +254,9 @@ def _is_safe_literal_not_formula(val: str) -> bool:
     return False
 
 
+_SQL_COMMENT_RE = re.compile(r'/\*.*?\*/', re.DOTALL)
+
+
 def _deobfuscate(value: str) -> str:
     """
     Multi-stage deobfuscation preprocessor applied before rule matching.
@@ -269,7 +272,8 @@ def _deobfuscate(value: str) -> str:
         except Exception:  # noqa: BLE001
             pass
     # Strip SQL inline comments /* ... */
-    value = re.sub(r'/\*.*?\*/', '', value, flags=re.DOTALL)
+    if "/*" in value:
+        value = _SQL_COMMENT_RE.sub('', value)
     # Remove common hex/unicode escape prefixes (evasion tricks)
     value = value.replace('\\x', '').replace('\\u', '')
     # Normalize excessive whitespace
@@ -277,9 +281,39 @@ def _deobfuscate(value: str) -> str:
     return value
 
 
+def _scoped(pattern: re.Pattern) -> str:
+    flags = "i" if pattern.flags & re.IGNORECASE else ""
+    flags += "m" if pattern.flags & re.MULTILINE else ""
+    flags += "s" if pattern.flags & re.DOTALL else ""
+    return f"(?{flags}:{pattern.pattern})" if flags else f"(?:{pattern.pattern})"
+
+
+# One pass over a cell that no rule can match (nearly every cell) instead of one per
+# rule. A cell the combined pattern matches still goes through every rule below.
+_ANY_RULE = re.compile("|".join(_scoped(r[4]) for r in _RULES))
+
+
+# Cell values already known to match no rule (datasets repeat values a lot). Bounded,
+# and only "no match" is remembered, so a finding is always computed for its own cell.
+_CLEAN_VALUES: set[tuple[bool, str]] = set()
+_CLEAN_VALUES_MAX = 200_000
+
+
 def _check_string_value(value: str, column: str, row_idx: str) -> list[ContentFinding]:
     """Apply deobfuscation then all text rules against a single string cell value."""
+    from config import settings
+
+    cache_key = (bool(settings.enable_encoding_normalization), value)
+    if cache_key in _CLEAN_VALUES:
+        return []
     deobfuscated = _deobfuscate(value)
+    targets = (deobfuscated,) if deobfuscated == value else (deobfuscated, value)
+    if not any(_ANY_RULE.search(t) for t in targets):
+        if len(_CLEAN_VALUES) >= _CLEAN_VALUES_MAX:
+            _CLEAN_VALUES.clear()
+        if len(value) <= 256:
+            _CLEAN_VALUES.add(cache_key)
+        return []
     findings = []
     is_safe_literal = _is_safe_literal_not_formula(value)
 
@@ -289,9 +323,13 @@ def _check_string_value(value: str, column: str, row_idx: str) -> list[ContentFi
             continue
 
         # Check both original and deobfuscated value for coverage
-        match = pattern.search(deobfuscated) or pattern.search(value)
+        match, target = None, value
+        for candidate in targets:
+            match = pattern.search(candidate)
+            if match:
+                target = candidate
+                break
         if match:
-            target = deobfuscated if pattern.search(deobfuscated) else value
             sample = target[max(0, match.start() - 20): match.start() + _SAMPLE_MAX_LEN]
             findings.append(ContentFinding(
                 rule_id=rule_id,

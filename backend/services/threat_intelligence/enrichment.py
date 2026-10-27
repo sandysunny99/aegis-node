@@ -13,6 +13,7 @@ Per AGENTS.md, only hashes, URLs and IPs are sent to providers (never dataset
 rows), URLs are never fetched, and every provider is opt-in (config defaults OFF).
 """
 
+import asyncio
 import logging
 import re
 from dataclasses import dataclass, field
@@ -206,33 +207,26 @@ async def _virustotal_evidence(result) -> NormalizedTIEvidence | None:
 async def _fused_report(result, file_path: str, evidence: list[NormalizedTIEvidence]) -> TIFusionReport:
     indicators = await run_in_threadpool(extract_indicators, file_path)
 
-    for url in indicators.urls:
+    async def url_reputation(url: str) -> NormalizedTIEvidence | None:
         intel = await lookup_url(url)
-        if intel.status != "unconfigured":
-            evidence.append(_url_evidence(url, intel))
+        return None if intel.status == "unconfigured" else _url_evidence(url, intel)
 
-    for ip in indicators.ips:
+    async def ip_reputation(ip: str) -> NormalizedTIEvidence | None:
         intel = await lookup_ip(ip)
-        if intel.status not in ("unconfigured", "invalid_ip"):
-            evidence.append(_ip_evidence(ip, intel))
+        return None if intel.status in ("unconfigured", "invalid_ip") else _ip_evidence(ip, intel)
 
+    # Every lookup runs at the same time (each is bounded by its own timeout), so a scan
+    # waits for the slowest provider, not the sum of all of them. Results keep this order.
+    calls = [url_reputation(url) for url in indicators.urls]
+    calls += [ip_reputation(ip) for ip in indicators.ips]
     # Approved lookup-only providers (each returns None when disabled).
-    for lookup in (lookups.malwarebazaar_hash, lookups.threatfox_hash, lookups.circl_hash,
-                   lookups.yaraify_hash, lookups.hybrid_analysis_hash, lookups.otx_hash):
-        ev = await lookup(result.sha256_hash)
-        if ev is not None:
-            evidence.append(ev)
-    for url in indicators.urls:
-        ev = await lookups.threatfox_url(url)
-        if ev is not None:
-            evidence.append(ev)
+    calls += [lookup(result.sha256_hash) for lookup in (
+        lookups.malwarebazaar_hash, lookups.threatfox_hash, lookups.circl_hash,
+        lookups.yaraify_hash, lookups.hybrid_analysis_hash, lookups.otx_hash)]
+    calls += [lookups.threatfox_url(url) for url in indicators.urls]
     for url in indicators.urls[: lookups._URLSCAN_MAX_URLS]:
-        ev = await lookups.urlscan_url(url)
-        if ev is not None:
-            evidence.append(ev)
-        ev = await lookups.otx_url(url)
-        if ev is not None:
-            evidence.append(ev)
+        calls += [lookups.urlscan_url(url), lookups.otx_url(url)]
+    evidence.extend(ev for ev in await asyncio.gather(*calls) if ev is not None)
 
     report = fuse_reports(evidence, configured_providers())
     conflict = evaluate_local_verdict_conflict(result.verdict, report)

@@ -75,6 +75,18 @@ def normalize_text(text: str, max_depth: int = _MAX_RECURSION_DEPTH) -> tuple[st
     if not text or not isinstance(text, str):
         return "", []
 
+    # Fast path (most dataset cells): plain ASCII with nothing any step below could
+    # decode returns unchanged. Every step needs one of these: a non-ASCII character
+    # (zero-width, homoglyph), "%" (URL), "&" (HTML entity), a backslash (hex escape)
+    # or a whole-string base64 token.
+    if (
+        len(text) <= _MAX_STRING_LENGTH
+        and text.isascii()
+        and "%" not in text and "&" not in text and "\\" not in text
+        and not (len(text.strip()) >= 8 and _BASE64_PATTERN.match(text.strip()))
+    ):
+        return text, []
+
     current = text[:_MAX_STRING_LENGTH]
     transformations: list[str] = []
 

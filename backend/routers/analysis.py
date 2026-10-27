@@ -26,6 +26,7 @@ from services.llm_service import analyse  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 from utils.auth import require_api_key  # noqa: E402
 from utils.datasets import get_dataset_by_public_id  # noqa: E402
+from utils.redact import redact_secrets  # noqa: E402
 
 router = APIRouter(prefix="/api/v1/datasets", tags=["analysis"])
 
@@ -130,7 +131,7 @@ async def analyse_dataset(
         prompt_tokens=db_record.prompt_tokens,
         completion_tokens=db_record.completion_tokens,
         created_at=db_record.created_at,
-        error=db_record.error_message,
+        error=redact_secrets(db_record.error_message),
         guardrail_status=db_record.guardrail_status,
         guardrail_score=db_record.guardrail_score,
         guardrail_signals=db_record.guardrail_signals,
@@ -186,7 +187,7 @@ def get_analysis(
         prompt_tokens=latest.prompt_tokens,
         completion_tokens=latest.completion_tokens,
         created_at=latest.created_at,
-        error=latest.error_message,
+        error=redact_secrets(latest.error_message),
         guardrail_status=latest.guardrail_status,
         guardrail_score=latest.guardrail_score,
         guardrail_signals=latest.guardrail_signals,

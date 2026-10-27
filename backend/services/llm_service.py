@@ -20,6 +20,7 @@ from typing import Literal
 
 from config import settings
 from pydantic import BaseModel, Field, ValidationError
+from utils.redact import redact_secrets
 
 logger = logging.getLogger(__name__)
 
@@ -320,6 +321,7 @@ def _validate_and_parse(raw_text: str) -> LlmAnalysisOutput | None:
 
 
 def _unavailable_result(model_name: str, reason: str) -> LlmAnalysisResult:
+    reason = redact_secrets(reason)
     return LlmAnalysisResult(
         status="unavailable",
         model_name=model_name,
@@ -335,6 +337,7 @@ def _unavailable_result(model_name: str, reason: str) -> LlmAnalysisResult:
 
 
 def _failed_result(model_name: str, error: str) -> LlmAnalysisResult:
+    error = redact_secrets(error)
     return LlmAnalysisResult(
         status="failed",
         model_name=model_name,
@@ -551,13 +554,13 @@ def analyse(
                 user_prompt=user_prompt,
             )
         except Exception as exc:  # noqa: BLE001
-            last_error = f"{provider_name}: unexpected error — {exc}"
+            last_error = redact_secrets(f"{provider_name}: unexpected error — {exc}")
             logger.warning("Provider %r raised unexpectedly: %s", provider_name, exc)
             continue
 
         # Soft failures: try next provider
         if result.status in ("failed", "unavailable", "unauthorized", "quota_exhausted", "timeout", "invalid_response"):
-            last_error = f"{provider_name}: {result.error or result.status}"
+            last_error = redact_secrets(f"{provider_name}: {result.error or result.status}")
             logger.info(
                 "Provider %r returned %r — trying next in chain (reason: %s)",
                 provider_name, result.status, last_error,
