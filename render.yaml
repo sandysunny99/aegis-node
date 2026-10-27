@@ -76,6 +76,14 @@ services:
         sync: false
       - key: CLAMAV_MOCK_MODE
         value: "false"
+      # Oracle ClamAV gateway (deploy/oracle-clamav/setup-vm.sh). Set both in the dashboard.
+      - key: CLAMAV_API_URL
+        sync: false
+      - key: CLAMAV_API_TOKEN
+        sync: false
+      # Answers only when AV_PROVIDER gives no result (e.g. the VM is down or reclaimed).
+      - key: AV_FALLBACK_PROVIDER
+        value: metadefender
 
       # ── Heuristic Scanning ────────────────────────────────────────────────────
       - key: ENABLE_HEURISTICS

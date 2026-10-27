@@ -52,6 +52,13 @@ Not measured: memory during a signature reload (the ClamAV docs say a second cop
 
 ## 4. Set up the VM (you)
 
+Shortcut (27 Oct 2026): after step 1 and 2 below, SSH into the VM and run
+`deploy/oracle-clamav/setup-vm.sh`. It does steps 3–5 and section 5: firewall rules for
+80/443, Docker from Docker's apt repository, the clone, a `.env` with a fresh token
+(mode 600), `docker compose up -d --build`, and a check of `/healthz`, the version and the
+401 without a token. Without an argument it uses `<public-ip>.sslip.io` as the HTTPS name,
+so no domain purchase is needed; pass your own DNS name as the first argument instead.
+
 1. In the Oracle console, create a `VM.Standard.A1.Flex` instance (2 OCPU, 12 GB) with Ubuntu 24.04 (aarch64). Keep the SSH key.
 2. VCN security list / NSG: allow inbound TCP 22 from your IP only, TCP 80 and 443 from anywhere. Nothing else. Do **not** open 3000 or 3310.
 3. On the VM, Ubuntu's own firewall also blocks ports; open 80 and 443 there:

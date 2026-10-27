@@ -241,7 +241,7 @@ async def remediate_dataset(
         findings_json=json.dumps(rescan_result.to_findings_dicts()),
         verification_limitations_json=json.dumps(rescan_result.verification_limitations),
         profile=settings.aegis_profile,
-        av_provider=(settings.av_provider or "").strip().lower() or None,
+        av_provider=getattr(rescan_result, "clamav_provider", None) or (settings.av_provider or "").strip().lower() or None,
         av_reason=av_reason_code(getattr(rescan_result, "clamav_error", None)),
     )
     db.add(rescan_report)

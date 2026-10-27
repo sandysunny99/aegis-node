@@ -164,6 +164,9 @@ class Settings(BaseSettings):
 
     # ─── Scanner & Multi-Engine Detection ────────────────────────────────────
     av_provider: str = "clamav_rest"
+    # Used only when AV_PROVIDER gives no result (e.g. the Oracle ClamAV gateway is down):
+    # "metadefender" or empty for none. A fallback never turns an unreachable scan into clean.
+    av_fallback_provider: str = ""
     clamav_api_url: str = "http://localhost:3000"
     clamav_mock_mode: bool = False
     # Bearer token for the authenticated HTTPS ClamAV gateway on the owner's VM.

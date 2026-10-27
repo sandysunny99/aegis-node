@@ -65,6 +65,7 @@ def detector_report(av_status: dict) -> dict:
             last_error=None if av_status.get("av_available") or not av_enabled else "unreachable",
             provider=av_provider,
             remote_gateway=bool(settings.clamav_api_token),
+            fallback=(getattr(settings, "av_fallback_provider", "") or "").strip().lower() or None,
             mock=bool(av_status.get("av_mock_mode")),
         ),
         _entry("yara", "L1", yara_on, yara_loaded,

@@ -11,6 +11,7 @@ Status: code and tests are in place on `integrate/core-audit`; **nothing is depl
 | `AEGIS_PROFILE` | `lite` | Reported by `/health/detectors`; Render free tier |
 | `AV_PROVIDER` | `clamav_rest` | The existing provider; no new provider type was needed |
 | `CLAMAV_API_URL` | `https://<SCAN_DOMAIN>` | Must be HTTPS when a token is set, or every scan is refused and reported unavailable |
+| `AV_FALLBACK_PROVIDER` | `metadefender` | Used only when the gateway gives no result (VM down, reclaimed, timeout). The scan report names the provider that answered; if neither answers, ClamAV's reason is kept and the scan is never clean |
 | `CLAMAV_API_TOKEN` | secret, same as `SCAN_GATEWAY_TOKEN` on the VM | `sync: false`; also read from `/etc/secrets/CLAMAV_API_TOKEN`. Never a `VITE_*` variable |
 | `CLAMAV_MOCK_MODE` | `false` | |
 | `MAX_UPLOAD_SIZE_MB` | `25` | From the 512 MB measurement below |

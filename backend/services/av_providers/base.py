@@ -9,6 +9,7 @@ class AVScanResult:
     virus_name: str | None
     raw_response: str
     error: str | None
+    provider: str | None = None   # which provider produced this result (set by the fallback chain)
 
 class AntivirusProvider(ABC):
     @property

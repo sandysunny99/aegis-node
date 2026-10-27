@@ -55,6 +55,7 @@ class ScanEngineResult:
     clamav_status: str = "skipped"        # clean | infected | skipped | error
     clamav_virus_name: str | None = None
     clamav_error: str | None = None        # provider's reason when it gave no result
+    clamav_provider: str | None = None     # provider that produced the result (fallback chain)
 
     # YARA (Stage 1.5)
     yara_available: bool = False
@@ -272,6 +273,7 @@ def run_scan(file_path: str) -> ScanEngineResult:
     logger.info("Stage 1: ClamAV scan for %s", path.name)
     clam: ClamAVResult = get_av_provider().scan_file(file_path)
     result.clamav_available = clam.available
+    result.clamav_provider = getattr(clam, "provider", None)
 
     if not clam.available:
         result.clamav_status = "skipped"

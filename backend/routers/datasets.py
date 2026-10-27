@@ -267,7 +267,7 @@ async def scan_dataset(
             threat_intel_json=ti_report.model_dump_json() if ti_report else _DISABLED_TI_JSON,
             started_at=started_at,
             profile=settings.aegis_profile,
-            av_provider=av_provider,
+            av_provider=getattr(result, "clamav_provider", None) or av_provider,
             av_reason=av_reason_code(result.clamav_error),
         )
         db.add(report)
