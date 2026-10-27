@@ -26,6 +26,14 @@ The 3D packages load in a lazy chunk, so they are not part of the initial landin
 - **pefile is past the 12-month rule.** Its last release is 26 months old. It was added because the owner's Phase A.5 decision named it explicitly. It is a pure-Python parser with no network access, used only on files that contain a PE header. If a maintained alternative is preferred, the PE checks can move to the planned capa / LIEF layer in Phase C.
 - `libmagic1` (system package, BSD-2-Clause) was already in the backend `Dockerfile`; no change was needed there. On Windows without a libmagic DLL, scans now carry `DETECTOR_UNAVAILABLE:libmagic` instead of skipping HEUR-007 silently.
 
+## External threat-intelligence services (no new packages; called with the existing httpx)
+
+| Service | Sent | Key (Render env) | Added | Notes |
+|---|---|---|---|---|
+| YARAify (abuse.ch) | file SHA-256 only (`lookup_hash`) | `ABUSECH_AUTH_KEY`, or `URL_HAUS_KEY` / `URLHAUS_AUTH_KEY` | 27 Oct 2026 | Never uploads the file. abuse.ch terms: free for not-for-profit use |
+| urlscan.io | URLs extracted from the file, as a search of existing scans | `URLSCAN_KEY` or `URLSCAN_API_KEY` | 27 Oct 2026 | Search and result API only; never submits a scan. At most 5 URLs per scan |
+| Maldatabase | not wired | `MALDATABASE_API_KEY` (unused) | — | Its API (https://maldatabase.com/api-doc.html, read 27 Oct 2026) offers only a daily bulk feed download, no per-hash lookup |
+
 ## Oracle scan VM (deploy/oracle-clamav, not part of the Render image)
 
 | Name | Pinned | Licence | Reason | Checked |

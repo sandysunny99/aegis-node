@@ -217,12 +217,17 @@ async def _fused_report(result, file_path: str, evidence: list[NormalizedTIEvide
             evidence.append(_ip_evidence(ip, intel))
 
     # Approved lookup-only providers (each returns None when disabled).
-    for lookup in (lookups.malwarebazaar_hash, lookups.threatfox_hash, lookups.circl_hash):
+    for lookup in (lookups.malwarebazaar_hash, lookups.threatfox_hash, lookups.circl_hash,
+                   lookups.yaraify_hash):
         ev = await lookup(result.sha256_hash)
         if ev is not None:
             evidence.append(ev)
     for url in indicators.urls:
         ev = await lookups.threatfox_url(url)
+        if ev is not None:
+            evidence.append(ev)
+    for url in indicators.urls[: lookups._URLSCAN_MAX_URLS]:
+        ev = await lookups.urlscan_url(url)
         if ev is not None:
             evidence.append(ev)
 

@@ -28,6 +28,11 @@ logger = logging.getLogger(__name__)
 _MB_URL = "https://mb-api.abuse.ch/api/v1/"
 _TF_URL = "https://threatfox-api.abuse.ch/api/v1/"
 _CIRCL_URL = "https://hashlookup.circl.lu/lookup/sha256/"
+_YARAIFY_URL = "https://yaraify-api.abuse.ch/api/v1/"
+_URLSCAN_SEARCH = "https://urlscan.io/api/v1/search/"
+_URLSCAN_RESULT = "https://urlscan.io/api/v1/result/"
+_URLSCAN_MAX_URLS = 5          # per scan: urlscan quotas are small
+_URLSCAN_MALICIOUS_SCORE = 50  # verdicts.urlscan.score runs from -100 (legitimate) to 100
 _MAX_BYTES = 1024 * 1024
 _CACHE_TTL = 3600.0
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -54,7 +59,16 @@ def enabled_providers() -> list[str]:
         providers.append("threatfox")
     if settings.enable_circl_hashlookup:
         providers.append("circl_hashlookup")
+    if getattr(settings, "enable_yaraify", False) is True and _abusech_key():
+        providers.append("yaraify")
+    if getattr(settings, "enable_urlscan", False) is True and _urlscan_key():
+        providers.append("urlscan")
     return providers
+
+
+def _urlscan_key() -> str:
+    key = getattr(settings, "urlscan_api_key", None)
+    return key.strip() if isinstance(key, str) else ""
 
 
 async def _request(method: str, url: str, **kwargs) -> tuple[str, dict | None]:
@@ -198,3 +212,97 @@ async def circl_hash(sha256: str) -> NormalizedTIEvidence | None:
                          category=f"known_file:{str(source)[:40]}" if source else "known_file",
                          confidence=f"trust:{trust}" if trust is not None else None)
     return await _cached("circl_hashlookup", "sha256", sha256, fetch)
+
+
+def _yaraify_category(data: dict) -> str | None:
+    """First ClamAV signature or YARA rule YARAify recorded for the file, else None."""
+    for task in data.get("tasks") or []:
+        if not isinstance(task, dict):
+            continue
+        for sig in task.get("clamav_results") or []:
+            if sig:
+                return f"clamav:{str(sig)[:60]}"
+        for rule in task.get("static_results") or []:
+            name = rule.get("rule_name") if isinstance(rule, dict) else rule
+            if name:
+                return f"yara:{str(name)[:60]}"
+    return None
+
+
+async def yaraify_hash(sha256: str) -> NormalizedTIEvidence | None:
+    """
+    YARAify lookup_hash: a SHA-256 only, never the file. A record with a ClamAV
+    signature or YARA rule hit is a MATCH; a record without any, or no record, is NO_MATCH.
+    """
+    sha256 = (sha256 or "").strip().lower()
+    if "yaraify" not in enabled_providers() or not _SHA256_RE.fullmatch(sha256):
+        return None
+
+    async def fetch():
+        state, payload = await _request("POST", _YARAIFY_URL, headers={"Auth-Key": _abusech_key()},
+                                        json={"query": "lookup_hash", "search_term": sha256})
+        if state != "OK":
+            return _evidence("yaraify", "sha256", sha256, "NO_MATCH" if state == "NOT_FOUND" else state)
+        status = str(payload.get("query_status", "")).lower()
+        if "auth" in status:
+            return _evidence("yaraify", "sha256", sha256, "UNAUTHORIZED")
+        if any(word in status for word in ("not_found", "no_result", "unknown")):
+            return _evidence("yaraify", "sha256", sha256, "NO_MATCH")
+        data = payload.get("data")
+        if status != "ok" or not isinstance(data, dict):
+            return _evidence("yaraify", "sha256", sha256, "INVALID_RESPONSE")
+        category = _yaraify_category(data)
+        if category is None:
+            return _evidence("yaraify", "sha256", sha256, "NO_MATCH")
+        return _evidence("yaraify", "sha256", sha256, "MATCH", category=category,
+                         reference=f"https://yaraify.abuse.ch/sample/{sha256}/")
+    return await _cached("yaraify", "sha256", sha256, fetch)
+
+
+def _urlscan_malicious(result: dict) -> tuple[bool, str | None]:
+    verdicts = result.get("verdicts") if isinstance(result.get("verdicts"), dict) else {}
+    overall = verdicts.get("overall") if isinstance(verdicts.get("overall"), dict) else {}
+    own = verdicts.get("urlscan") if isinstance(verdicts.get("urlscan"), dict) else {}
+    categories = overall.get("categories") or own.get("categories") or []
+    category = str(categories[0])[:80] if categories else None
+    score = own.get("score", overall.get("score"))
+    malicious = overall.get("malicious") is True or own.get("malicious") is True
+    if isinstance(score, (int, float)) and not isinstance(score, bool) and score >= _URLSCAN_MALICIOUS_SCORE:
+        malicious = True
+    return malicious, category
+
+
+async def urlscan_url(url: str) -> NormalizedTIEvidence | None:
+    """
+    urlscan.io: searches existing scans of this exact URL and reads the newest scan's
+    verdict. Never submits a scan. No earlier scan, or no malicious verdict, is NO_MATCH.
+    """
+    url = (url or "").strip()
+    if "urlscan" not in enabled_providers() or not url.lower().startswith(("http://", "https://")):
+        return None
+    headers = {"API-Key": _urlscan_key(), "Accept": "application/json"}
+    quoted = url.replace("\\", "\\\\").replace('"', '\\"')
+
+    async def fetch():
+        state, payload = await _request("GET", _URLSCAN_SEARCH, headers=headers,
+                                        params={"q": f'page.url:"{quoted}"', "size": 1})
+        if state != "OK":
+            return _evidence("urlscan", "url", url, "NO_MATCH" if state == "NOT_FOUND" else state)
+        results = payload.get("results")
+        if not isinstance(results, list):
+            return _evidence("urlscan", "url", url, "INVALID_RESPONSE")
+        if not results:
+            return _evidence("urlscan", "url", url, "NO_MATCH")
+        first = results[0] if isinstance(results[0], dict) else {}
+        scan_id = str(first.get("_id") or (first.get("task") or {}).get("uuid") or "")
+        if not re.fullmatch(r"[0-9a-f-]{36}", scan_id):
+            return _evidence("urlscan", "url", url, "INVALID_RESPONSE")
+        state, result = await _request("GET", f"{_URLSCAN_RESULT}{scan_id}/", headers=headers)
+        if state != "OK":
+            return _evidence("urlscan", "url", url, "NO_MATCH" if state == "NOT_FOUND" else state)
+        malicious, category = _urlscan_malicious(result)
+        if not malicious:
+            return _evidence("urlscan", "url", url, "NO_MATCH")
+        return _evidence("urlscan", "url", url, "MATCH", category=category,
+                         reference=f"https://urlscan.io/result/{scan_id}/")
+    return await _cached("urlscan", "url", url, fetch)

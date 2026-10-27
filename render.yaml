@@ -111,6 +111,12 @@ services:
         value: "true"
       - key: ENABLE_ABUSEIPDB
         value: "true"
+      # YARAify uses the abuse.ch key (URL_HAUS_KEY works too) and gets the SHA-256 only;
+      # urlscan.io (URLSCAN_KEY) searches existing scans of extracted URLs, never submits.
+      - key: ENABLE_YARAIFY
+        value: "true"
+      - key: ENABLE_URLSCAN
+        value: "true"
       - key: ABUSECH_AUTH_KEY
         sync: false
       - key: VIRUSTOTAL_API_KEY

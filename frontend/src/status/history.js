@@ -77,7 +77,10 @@ const AV_REASONS = {
 };
 const DETECTORS = { clamav: 'Antivirus (ClamAV)', yara: 'YARA rules', heuristics: 'Heuristic checks', content_rules: 'Content rules' };
 const DETECTOR_STATES = { ran: 'ran', unavailable: 'unavailable', disabled: 'switched off', incomplete: 'incomplete' };
-const PROVIDERS = { virustotal: 'VirusTotal', urlhaus: 'URLhaus', abuseipdb: 'AbuseIPDB' };
+const PROVIDERS = {
+  virustotal: 'VirusTotal', urlhaus: 'URLhaus', abuseipdb: 'AbuseIPDB', malwarebazaar: 'MalwareBazaar',
+  threatfox: 'ThreatFox', circl_hashlookup: 'CIRCL hashlookup', yaraify: 'YARAify', urlscan: 'urlscan.io',
+};
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const words = (code) => String(code).toLowerCase().replace(/_/g, ' ');

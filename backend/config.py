@@ -5,6 +5,7 @@ Loaded once at startup via pydantic-settings.
 
 import ipaddress
 import logging
+import os
 from pathlib import Path
 
 from pydantic import field_validator, model_validator
@@ -202,6 +203,12 @@ class Settings(BaseSettings):
     enable_malwarebazaar: bool = False
     enable_threatfox: bool = False
     enable_circl_hashlookup: bool = False
+    # Added 27 Oct 2026, lookup-only and off by default. YARAify (abuse.ch key) gets the
+    # file SHA-256 only, never the file. urlscan.io gets URLs found in the file and only
+    # searches existing scans; it never submits a scan.
+    enable_yaraify: bool = False
+    enable_urlscan: bool = False
+    urlscan_api_key: str | None = None
     threat_intel_timeout_seconds: float = 8.0
 
     enable_phishtank: bool = False
@@ -331,6 +338,15 @@ class Settings(BaseSettings):
             self.urlhaus_auth_key = _read_secret_file("URLHAUS_AUTH_KEY")
         if not self.abusech_auth_key:
             self.abusech_auth_key = _read_secret_file("ABUSECH_AUTH_KEY")
+        # Names the owner used in the Render dashboard (27 Oct 2026).
+        if not self.urlhaus_auth_key:
+            self.urlhaus_auth_key = os.environ.get("URL_HAUS_KEY", "").strip() or None
+        if not self.urlscan_api_key:
+            self.urlscan_api_key = (
+                os.environ.get("URLSCAN_KEY", "").strip()
+                or _read_secret_file("URLSCAN_API_KEY")
+                or None
+            )
         if not self.abuseipdb_api_key:
             self.abuseipdb_api_key = _read_secret_file("ABUSEIPDB_API_KEY")
         if not self.api_key:

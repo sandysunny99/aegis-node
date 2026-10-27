@@ -90,6 +90,10 @@ def detector_report(av_status: dict) -> dict:
                lookup="sha256 and extracted URLs"),
         _entry("circl_hashlookup", "L4", "circl_hashlookup" in lookups.enabled_providers(), True,
                lookup="sha256 only; known-good annotation"),
+        _entry("yaraify", "L4", "yaraify" in lookups.enabled_providers(), True,
+               lookup="sha256 only; never the file"),
+        _entry("urlscan", "L4", "urlscan" in lookups.enabled_providers(), True,
+               lookup="extracted URLs; searches existing scans, never submits"),
     ]
 
     persistence = persistence_info()

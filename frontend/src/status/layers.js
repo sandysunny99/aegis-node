@@ -15,6 +15,8 @@ const PROVIDER_TEXT = {
   malwarebazaar: { name: 'MalwareBazaar', sends: 'file SHA-256', idle: 'No result recorded for the file hash.' },
   threatfox: { name: 'ThreatFox', sends: 'file SHA-256 and URLs found in the file', idle: 'No result recorded for the file hash or URLs.' },
   circl_hashlookup: { name: 'CIRCL hashlookup', sends: 'file SHA-256', idle: 'No result recorded for the file hash.' },
+  yaraify: { name: 'YARAify', sends: 'file SHA-256', idle: 'No result recorded for the file hash.' },
+  urlscan: { name: 'urlscan.io', sends: 'URLs found in the file (search only)', idle: 'No URLs were found in the file, so nothing was looked up.' },
 };
 const LEGACY_PROVIDERS = ['virustotal', 'urlhaus', 'abuseipdb'];
 
