@@ -98,6 +98,11 @@ class ScanResultResponse(BaseModel):
     dataset_id: str = Field(..., description="Unguessable public dataset identifier (uuid4 hex)")
     clamav_status: str
     clamav_virus_name: str | None
+    av_provider: str | None = Field(default=None, description="Antivirus provider used: clamav_rest | metadefender | ...")
+    av_reason: str | None = Field(
+        default=None,
+        description="Why the antivirus gave no result: METADEFENDER_HASH_NOT_FOUND | RATE_LIMITED | AUTH | UNREACHABLE",
+    )
     threats_found_count: int
     risk_score: float = Field(..., description="Composite risk score 0.0 – 10.0")
     scan_duration_ms: int

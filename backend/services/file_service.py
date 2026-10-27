@@ -15,6 +15,7 @@ import logging
 import mimetypes
 import re
 import uuid
+import zlib
 from pathlib import Path
 
 from config import settings
@@ -140,6 +141,46 @@ def compute_sha256(path: Path) -> str:
         for chunk in iter(lambda: fh.read(65536), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+
+class GzipUploadReader:
+    """
+    Wraps an UploadFile whose body the browser gzip-compressed, and returns the
+    decompressed bytes through the same async read(n) interface. Output per call is
+    bounded, so the caller's size limit stops a decompression bomb early.
+    """
+
+    def __init__(self, upload_file, chunk_size: int = 65536):
+        self._src = upload_file
+        self._chunk = chunk_size
+        self._z = zlib.decompressobj(wbits=31)  # gzip container only
+        self._pending = b""
+        self._eof = False
+
+    async def read(self, size: int = 65536) -> bytes:
+        size = max(1, size)
+        while True:
+            if self._pending:
+                try:
+                    out = self._z.decompress(self._pending, size)
+                except zlib.error as exc:
+                    raise ValueError("Invalid compressed upload: not a gzip stream.") from exc
+                self._pending = self._z.unconsumed_tail
+            else:
+                out = b""
+            if out:
+                return out
+            if self._z.eof:
+                if self._z.unused_data or await self._src.read(1):
+                    raise ValueError("Invalid compressed upload: data after the end of the gzip stream.")
+                return b""
+            if self._eof:
+                raise ValueError("Invalid compressed upload: the gzip stream is truncated.")
+            raw = await self._src.read(self._chunk)
+            if not raw:
+                self._eof = True
+            self._pending = raw
 
 
 class FileService:

@@ -123,6 +123,33 @@ export function aiSummary(analysis) {
   return { word: 'Failed', tone: 'risk', text: analysis.error || 'The AI analysis failed. The verdict does not depend on it.' };
 }
 
+const AV_NAMES = { clamav: 'ClamAV', clamav_rest: 'ClamAV', metadefender: 'MetaDefender (hash lookup)' };
+const AV_REASONS = {
+  METADEFENDER_HASH_NOT_FOUND: 'no record of this file, so no signature result',
+  RATE_LIMITED: 'rate limited, so no signature result',
+  AUTH: 'API key rejected, so no signature result',
+  UNREACHABLE: 'unreachable, so no signature result',
+};
+
+/**
+ * Antivirus line for the local layer, named after the provider that actually ran.
+ * A MetaDefender "clean" covers the whole file by hash; it says nothing about rows
+ * the content scanner did not inspect.
+ */
+export function antivirusSummary(report, avProviderFallback = null) {
+  if (!report) return null;
+  const provider = report.av_provider || avProviderFallback;
+  const name = AV_NAMES[provider] ?? (provider ? provider : 'Antivirus');
+  const status = report.clamav_status;
+  if (status === 'infected') return { tone: 'breach', text: `Antivirus, ${name}: infected${report.clamav_virus_name ? ` (${report.clamav_virus_name})` : ''}.` };
+  if (status === 'clean') {
+    const scope = provider === 'metadefender' ? ' (known-clean hash)' : '';
+    return { tone: 'neutral', text: `Antivirus, ${name}: clean${scope}.` };
+  }
+  const why = AV_REASONS[report.av_reason] ?? 'no result for this file';
+  return { tone: 'risk', text: `Antivirus, ${name}: ${why}.` };
+}
+
 /** Coverage line for the local layer. */
 export function coverageSummary(report) {
   if (!report) return null;

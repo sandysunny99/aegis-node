@@ -73,7 +73,7 @@ def record_event(
     return event
 
 
-def _av_reason(error: str | None) -> str | None:
+def av_reason_code(error: str | None) -> str | None:
     """Short, non-sensitive reason code for an antivirus stage that gave no result."""
     if not error:
         return None
@@ -100,7 +100,7 @@ def detector_events(db: Session, dataset: DatasetRecord, scan: ScanReportRecord,
     record_event(db, "DETECTOR_COMPLETED", dataset=dataset, scan=scan, detector="clamav",
                  state={"clean": "ran", "infected": "ran"}.get(result.clamav_status, "unavailable"),
                  clamav_status=result.clamav_status, provider=scan.av_provider,
-                 reason=_av_reason(getattr(result, "clamav_error", None)))
+                 reason=av_reason_code(getattr(result, "clamav_error", None)))
     record_event(db, "DETECTOR_COMPLETED", dataset=dataset, scan=scan, detector="yara",
                  state=state("yara", result.yara_available), findings=len(result.yara_findings))
     record_event(db, "DETECTOR_COMPLETED", dataset=dataset, scan=scan, detector="heuristics",

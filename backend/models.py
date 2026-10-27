@@ -108,6 +108,8 @@ class ScanReportRecord(Base):
     # Deployment profile and AV provider in effect for this scan (null on older rows).
     profile: Mapped[str | None] = mapped_column(String(16), nullable=True)
     av_provider: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # Why the antivirus stage gave no result (e.g. METADEFENDER_HASH_NOT_FOUND); null otherwise.
+    av_reason: Mapped[str | None] = mapped_column(String(48), nullable=True)
 
     # ClamAV stage
     clamav_status: Mapped[str] = mapped_column(String(64), nullable=False, default="skipped")

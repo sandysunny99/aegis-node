@@ -81,6 +81,37 @@ services:
       - key: ENABLE_HEURISTICS
         value: "true"
 
+      # Rows inspected per dataset (larger files are scanned up to this and marked PARTIAL).
+      - key: SCAN_MAX_ROWS
+        value: "100000"
+
+      # ── Threat intelligence (owner decision 27 Oct 2026: on) ──────────────────
+      # Extra evidence only; never changes the local verdict. CIRCL hashlookup needs no key
+      # and receives the file SHA-256 only. The others run only once their key is set in
+      # the dashboard: MalwareBazaar/ThreatFox (SHA-256, URLs) use ABUSECH_AUTH_KEY,
+      # VirusTotal (SHA-256) VIRUSTOTAL_API_KEY, URLhaus (URLs) URLHAUS_AUTH_KEY,
+      # AbuseIPDB (public IPs) ABUSEIPDB_API_KEY.
+      - key: ENABLE_CIRCL_HASHLOOKUP
+        value: "true"
+      - key: ENABLE_MALWAREBAZAAR
+        value: "true"
+      - key: ENABLE_THREATFOX
+        value: "true"
+      - key: ENABLE_VIRUSTOTAL
+        value: "true"
+      - key: ENABLE_URLHAUS
+        value: "true"
+      - key: ENABLE_ABUSEIPDB
+        value: "true"
+      - key: ABUSECH_AUTH_KEY
+        sync: false
+      - key: VIRUSTOTAL_API_KEY
+        sync: false
+      - key: URLHAUS_AUTH_KEY
+        sync: false
+      - key: ABUSEIPDB_API_KEY
+        sync: false
+
       # ── App Config ────────────────────────────────────────────────────────────
       - key: APP_ENV
         value: production

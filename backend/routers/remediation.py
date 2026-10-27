@@ -29,7 +29,7 @@ from limiter import limiter  # noqa: E402
 from models import RemediationRecord, ScanReportRecord  # noqa: E402
 from schemas import RemediationActionSchema, RemediationResponse  # noqa: E402
 from services.file_service import file_service  # noqa: E402
-from services.history import record_event  # noqa: E402
+from services.history import av_reason_code, record_event  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 from utils.auth import require_api_key  # noqa: E402
 from utils.datasets import get_dataset_by_public_id  # noqa: E402
@@ -240,6 +240,9 @@ async def remediate_dataset(
         scan_duration_ms=rescan_result.scan_duration_ms,
         findings_json=json.dumps(rescan_result.to_findings_dicts()),
         verification_limitations_json=json.dumps(rescan_result.verification_limitations),
+        profile=settings.aegis_profile,
+        av_provider=(settings.av_provider or "").strip().lower() or None,
+        av_reason=av_reason_code(getattr(rescan_result, "clamav_error", None)),
     )
     db.add(rescan_report)
     db.flush()

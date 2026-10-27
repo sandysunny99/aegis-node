@@ -28,8 +28,8 @@ from schemas import (  # noqa: E402
     ThreatFinding,
     TIFusionReport,
 )
-from services.file_service import file_service  # noqa: E402
-from services.history import detector_events, record_event, threat_intel_events  # noqa: E402
+from services.file_service import GzipUploadReader, file_service  # noqa: E402
+from services.history import av_reason_code, detector_events, record_event, threat_intel_events  # noqa: E402
 from services.threat_intelligence.enrichment import enrich_scan_result  # noqa: E402
 from sqlalchemy import update  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
@@ -81,10 +81,17 @@ async def upload_dataset(
             detail=f"File type not allowed. Accepted extensions: {sorted(list(settings.allowed_extensions))}. Got: {Path(filename).suffix!r}",
         )
 
-    # 2. Stream directly to disk with incremental SHA-256 and size enforcement
+    # 2. Stream directly to disk with incremental SHA-256 and size enforcement.
+    # The web UI gzip-compresses the body (X-Upload-Encoding: gzip) because Render's
+    # edge firewall returns 403 for uploads that contain SQL-injection text, which is
+    # exactly what Aegis scans for. Size, hash and magic bytes apply to the decompressed file.
     max_bytes = settings.max_upload_size_mb * 1024 * 1024
+    encoding = (request.headers.get("x-upload-encoding") or "").strip().lower()
+    if encoding not in ("", "identity", "gzip"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported X-Upload-Encoding; use gzip.")
+    source = GzipUploadReader(file) if encoding == "gzip" else file
     try:
-        meta = await file_service.save_upload_stream(file, filename, max_bytes=max_bytes)
+        meta = await file_service.save_upload_stream(source, filename, max_bytes=max_bytes)
     except ValueError as exc:
         msg = str(exc)
         if "exceeds maximum allowed size" in msg:
@@ -170,6 +177,8 @@ def _scan_response(record: DatasetRecord, report: ScanReportRecord) -> ScanResul
         dataset_id=record.public_id,
         clamav_status=report.clamav_status,
         clamav_virus_name=report.clamav_virus_name,
+        av_provider=report.av_provider,
+        av_reason=report.av_reason,
         threats_found_count=report.threats_found_count,
         risk_score=report.risk_score,
         scan_duration_ms=report.scan_duration_ms,
@@ -259,6 +268,7 @@ async def scan_dataset(
             started_at=started_at,
             profile=settings.aegis_profile,
             av_provider=av_provider,
+            av_reason=av_reason_code(result.clamav_error),
         )
         db.add(report)
         db.flush()

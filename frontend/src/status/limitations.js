@@ -26,7 +26,7 @@ export function describeLimitation(code) {
     const label = { xlsx_rows: 'workbook rows', xlsx_count: 'workbook rows counted' }[what] ?? what;
     return `The scanner stopped at its limit of ${value ?? '?'} ${label}, so content beyond it was not inspected.`;
   }
-  if (code === 'CLAMAV_UNAVAILABLE') return 'No antivirus signature result for this file: the engine was unreachable, or a hash-only lookup (MetaDefender) had no record of it.';
+  if (code === 'CLAMAV_UNAVAILABLE') return 'No antivirus signature result for this file (MetaDefender only knows files it has seen before; a ClamAV engine may be unreachable).';
   if (code === 'PARTIAL_DATASET_SCAN') return 'Only part of the dataset was inspected, so findings may be incomplete.';
   if (code === 'PARSER_LIMITATION') return 'The file could not be fully parsed, so some values were not checked cell by cell.';
   if (code === 'MALWARE_REFERENCE_ONLY') return 'The data mentions malware names (for example in research notes) but contains no malware artifact.';

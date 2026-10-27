@@ -129,7 +129,8 @@ def _migrate_scan_history_columns() -> None:
     with engine.begin() as conn:
         if "public_id" not in columns:
             conn.execute(text("ALTER TABLE scan_reports ADD COLUMN public_id VARCHAR(32)"))
-        for name, ddl in (("started_at", "TIMESTAMP"), ("profile", "VARCHAR(16)"), ("av_provider", "VARCHAR(32)")):
+        for name, ddl in (("started_at", "TIMESTAMP"), ("profile", "VARCHAR(16)"), ("av_provider", "VARCHAR(32)"),
+                          ("av_reason", "VARCHAR(48)")):
             if name not in columns:
                 conn.execute(text(f"ALTER TABLE scan_reports ADD COLUMN {name} {ddl}"))
         missing = conn.execute(text("SELECT id FROM scan_reports WHERE public_id IS NULL")).all()

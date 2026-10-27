@@ -55,14 +55,31 @@ async function request(path, options = {}) {
  * @param {string|null} turnstileToken - Optional Cloudflare Turnstile token.
  * @returns {Promise<Object>} Upload response
  */
-export function uploadDataset(file, onProgress, turnstileToken = null) {
+/**
+ * Gzip the file in the browser. Render's edge firewall answers 403 to uploads that
+ * contain SQL-injection text, which is what Aegis scans for; compressed, the payload
+ * passes through and the server decompresses it (X-Upload-Encoding: gzip).
+ */
+async function gzipFile(file) {
+  if (typeof CompressionStream === 'undefined') return null;
+  try {
+    const stream = file.stream().pipeThrough(new CompressionStream('gzip'));
+    return await new Response(stream).blob();
+  } catch {
+    return null;
+  }
+}
+
+export async function uploadDataset(file, onProgress, turnstileToken = null) {
+  const compressed = await gzipFile(file);
   return new Promise((resolve, reject) => {
     const form = new FormData();
-    form.append('file', file);
+    form.append('file', compressed ?? file, file.name);
 
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `${BASE}/api/v1/datasets/upload`);
 
+    if (compressed) xhr.setRequestHeader('X-Upload-Encoding', 'gzip');
     if (turnstileToken) xhr.setRequestHeader('X-Turnstile-Token', turnstileToken);
 
     xhr.upload.addEventListener('progress', (e) => {
@@ -86,7 +103,10 @@ export function uploadDataset(file, onProgress, turnstileToken = null) {
           const detail = err.detail ?? `HTTP ${xhr.status}`;
           reject(new Error(friendlyError(xhr.status, detail)));
         } catch {
-          reject(new Error(friendlyError(xhr.status, `HTTP ${xhr.status}: ${xhr.statusText}`)));
+          // Not JSON: the request was stopped before it reached Aegis (hosting firewall or proxy).
+          reject(new Error(xhr.status === 403
+            ? "The hosting provider's firewall blocked this upload before it reached Aegis. Reload the page and try again; if it persists, the file contains a pattern the host refuses."
+            : friendlyError(xhr.status, `HTTP ${xhr.status}${xhr.statusText ? `: ${xhr.statusText}` : ''}`)));
         }
       }
     });

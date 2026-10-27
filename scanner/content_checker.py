@@ -12,6 +12,7 @@ Security note:
 import io
 import json
 import logging
+import os
 import re
 import zipfile
 from dataclasses import dataclass, field
@@ -29,7 +30,18 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 # ─── Maximum rows inspected per dataset ─────────────────────────────────────
-_MAX_ROWS = 10_000
+# SCAN_MAX_ROWS overrides it. 100k rows of a typical CSV take ~40 s and ~11 MiB of
+# Python heap on a laptop (measured 27 Oct 2026); larger files are scanned up to the
+# cap and reported PARTIAL, never clean_verified.
+def _env_int(name: str, default: int) -> int:
+    try:
+        value = int(os.environ.get(name, "") or default)
+    except ValueError:
+        return default
+    return value if value > 0 else default
+
+
+_MAX_ROWS = _env_int("SCAN_MAX_ROWS", 100_000)
 _XLSX_MAX_MB = 50  # Hard cap for Excel files (compressed size)
 _XLSX_MAX_UNCOMPRESSED_BYTES = 500 * 1024 * 1024  # zip-bomb guard: total declared size
 _XLSX_MAX_ENTRIES = 10_000                         # zip-bomb guard: archive members

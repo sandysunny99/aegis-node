@@ -81,3 +81,34 @@ def test_antivirus_event_records_why_it_did_not_run():
     av = next(e for e in events if e["event_type"] == "DETECTOR_COMPLETED" and e["detail"]["detector"] == "clamav")
     assert av["detail"]["provider"]
     assert "reason" in av["detail"]
+
+
+def test_scan_report_names_the_antivirus_and_its_reason(monkeypatch):
+    from services.av_providers.base import AVScanResult
+
+    class _NotFound:
+        def scan_file(self, path):
+            return AVScanResult(available=False, infected=False, virus_name=None, raw_response="",
+                                error="METADEFENDER_HASH_NOT_FOUND")
+
+        def ping(self):
+            return True
+
+    monkeypatch.setattr(settings, "av_provider", "metadefender")
+    monkeypatch.setattr("scanner.engine.get_av_provider", lambda: _NotFound())
+    ds = client.post("/api/v1/datasets/upload", files={"file": ("d.csv", b"id,n\n1,a\n", "text/csv")}).json()["dataset_id"]
+    scan = client.post(f"/api/v1/datasets/{ds}/scan").json()
+    assert scan["av_provider"] == "metadefender"
+    assert scan["av_reason"] == "METADEFENDER_HASH_NOT_FOUND"
+    report = client.get(f"/api/v1/datasets/{ds}/report").json()
+    assert report["av_reason"] == "METADEFENDER_HASH_NOT_FOUND"
+
+
+def test_row_cap_defaults_to_100k_and_reads_scan_max_rows(monkeypatch):
+    import scanner.content_checker as cc
+
+    assert cc._env_int("SCAN_MAX_ROWS_UNSET_FOR_TEST", 100_000) == 100_000
+    monkeypatch.setenv("SCAN_MAX_ROWS_TEST", "2500")
+    assert cc._env_int("SCAN_MAX_ROWS_TEST", 100_000) == 2500
+    monkeypatch.setenv("SCAN_MAX_ROWS_TEST", "junk")
+    assert cc._env_int("SCAN_MAX_ROWS_TEST", 100_000) == 100_000

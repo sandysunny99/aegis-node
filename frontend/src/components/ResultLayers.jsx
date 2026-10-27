@@ -1,6 +1,6 @@
 import { detectorGaps } from '../status/limitations';
 import { useDetectors } from '../data/useDetectors';
-import { aiSummary, coverageSummary, enrichmentSummary, providerStates } from '../status/layers';
+import { aiSummary, antivirusSummary, coverageSummary, enrichmentSummary, providerStates } from '../status/layers';
 import { VERDICT_TO_STATUS } from '../status/statusToPlate';
 import Card from '../ui/Card';
 import StatusPill from '../ui/StatusPill';
@@ -15,7 +15,10 @@ export default function ResultLayers({ report, analysis }) {
   const coverage = coverageSummary(report);
   const gaps = detectorGaps(report.verification_limitations);
   const ti = enrichmentSummary(report.threat_intel);
-  const providers = providerStates(report.threat_intel, useDetectors());
+  const detectors = useDetectors();
+  const providers = providerStates(report.threat_intel, detectors);
+  const avFallback = detectors?.find((d) => d.name === 'clamav')?.provider ?? null;
+  const av = antivirusSummary(report, avFallback);
   const ai = analysis === undefined ? null : aiSummary(analysis);
 
   return (
@@ -26,9 +29,13 @@ export default function ResultLayers({ report, analysis }) {
           <StatusPill status={VERDICT_TO_STATUS[report.verdict] ?? 'incomplete'} />
           <ul className="layer__facts">
             <li className={coverage.full ? undefined : 'is-risk'}>{coverage.text}</li>
-            <li>Antivirus: {report.clamav_status}{report.clamav_virus_name ? ` (${report.clamav_virus_name})` : ''}</li>
+            <li className={av.tone === 'neutral' ? undefined : 'is-risk'}>{av.text}</li>
             <li className={gaps.length ? 'is-risk' : undefined}>
-              {gaps.length ? `Not run: ${gaps.map((g) => `${g.name} (${g.state})`).join('; ')}` : 'No detector reported as missing or switched off.'}
+              {gaps.length
+                ? `Not run: ${gaps.map((g) => `${g.name} (${g.state})`).join('; ')}`
+                : coverage.full
+                  ? 'Every local detector ran.'
+                  : 'Every local detector ran, but only on the inspected rows.'}
             </li>
           </ul>
         </section>

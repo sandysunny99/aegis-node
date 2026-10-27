@@ -117,3 +117,17 @@ test('partial coverage is never described as full', () => {
   assert.match(c.text, /Partial coverage: 41.2%/);
   assert.equal(coverageSummary({ coverage_status: 'FULL', coverage_percentage: 100, rows_inspected: 15, rows_total: 15 }).full, true);
 });
+
+test('antivirus line names the provider and never calls a hash miss "clean"', async () => {
+  const { antivirusSummary } = await import('./layers.js');
+  const miss = antivirusSummary({ clamav_status: 'skipped', av_provider: 'metadefender', av_reason: 'METADEFENDER_HASH_NOT_FOUND' });
+  assert.equal(miss.text, 'Antivirus, MetaDefender (hash lookup): no record of this file, so no signature result.');
+  assert.equal(miss.tone, 'risk');
+  const known = antivirusSummary({ clamav_status: 'clean', av_provider: 'metadefender' });
+  assert.match(known.text, /clean \(known-clean hash\)/);
+  const older = antivirusSummary({ clamav_status: 'skipped' }, 'metadefender');
+  assert.match(older.text, /MetaDefender/);
+  const clam = antivirusSummary({ clamav_status: 'infected', av_provider: 'clamav_rest', clamav_virus_name: 'Eicar-Test-Signature' });
+  assert.equal(clam.tone, 'breach');
+  assert.match(clam.text, /ClamAV: infected \(Eicar-Test-Signature\)/);
+});
