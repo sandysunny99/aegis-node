@@ -122,6 +122,11 @@ services:
         value: "true"
       - key: HYBRID_ANALYSIS_API_KEY
         sync: false
+      # AlienVault OTX (OTX_API_KEY): read-only indicator lookups for the SHA-256 and URLs.
+      - key: ENABLE_OTX
+        value: "true"
+      - key: OTX_API_KEY
+        sync: false
       - key: ABUSECH_AUTH_KEY
         sync: false
       - key: VIRUSTOTAL_API_KEY

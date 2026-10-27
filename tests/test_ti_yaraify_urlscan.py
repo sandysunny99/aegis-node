@@ -23,7 +23,7 @@ SCAN_ID = "0199a1b2-c3d4-4e5f-8a9b-0c1d2e3f4a5b"
 def isolated(monkeypatch):
     lookups.clear_cache()
     for flag in ("enable_malwarebazaar", "enable_threatfox", "enable_circl_hashlookup",
-                 "enable_yaraify", "enable_urlscan", "enable_hybrid_analysis"):
+                 "enable_yaraify", "enable_urlscan", "enable_hybrid_analysis", "enable_otx"):
         monkeypatch.setattr(settings, flag, False)
     monkeypatch.setattr(settings, "abusech_auth_key", "test-abusech-key")
     monkeypatch.setattr(settings, "urlscan_api_key", "test-urlscan-key")
@@ -201,3 +201,46 @@ def test_hybrid_analysis_verdicts(monkeypatch, verdict, state, reputation):
 def test_hybrid_analysis_rejected_key_is_unauthorized(monkeypatch):
     _ha(monkeypatch, {"message": "Your API key is incompatible with API v2."}, status=403)
     assert run(lookups.hybrid_analysis_hash(SHA)).result_state == "UNAUTHORIZED"
+
+
+# ─── AlienVault OTX ──────────────────────────────────────────────────────────
+
+def _otx(monkeypatch, body, status=200):
+    monkeypatch.setattr(settings, "enable_otx", True)
+    monkeypatch.setattr(settings, "otx_api_key", "test-otx-key")
+    return _serve(monkeypatch, lambda r: httpx.Response(status, json=body))
+
+
+def test_otx_reads_the_general_record(monkeypatch):
+    seen = _otx(monkeypatch, {"pulse_info": {"count": 0, "pulses": []}, "validation": []})
+    assert run(lookups.otx_hash(SHA)).result_state == "NO_MATCH"
+    req = seen[0]
+    assert req.method == "GET"
+    assert str(req.url) == f"https://otx.alienvault.com/api/v1/indicators/file/{SHA}/general"
+    assert req.headers["X-OTX-API-KEY"] == "test-otx-key"
+
+
+def test_otx_pulses_are_suspicious_not_malicious(monkeypatch):
+    _otx(monkeypatch, {"pulse_info": {"count": 3, "pulses": [{"tags": ["qbot"]}],
+                                      "related": {"alienvault": {"malware_families": ["Qakbot"]}}}})
+    ev = run(lookups.otx_hash(SHA))
+    assert (ev.result_state, ev.reputation, ev.category) == ("MATCH", "suspicious", "Qakbot")
+
+
+def test_otx_whitelist_is_known_good(monkeypatch):
+    _otx(monkeypatch, {"pulse_info": {"count": 1}, "validation": [{"source": "whitelist", "name": "x"}]})
+    assert run(lookups.otx_hash(SHA)).reputation == "known_good"
+
+
+def test_otx_url_is_path_encoded(monkeypatch):
+    seen = _otx(monkeypatch, {"pulse_info": {"count": 0}})
+    assert run(lookups.otx_url(URL)).result_state == "NO_MATCH"
+    assert seen[0].url.raw_path.decode().startswith("/api/v1/indicators/url/http%3A%2F%2Fbad.example.org%2Fpayload/")
+
+
+@pytest.mark.parametrize(("body", "status", "state"), [
+    ({}, 403, "UNAUTHORIZED"), ({"detail": "x"}, 200, "INVALID_RESPONSE"), ({}, 503, "UNAVAILABLE"),
+])
+def test_otx_failures_are_explicit(monkeypatch, body, status, state):
+    _otx(monkeypatch, body, status)
+    assert run(lookups.otx_hash(SHA)).result_state == state

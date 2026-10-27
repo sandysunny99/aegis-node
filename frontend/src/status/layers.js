@@ -17,6 +17,7 @@ const PROVIDER_TEXT = {
   circl_hashlookup: { name: 'CIRCL hashlookup', sends: 'file SHA-256', idle: 'No result recorded for the file hash.' },
   yaraify: { name: 'YARAify', sends: 'file SHA-256', idle: 'No result recorded for the file hash.' },
   hybrid_analysis: { name: 'Hybrid Analysis', sends: 'file SHA-256', idle: 'No result recorded for the file hash.' },
+  otx: { name: 'AlienVault OTX', sends: 'file SHA-256 and URLs found in the file', idle: 'No result recorded for the file hash or URLs.' },
   urlscan: { name: 'urlscan.io', sends: 'URLs found in the file (search only)', idle: 'No URLs were found in the file, so nothing was looked up.' },
 };
 const LEGACY_PROVIDERS = ['virustotal', 'urlhaus', 'abuseipdb'];

@@ -213,6 +213,10 @@ class Settings(BaseSettings):
     # submits a file for sandboxing.
     enable_hybrid_analysis: bool = False
     hybrid_analysis_api_key: str | None = None
+    # AlienVault OTX (27 Oct 2026): reads indicator "general" records for the file
+    # SHA-256 and extracted URLs; never creates pulses or submits files.
+    enable_otx: bool = False
+    otx_api_key: str | None = None
     threat_intel_timeout_seconds: float = 8.0
 
     enable_phishtank: bool = False

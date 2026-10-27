@@ -30,6 +30,7 @@ _TF_URL = "https://threatfox-api.abuse.ch/api/v1/"
 _CIRCL_URL = "https://hashlookup.circl.lu/lookup/sha256/"
 _YARAIFY_URL = "https://yaraify-api.abuse.ch/api/v1/"
 _HA_OVERVIEW = "https://hybrid-analysis.com/api/v2/overview/"
+_OTX_INDICATORS = "https://otx.alienvault.com/api/v1/indicators/"
 _URLSCAN_SEARCH = "https://urlscan.io/api/v1/search/"
 _URLSCAN_RESULT = "https://urlscan.io/api/v1/result/"
 _URLSCAN_MAX_URLS = 5          # per scan: urlscan quotas are small
@@ -66,7 +67,14 @@ def enabled_providers() -> list[str]:
         providers.append("urlscan")
     if getattr(settings, "enable_hybrid_analysis", False) is True and _ha_key():
         providers.append("hybrid_analysis")
+    if getattr(settings, "enable_otx", False) is True and _otx_key():
+        providers.append("otx")
     return providers
+
+
+def _otx_key() -> str:
+    key = getattr(settings, "otx_api_key", None)
+    return key.strip() if isinstance(key, str) else ""
 
 
 def _ha_key() -> str:
@@ -350,3 +358,62 @@ async def hybrid_analysis_hash(sha256: str) -> NormalizedTIEvidence | None:
                              category="whitelisted", reference=reference)
         return _evidence("hybrid_analysis", "sha256", sha256, "NO_MATCH")
     return await _cached("hybrid_analysis", "sha256", sha256, fetch)
+
+
+def _otx_evidence(kind: str, indicator: str, state: str, payload: dict | None) -> NormalizedTIEvidence:
+    """
+    OTX pulses are community reports, so an indicator that appears in pulses is
+    "suspicious", not proof of malware. A whitelist validation is a known-good annotation.
+    """
+    if state == "NOT_FOUND":
+        return _evidence("otx", kind, indicator, "NO_MATCH")
+    if state != "OK":
+        return _evidence("otx", kind, indicator, state)
+    pulse_info = payload.get("pulse_info")
+    if not isinstance(pulse_info, dict):
+        return _evidence("otx", kind, indicator, "INVALID_RESPONSE")
+    validation = payload.get("validation") or []
+    if any(isinstance(v, dict) and "whitelist" in str(v.get("source", "")).lower() for v in validation):
+        return _evidence("otx", kind, indicator, "MATCH", reputation="known_good", category="whitelisted")
+    count = pulse_info.get("count")
+    if not isinstance(count, int) or count <= 0:
+        return _evidence("otx", kind, indicator, "NO_MATCH")
+    related = ((pulse_info.get("related") or {}).get("alienvault") or {}).get("malware_families") or []
+    category = str(related[0])[:80] if related else None
+    if category is None:
+        for pulse in pulse_info.get("pulses") or []:
+            tags = pulse.get("tags") if isinstance(pulse, dict) else None
+            if tags:
+                category = str(tags[0])[:80]
+                break
+    return _evidence("otx", kind, indicator, "MATCH", reputation="suspicious", category=category,
+                     confidence=f"pulses:{count}")
+
+
+async def otx_hash(sha256: str) -> NormalizedTIEvidence | None:
+    sha256 = (sha256 or "").strip().lower()
+    if "otx" not in enabled_providers() or not _SHA256_RE.fullmatch(sha256):
+        return None
+
+    async def fetch():
+        state, payload = await _request("GET", f"{_OTX_INDICATORS}file/{sha256}/general",
+                                        headers={"X-OTX-API-KEY": _otx_key(), "Accept": "application/json"})
+        ev = _otx_evidence("sha256", sha256, state, payload)
+        if ev.result_state == "MATCH":
+            ev.reference_url = f"https://otx.alienvault.com/indicator/file/{sha256}"
+        return ev
+    return await _cached("otx", "sha256", sha256, fetch)
+
+
+async def otx_url(url: str) -> NormalizedTIEvidence | None:
+    from urllib.parse import quote
+
+    url = (url or "").strip()
+    if "otx" not in enabled_providers() or not url.lower().startswith(("http://", "https://")):
+        return None
+
+    async def fetch():
+        state, payload = await _request("GET", f"{_OTX_INDICATORS}url/{quote(url, safe='')}/general",
+                                        headers={"X-OTX-API-KEY": _otx_key(), "Accept": "application/json"})
+        return _otx_evidence("url", url, state, payload)
+    return await _cached("otx", "url", url, fetch)

@@ -80,7 +80,7 @@ const DETECTOR_STATES = { ran: 'ran', unavailable: 'unavailable', disabled: 'swi
 const PROVIDERS = {
   virustotal: 'VirusTotal', urlhaus: 'URLhaus', abuseipdb: 'AbuseIPDB', malwarebazaar: 'MalwareBazaar',
   threatfox: 'ThreatFox', circl_hashlookup: 'CIRCL hashlookup', yaraify: 'YARAify', urlscan: 'urlscan.io',
-  hybrid_analysis: 'Hybrid Analysis',
+  hybrid_analysis: 'Hybrid Analysis', otx: 'AlienVault OTX',
 };
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
