@@ -23,8 +23,8 @@ def test_ordinary_text_is_untouched():
 
 
 def test_keys_are_trimmed_at_load(monkeypatch):
-    monkeypatch.setenv("NVIDIA_API_KEY", "nvapi-abc123456789\n")
-    assert Settings(_env_file=None).nvidia_api_key == "nvapi-abc123456789"
+    monkeypatch.setenv("NVIDIA_API_KEY", "nvapi-abc123456789\n")  # gitleaks:allow (synthetic test value)
+    assert Settings(_env_file=None).nvidia_api_key == "nvapi-abc123456789"  # gitleaks:allow (synthetic test value)
 
 
 def test_unavailable_analysis_never_returns_the_key(monkeypatch):

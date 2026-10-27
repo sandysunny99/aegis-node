@@ -1,0 +1,3 @@
+# Synthetic test values in tests/test_secret_redaction.py (not real credentials), commit 410ee21.
+410ee2167b572b734d5dedcff284d0bfdcb07ba5:tests/test_secret_redaction.py:generic-api-key:26
+410ee2167b572b734d5dedcff284d0bfdcb07ba5:tests/test_secret_redaction.py:generic-api-key:27
