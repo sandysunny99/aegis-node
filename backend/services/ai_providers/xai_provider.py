@@ -39,12 +39,14 @@ def call_xai(
 
     # Model candidates in order of preference
     models_to_try = [model] if model else []
-    for candidate in ("grok-2-latest", "grok-beta", "grok-2-1212", "grok-2"):
+    # Current models (docs.x.ai/docs/models, 27 Oct 2026); the grok-2 names are gone.
+    for candidate in ("grok-4.20-0309-non-reasoning", "grok-4.3"):
         if candidate not in models_to_try:
             models_to_try.append(candidate)
 
     with httpx.Client(timeout=timeout) as client:
         last_exc = None
+        last_detail = None
         for m in models_to_try:
             payload = {
                 "model": m,
@@ -73,10 +75,15 @@ def call_xai(
                 logger.warning("xAI API HTTP error with model %s: status=%s", m, status_code)
                 if status_code in (401, 403, 429):
                     raise last_exc from None
+                if 400 <= status_code < 500:
+                    # Keep xAI's own reason (e.g. unknown model, no credits); the caller redacts keys.
+                    last_detail = f"xAI HTTP {status_code} for {m}: {e.response.text[:200]}"
             except Exception as e:  # noqa: BLE001
                 last_exc = e
                 logger.warning("xAI API call error with model %s: %s", m, e)
 
+        if last_detail:
+            return None, last_detail
         if last_exc:
             raise last_exc
 

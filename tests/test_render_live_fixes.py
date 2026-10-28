@@ -132,3 +132,13 @@ def test_optional_antivirus_is_reported_as_off_but_never_verified(monkeypatch):
     assert "AV_SIGNATURE_SCAN_OFF" in scan["verification_limitations"]
     assert "CLAMAV_UNAVAILABLE" not in scan["verification_limitations"]
     assert scan["verdict"] == "clean_with_limitations"
+
+
+def test_signature_av_requirement_follows_the_provider(monkeypatch):
+    monkeypatch.setattr(settings, "av_required", None)
+    monkeypatch.setattr(settings, "av_provider", "metadefender")
+    assert settings.signature_av_required() is False
+    monkeypatch.setattr(settings, "av_provider", "clamav_rest")
+    assert settings.signature_av_required() is True
+    monkeypatch.setattr(settings, "av_required", False)
+    assert settings.signature_av_required() is False

@@ -172,7 +172,14 @@ class Settings(BaseSettings):
     # MetaDefender hash lookup plus threat intelligence, no ClamAV server). A missing
     # antivirus result is then AV_SIGNATURE_SCAN_OFF instead of CLAMAV_UNAVAILABLE. It is
     # still a limitation: without a signature scan a dataset is never clean_verified.
-    av_required: bool = True
+    # Unset = decided by AV_PROVIDER: a signature engine (clamav*) is required, a
+    # hash-lookup provider (metadefender) is not, so no dashboard change is needed.
+    av_required: bool | None = None
+
+    def signature_av_required(self) -> bool:
+        if self.av_required is not None:
+            return bool(self.av_required)
+        return (self.av_provider or "").strip().lower().startswith("clamav")
     clamav_api_url: str = "http://localhost:3000"
     clamav_mock_mode: bool = False
     # Bearer token for the authenticated HTTPS ClamAV gateway on the owner's VM.

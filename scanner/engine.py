@@ -194,7 +194,8 @@ def _determine_verdict(
     all_findings = content_result.findings + heur_findings + yara_findings
 
     if not clamav_result.available:
-        code = "CLAMAV_UNAVAILABLE" if getattr(settings, "av_required", True) is not False else "AV_SIGNATURE_SCAN_OFF"
+        required = settings.signature_av_required() if hasattr(settings, "signature_av_required") else True
+        code = "CLAMAV_UNAVAILABLE" if required is not False else "AV_SIGNATURE_SCAN_OFF"
         if code not in limitations:
             limitations.append(code)
 
