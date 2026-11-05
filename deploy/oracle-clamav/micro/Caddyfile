@@ -1,0 +1,36 @@
+# HTTPS front for the micro-VM gateway. {$SCAN_DOMAIN} is <reserved-ip>.sslip.io;
+# the certificate comes from Let's Encrypt over TLS-ALPN on 443 (port 80 stays closed).
+{
+	servers {
+		protocols h1 h2
+	}
+}
+
+{$SCAN_DOMAIN} {
+	request_body {
+		max_size 51MiB
+	}
+
+	@allowed path /healthz /api/v1/version /api/v1/scan
+	handle @allowed {
+		reverse_proxy 127.0.0.1:8080 {
+			transport http {
+				read_timeout 180s
+				write_timeout 180s
+			}
+		}
+	}
+	handle {
+		respond 404
+	}
+
+	log {
+		output stdout
+		format filter {
+			wrap console
+			fields {
+				request>headers>Authorization replace REDACTED
+			}
+		}
+	}
+}

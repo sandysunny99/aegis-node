@@ -1,0 +1,20 @@
+[Unit]
+Description=Aegis scan gateway (127.0.0.1:8080 -> clamd Unix socket)
+After=network-online.target clamd@scan.service
+Wants=clamd@scan.service
+
+[Service]
+EnvironmentFile=/etc/aegis-gateway.env
+ExecStart=/usr/bin/python3 /opt/aegis-gateway/clamd_gateway.py
+User=clamscan
+Group=clamscan
+Restart=always
+RestartSec=5
+MemoryMax=96M
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target
